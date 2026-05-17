@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; connect-src 'self' https://hqzugbxutgefjilgmxqu.supabase.co https://*.supabase.co data: blob:;">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PawketPetsVT — Register</title>
+  <link rel="stylesheet" href="css/style.css?t=12345" />
+  <link rel="stylesheet" href="css/style-additions.css?t=12345" />
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-hero">
+      <div class="sparkle-row">✦ ✧ ✦</div>
+      <h1>Join PawketPetsVT!</h1>
+      <p>Create your account and start your pet collection adventure ✨</p>
+    </div>
+    <div class="form-card">
+      <h2>🌟 Register</h2>
+      <p class="form-subtitle">Already have an account? <a href="login.html">Login here!</a></p>
+      <div class="alert alert-error" id="reg-error"></div>
+      <div class="alert alert-success" id="reg-success"></div>
+      <div class="form-group"><label>Username</label><input type="text" id="username" placeholder="CoolPetTrainer123" maxlength="30" /></div>
+      <div class="form-group"><label>Email Address</label><input type="email" id="email" placeholder="your@email.com" autocomplete="email" /></div>
+      <div class="form-group"><label>Password</label><input type="password" id="password" placeholder="At least 6 characters" autocomplete="new-password" /></div>
+      <div class="form-group"><label>Confirm Password</label><input type="password" id="confirm-password" placeholder="••••••••" /></div>
+      <button class="btn btn-primary btn-lg form-submit" id="reg-btn" onclick="handleRegister()">🌟 Create Account</button>
+      <div class="form-footer">Already have an account? <a href="login.html">Login!</a></div>
+    </div>
+  </div>
+  <footer class="footer"><div class="footer-sparkles">✦ ✧ ★ ✦ ✧ ★ ✦</div><p>© 2025 PawketPetsVT &nbsp;|&nbsp; Made with 💖</p></footer>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/shared.js"></script>
+  <script>
+    injectShared('');
+    redirectIfLoggedIn();
+    async function handleRegister() {
+      var username = document.getElementById('username').value.trim();
+      var email = document.getElementById('email').value.trim();
+      var password = document.getElementById('password').value;
+      var confirm = document.getElementById('confirm-password').value;
+      var btn = document.getElementById('reg-btn');
+      var errorEl = document.getElementById('reg-error');
+      var successEl = document.getElementById('reg-success');
+      errorEl.classList.remove('show'); successEl.classList.remove('show');
+      if (!username || !email || !password || !confirm) { errorEl.textContent = 'Please fill in all fields!'; errorEl.classList.add('show'); return; }
+      if (username.length < 3) { errorEl.textContent = 'Username must be at least 3 characters!'; errorEl.classList.add('show'); return; }
+      if (password.length < 6) { errorEl.textContent = 'Password must be at least 6 characters!'; errorEl.classList.add('show'); return; }
+      if (password !== confirm) { errorEl.textContent = 'Passwords do not match!'; errorEl.classList.add('show'); return; }
+      btn.textContent = '🌟 Creating account...'; btn.disabled = true;
+      try {
+        await registerUser(email, password, username);
+        successEl.innerHTML = 'Account created! 🎉<br><small>Now <a href="login.html">login here</a> to start playing!</small>';
+        successEl.classList.add('show'); btn.textContent = '✅ Account Created!';
+      } catch(err) {
+        errorEl.textContent = err.message || 'Registration failed.'; errorEl.classList.add('show');
+        btn.textContent = '🌟 Create Account'; btn.disabled = false;
+      }
+    }
+    document.addEventListener('keydown', function(e) { if (e.key === 'Enter') handleRegister(); });
+  </script>
+</body>
+</html>

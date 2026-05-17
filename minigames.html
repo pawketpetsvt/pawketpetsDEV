@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; connect-src 'self' https://hqzugbxutgefjilgmxqu.supabase.co https://*.supabase.co data: blob:;">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PawketPetsVT — Minigames</title>
+  <link rel="stylesheet" href="css/style.css?t=12345" />
+  <link rel="stylesheet" href="css/style-additions.css?t=12345" />
+  <style>
+    .games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 28px; margin-top: 24px; }
+    .game-card { background: var(--white); border: 2.5px solid var(--border); border-radius: var(--radius-lg); padding: 28px 24px; box-shadow: 0 6px 24px var(--shadow); display: flex; flex-direction: column; gap: 16px; }
+    .game-title { font-family: 'Fredoka One', cursive; font-size: 1.4rem; color: var(--purple-dark); display: flex; align-items: center; gap: 10px; }
+    .game-desc { font-size: 0.9rem; color: var(--text-light); line-height: 1.5; }
+    .game-reward { font-family: 'Fredoka One', cursive; font-size: 0.9rem; color: var(--purple); background: var(--purple-light); padding: 4px 12px; border-radius: 20px; display: inline-block; }
+    .game-area { background: var(--cream); border: 2px solid var(--border); border-radius: var(--radius); padding: 20px; text-align: center; }
+    .game-result { font-family: 'Fredoka One', cursive; font-size: 1.1rem; min-height: 28px; margin-top: 10px; transition: opacity 0.3s; }
+    .cooldown-msg { font-size: 0.85rem; color: var(--text-light); font-weight: 700; background: #f5f0ff; border: 2px solid var(--border); border-radius: var(--radius); padding: 8px 14px; text-align: center; }
+
+    /* ── Dice game ── */
+    .dice-wrap { display: flex; justify-content: center; gap: 20px; margin: 12px 0; }
+    .die { width: 70px; height: 70px; background: var(--white); border: 3px solid var(--purple); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 2.8rem; box-shadow: 0 4px 12px var(--shadow); transition: transform 0.3s; }
+    .die.rolling { animation: diceroll 0.5s ease infinite alternate; }
+    @keyframes diceroll { from { transform: rotate(-15deg) scale(0.95); } to { transform: rotate(15deg) scale(1.05); } }
+
+    /* ── Guess the number ── */
+    .guess-input { width: 100px; padding: 10px; border: 2.5px solid var(--border); border-radius: var(--radius); font-family: 'Fredoka One', cursive; font-size: 1.3rem; text-align: center; outline: none; transition: border-color 0.2s; }
+    .guess-input:focus { border-color: var(--purple); }
+    .attempts-left { font-size: 0.82rem; color: var(--text-light); font-weight: 700; margin-top: 6px; }
+
+    /* ── Memory match ── */
+    .memory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-width: 280px; margin: 0 auto 12px; }
+    .memory-card { height: 60px; background: linear-gradient(135deg, var(--purple), var(--pink)); border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; transition: transform 0.2s; border: none; box-shadow: 0 2px 8px var(--shadow); }
+    .memory-card.flipped, .memory-card.matched { background: var(--white); border: 2.5px solid var(--border); }
+    .memory-card.matched { border-color: var(--green); background: #f0fff4; cursor: default; }
+    .memory-card:hover:not(.matched):not(:disabled) { transform: scale(1.05); }
+    .memory-stats { display: flex; justify-content: center; gap: 20px; font-family: 'Fredoka One', cursive; font-size: 0.95rem; color: var(--text-light); }
+  </style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-hero">
+      <div class="sparkle-row">🎮 ✦ 🎮</div>
+      <h1>Minigames</h1>
+      <p>Play daily games to earn PawketPoints for your pets! 🪙</p>
+    </div>
+    <div class="points-banner">
+      <span class="pb-label">🪙 Your PawketPoints</span>
+      <span class="pb-amount" id="points-display">0 PP</span>
+    </div>
+
+    <div class="games-grid">
+
+      <!-- ── DICE ROLLER ── -->
+      <div class="game-card">
+        <div class="game-title">🎲 Lucky Dice</div>
+        <div class="game-desc">Roll two dice once per day! Whatever you roll is how many PawketPoints you earn. Get a double and earn triple!</div>
+        <span class="game-reward">Up to 12 PP per day</span>
+        <div class="game-area">
+          <div class="dice-wrap">
+            <div class="die" id="die1">🎲</div>
+            <div class="die" id="die2">🎲</div>
+          </div>
+          <div id="dice-cooldown" class="cooldown-msg" style="display:none"></div>
+          <button class="btn btn-primary" id="roll-btn" onclick="rollDice()">🎲 Roll the Dice!</button>
+          <div class="game-result" id="dice-result"></div>
+        </div>
+      </div>
+
+      <!-- ── GUESS THE NUMBER ── -->
+      <div class="game-card">
+        <div class="game-title">🔮 Guess the Number</div>
+        <div class="game-desc">I'm thinking of a number between 1 and 10. You have 3 guesses. Get it right and win 25 PP! One attempt per day.</div>
+        <span class="game-reward">25 PP if correct</span>
+        <div class="game-area">
+          <div id="guess-cooldown" class="cooldown-msg" style="display:none"></div>
+          <div id="guess-play">
+            <input type="number" class="guess-input" id="guess-input" min="1" max="10" placeholder="?" onkeydown="if(event.key==='Enter')makeGuess()" />
+            <br><br>
+            <button class="btn btn-primary" onclick="makeGuess()">🔮 Guess!</button>
+            <div class="attempts-left" id="attempts-left">3 guesses remaining</div>
+          </div>
+          <div class="game-result" id="guess-result"></div>
+        </div>
+      </div>
+
+      <!-- ── MEMORY MATCH ── -->
+      <div class="game-card" style="grid-column: 1 / -1;">
+        <div class="game-title">🃏 Memory Match</div>
+        <div class="game-desc">Match all 6 pairs of cards! Earn 5 PP per matched pair (up to 30 PP). You get 15 attempts. One full game per day.</div>
+        <span class="game-reward">Up to 30 PP per day</span>
+        <div class="game-area">
+          <div id="memory-cooldown" class="cooldown-msg" style="display:none"></div>
+          <div id="memory-play">
+            <div class="memory-stats">
+              <span>Matches: <strong id="match-count">0</strong>/6</span>
+              <span>Tries left: <strong id="tries-left">15</strong></span>
+              <span>Earned: <strong id="memory-earned">0</strong> PP</span>
+            </div>
+            <div class="memory-grid" id="memory-grid"></div>
+            <button class="btn btn-outline btn-sm" onclick="initMemory()">🔄 New Game</button>
+          </div>
+          <div class="game-result" id="memory-result"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer class="footer"><div class="footer-sparkles">✦ ✧ ★ ✦ ✧ ★ ✦</div><p>© 2025 PawketPetsVT &nbsp;|&nbsp; Made with 💖</p></footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/shared.js"></script>
+  <script>
+    injectShared('minigames');
+    var currentUser = null, currentPoints = 0;
+    var today = new Date().toISOString().split('T')[0];
+
+    // ── Cooldown helpers ──
+    function getCooldownKey(game, userId) { return 'game_' + game + '_' + userId + '_' + today; }
+    function isOnCooldown(game) { return localStorage.getItem(getCooldownKey(game, currentUser.id)) === 'done'; }
+    function setCooldown(game) { localStorage.setItem(getCooldownKey(game, currentUser.id), 'done'); }
+
+    // ── Award PP ──
+    async function awardPoints(amount) {
+      var newPoints = currentPoints + amount;
+      var res = await supabaseClient.from('players').update({pawketpoints: newPoints}).eq('id', currentUser.id);
+      if (!res.error) { currentPoints = newPoints; updatePointsDisplay(); }
+      return !res.error;
+    }
+
+    function updatePointsDisplay() {
+      var el = document.getElementById('points-display'); if (el) el.textContent = currentPoints + ' PP';
+      var nav = document.getElementById('nav-points'); if (nav) nav.textContent = '🪙 ' + currentPoints + ' PP';
+    }
+
+    // ══════════════════════════════
+    // 🎲 DICE ROLLER
+    // ══════════════════════════════
+    var diceValues = [1,2,3,4,5,6];
+    var diceFaces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+
+    async function rollDice() {
+      if (isOnCooldown('dice')) return;
+      var btn = document.getElementById('roll-btn');
+      var d1 = document.getElementById('die1');
+      var d2 = document.getElementById('die2');
+      var result = document.getElementById('dice-result');
+
+      btn.disabled = true;
+      d1.classList.add('rolling'); d2.classList.add('rolling');
+      result.textContent = ''; result.style.opacity = '0';
+
+      // Animate for 1.2s
+      var rollInterval = setInterval(function() {
+        d1.textContent = diceFaces[Math.floor(Math.random()*6)];
+        d2.textContent = diceFaces[Math.floor(Math.random()*6)];
+      }, 100);
+
+      setTimeout(async function() {
+        clearInterval(rollInterval);
+        d1.classList.remove('rolling'); d2.classList.remove('rolling');
+
+        var v1 = diceValues[Math.floor(Math.random()*6)];
+        var v2 = diceValues[Math.floor(Math.random()*6)];
+        d1.textContent = diceFaces[v1-1];
+        d2.textContent = diceFaces[v2-1];
+
+        var total = v1 + v2;
+        var isDouble = v1 === v2;
+        var earned = isDouble ? total * 3 : total;
+
+        await awardPoints(earned);
+        setCooldown('dice');
+
+        result.style.opacity = '1';
+        if (isDouble) {
+          result.textContent = '🎉 DOUBLE ' + v1 + 's! Triple points! +' + earned + ' PP!';
+          result.style.color = '#b06aff';
+        } else {
+          result.textContent = 'You rolled ' + v1 + ' + ' + v2 + ' = ' + total + '! +' + earned + ' PP!';
+          result.style.color = '#5dde7a';
+        }
+
+        btn.style.display = 'none';
+        document.getElementById('dice-cooldown').style.display = 'block';
+        document.getElementById('dice-cooldown').textContent = '✅ Come back tomorrow for another roll!';
+      }, 1200);
+    }
+
+    // ══════════════════════════════
+    // 🔮 GUESS THE NUMBER
+    // ══════════════════════════════
+    var secretNumber = 0, guessesLeft = 3;
+
+    function initGuess() {
+      secretNumber = Math.floor(Math.random() * 10) + 1;
+      guessesLeft = 3;
+      document.getElementById('guess-input').value = '';
+      document.getElementById('guess-result').textContent = '';
+      document.getElementById('attempts-left').textContent = '3 guesses remaining';
+    }
+
+    async function makeGuess() {
+      if (isOnCooldown('guess')) return;
+      var input = document.getElementById('guess-input');
+      var guess = parseInt(input.value);
+      var result = document.getElementById('guess-result');
+      var attemptsEl = document.getElementById('attempts-left');
+
+      if (!guess || guess < 1 || guess > 10) {
+        result.textContent = 'Enter a number between 1 and 10!'; result.style.color = '#ff6eb4'; return;
+      }
+
+      guessesLeft--;
+
+      if (guess === secretNumber) {
+        await awardPoints(25);
+        setCooldown('guess');
+        result.textContent = '🎉 Correct! The number was ' + secretNumber + '! +25 PP!';
+        result.style.color = '#5dde7a';
+        document.getElementById('guess-play').style.display = 'none';
+        document.getElementById('guess-cooldown').style.display = 'block';
+        document.getElementById('guess-cooldown').textContent = '✅ Come back tomorrow to play again!';
+      } else if (guessesLeft === 0) {
+        setCooldown('guess');
+        result.textContent = '😢 The number was ' + secretNumber + '. Better luck tomorrow!';
+        result.style.color = '#ff6eb4';
+        document.getElementById('guess-play').style.display = 'none';
+        document.getElementById('guess-cooldown').style.display = 'block';
+        document.getElementById('guess-cooldown').textContent = '✅ Come back tomorrow to try again!';
+      } else {
+        var hint = guess < secretNumber ? 'Too low! 📈' : 'Too high! 📉';
+        result.textContent = hint + ' ' + guessesLeft + ' guess' + (guessesLeft === 1 ? '' : 'es') + ' left.';
+        result.style.color = '#ff9f43';
+        attemptsEl.textContent = guessesLeft + ' guess' + (guessesLeft === 1 ? '' : 'es') + ' remaining';
+        input.value = ''; input.focus();
+      }
+    }
+
+    // ══════════════════════════════
+    // 🃏 MEMORY MATCH
+    // ══════════════════════════════
+    var memoryEmojis = ['🐾','🌟','💖','⚡','🍖','🎾'];
+    var memoryCards = [], flippedCards = [], matchedPairs = 0, triesLeft = 15, memoryEarned = 0, memoryLocked = false;
+
+    function shuffle(arr) {
+      var a = arr.slice();
+      for (var i = a.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+      }
+      return a;
+    }
+
+    function initMemory() {
+      if (isOnCooldown('memory')) return;
+      var pairs = memoryEmojis.concat(memoryEmojis);
+      memoryCards = shuffle(pairs);
+      flippedCards = []; matchedPairs = 0; triesLeft = 15; memoryEarned = 0; memoryLocked = false;
+      document.getElementById('match-count').textContent = '0';
+      document.getElementById('tries-left').textContent = '15';
+      document.getElementById('memory-earned').textContent = '0';
+      document.getElementById('memory-result').textContent = '';
+
+      var grid = document.getElementById('memory-grid');
+      grid.innerHTML = '';
+      memoryCards.forEach(function(emoji, idx) {
+        var btn = document.createElement('button');
+        btn.className = 'memory-card';
+        btn.dataset.idx = idx;
+        btn.dataset.emoji = emoji;
+        btn.textContent = '';
+        btn.onclick = function() { flipCard(this); };
+        grid.appendChild(btn);
+      });
+    }
+
+    function flipCard(btn) {
+      if (memoryLocked) return;
+      if (btn.classList.contains('flipped') || btn.classList.contains('matched')) return;
+      if (flippedCards.length >= 2) return;
+
+      btn.textContent = btn.dataset.emoji;
+      btn.classList.add('flipped');
+      flippedCards.push(btn);
+
+      if (flippedCards.length === 2) {
+        memoryLocked = true;
+        triesLeft--;
+        document.getElementById('tries-left').textContent = triesLeft;
+
+        if (flippedCards[0].dataset.emoji === flippedCards[1].dataset.emoji) {
+          // Match!
+          flippedCards[0].classList.add('matched'); flippedCards[1].classList.add('matched');
+          flippedCards[0].classList.remove('flipped'); flippedCards[1].classList.remove('flipped');
+          matchedPairs++;
+          memoryEarned += 5;
+          document.getElementById('match-count').textContent = matchedPairs;
+          document.getElementById('memory-earned').textContent = memoryEarned;
+          flippedCards = []; memoryLocked = false;
+
+          if (matchedPairs === 6) {
+            // All matched!
+            awardPoints(memoryEarned);
+            setCooldown('memory');
+            var res = document.getElementById('memory-result');
+            res.textContent = '🎉 All matched! You earned ' + memoryEarned + ' PP!';
+            res.style.color = '#5dde7a';
+            document.getElementById('memory-cooldown').style.display = 'block';
+            document.getElementById('memory-cooldown').textContent = '✅ Come back tomorrow to play again!';
+          }
+        } else {
+          // No match — flip back after delay
+          setTimeout(function() {
+            flippedCards[0].textContent = ''; flippedCards[0].classList.remove('flipped');
+            flippedCards[1].textContent = ''; flippedCards[1].classList.remove('flipped');
+            flippedCards = []; memoryLocked = false;
+
+            if (triesLeft === 0 && matchedPairs < 6) {
+              // Out of tries
+              awardPoints(memoryEarned);
+              setCooldown('memory');
+              var res = document.getElementById('memory-result');
+              res.textContent = 'Out of tries! You matched ' + matchedPairs + '/6 and earned ' + memoryEarned + ' PP.';
+              res.style.color = '#ff9f43';
+              document.getElementById('memory-cooldown').style.display = 'block';
+              document.getElementById('memory-cooldown').textContent = '✅ Come back tomorrow to try again!';
+              // Reveal all cards
+              document.querySelectorAll('.memory-card:not(.matched)').forEach(function(c){ c.textContent = c.dataset.emoji; c.disabled = true; });
+            }
+          }, 900);
+        }
+      }
+    }
+
+    // ══════════════════════════════
+    // INIT
+    // ══════════════════════════════
+    async function init() {
+      var session = await requireLogin(); if (!session) return;
+      await updateNav(); currentUser = session.user;
+      var pr = await supabaseClient.from('players').select('pawketpoints').eq('id', currentUser.id).single();
+      if (pr.data) { currentPoints = pr.data.pawketpoints; updatePointsDisplay(); }
+
+      // Check cooldowns and set up games
+      if (isOnCooldown('dice')) {
+        document.getElementById('roll-btn').style.display = 'none';
+        document.getElementById('dice-cooldown').style.display = 'block';
+        document.getElementById('dice-cooldown').textContent = '✅ Already played today! Come back tomorrow.';
+        document.getElementById('die1').textContent = '🎲'; document.getElementById('die2').textContent = '🎲';
+      }
+
+      if (isOnCooldown('guess')) {
+        document.getElementById('guess-play').style.display = 'none';
+        document.getElementById('guess-cooldown').style.display = 'block';
+        document.getElementById('guess-cooldown').textContent = '✅ Already played today! Come back tomorrow.';
+      } else {
+        initGuess();
+      }
+
+      if (isOnCooldown('memory')) {
+        document.getElementById('memory-play').style.display = 'none';
+        document.getElementById('memory-cooldown').style.display = 'block';
+        document.getElementById('memory-cooldown').textContent = '✅ Already played today! Come back tomorrow.';
+      } else {
+        initMemory();
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

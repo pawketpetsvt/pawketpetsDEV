@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; connect-src 'self' https://hqzugbxutgefjilgmxqu.supabase.co https://*.supabase.co https://id.twitch.tv https://api.twitch.tv data: blob:;">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PawketPetsVT — Link Twitch</title>
+  <link rel="stylesheet" href="css/style.css?t=12345" />
+  <link rel="stylesheet" href="css/style-additions.css?t=12345" />
+  <style>
+    .twitch-card { background: var(--white); border: 2.5px solid var(--border); border-radius: var(--radius-lg); padding: 36px; box-shadow: 0 6px 24px var(--shadow); max-width: 520px; margin: 0 auto; text-align: center; }
+    .twitch-card h2 { color: var(--purple-dark); margin-bottom: 10px; }
+    .twitch-card p { color: var(--text-light); line-height: 1.6; margin-bottom: 20px; }
+    .btn-twitch { background: #9146ff; color: white; font-family: 'Fredoka One', cursive; font-size: 1.1rem; padding: 12px 32px; border-radius: 30px; border: none; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; display: inline-flex; align-items: center; gap: 10px; }
+    .btn-twitch:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(145,70,255,0.4); }
+    .linked-panel { background: linear-gradient(135deg, var(--purple-light), var(--pink-light)); border: 2.5px solid var(--border); border-radius: var(--radius-lg); padding: 24px; margin-top: 20px; }
+    .linked-panel h3 { color: var(--purple-dark); margin-bottom: 8px; }
+    .reward-list { list-style: none; padding: 0; margin: 12px 0; }
+    .reward-list li { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.95rem; color: var(--text); display: flex; align-items: center; gap: 8px; }
+    .reward-list li:last-child { border-bottom: none; }
+    .status-badge { display: inline-block; font-family: 'Fredoka One', cursive; font-size: 0.75rem; padding: 2px 10px; border-radius: 20px; }
+    .status-done { background: var(--green); color: white; }
+    .status-pending { background: var(--yellow); color: var(--text); }
+    .token-box { background: var(--cream); border: 2.5px solid var(--purple); border-radius: var(--radius-lg); padding: 20px; margin: 0 auto 24px; max-width: 520px; text-align: center; }
+    .token-box h3 { color: var(--purple-dark); font-family: 'Fredoka One', cursive; margin-bottom: 8px; }
+    .token-box p { font-size: 0.85rem; color: var(--text-light); margin-bottom: 12px; }
+    .token-textarea { width: 100%; height: 70px; border: 2px solid var(--border); border-radius: 10px; padding: 8px; font-size: 0.72rem; font-family: monospace; resize: none; background: var(--white); color: var(--text); }
+    .btn-copy { background: linear-gradient(135deg, var(--purple), var(--pink)); color: white; border: none; padding: 8px 20px; border-radius: 20px; font-family: 'Fredoka One', cursive; font-size: 0.95rem; cursor: pointer; margin-top: 10px; transition: transform 0.15s; }
+    .btn-copy:hover { transform: translateY(-2px); }
+  </style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-hero">
+      <div class="sparkle-row">&#128995; &#10022; &#128995;</div>
+      <h1>Link Your Twitch</h1>
+      <p>Connect your Twitch account to earn PawketPoints for watching streams! &#10024;</p>
+    </div>
+
+    <!-- Token display box — shown after OAuth redirect, hidden by default -->
+    <div class="token-box" id="token-box" style="display:none">
+      <h3>&#10003; Authorization Successful!</h3>
+      <p>If you are a streamer setting up Cloudflare, copy this token and add it as a secret in your Worker. Viewers can ignore this box.</p>
+      <textarea class="token-textarea" id="token-display" readonly></textarea>
+      <br>
+      <button class="btn-copy" onclick="copyToken()">Copy Token</button>
+      <p style="margin-top:10px;font-size:0.8rem;color:var(--text-light);">Add this as BROADCASTER_TOKEN_EMBERTAIL or BROADCASTER_TOKEN_PYXSHUUL in Cloudflare Workers secrets.</p>
+    </div>
+
+    <div class="twitch-card">
+      <h2>Connect Twitch Account</h2>
+      <p>Link your Twitch account to unlock stream rewards! Earn PawketPoints for following our streamers and watching live.</p>
+
+      <div id="twitch-not-linked">
+        <button class="btn-twitch" onclick="linkTwitch()">&#128995; Connect with Twitch</button>
+        <p style="margin-top:16px;font-size:0.85rem;color:var(--text-light);">We only read your public Twitch info. We never post on your behalf.</p>
+      </div>
+
+      <div id="twitch-linked" style="display:none">
+        <div class="linked-panel">
+          <h3>&#10003; Twitch Linked!</h3>
+          <p style="color:var(--text-light);font-size:0.9rem;">Connected as: <strong id="twitch-username" style="color:var(--purple-dark)"></strong></p>
+          <ul class="reward-list">
+            <li>&#128995; Follow Embertail <span class="status-badge" id="follow-ember-badge" style="display:none"></span></li>
+            <li>&#128995; Follow Pyxshuul <span class="status-badge" id="follow-pyxs-badge" style="display:none"></span></li>
+            <li>&#129689; +50 PP for each follow (one time)</li>
+          </ul>
+          <button class="btn btn-primary" id="check-follows-btn" onclick="checkFollows()">Check Follows and Claim Rewards</button>
+        </div>
+        <br>
+        <button class="btn btn-outline btn-sm" onclick="unlinkTwitch()">Unlink Twitch</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer"><div class="footer-sparkles">&#10022; &#10023; &#9733; &#10022; &#10023; &#9733; &#10022;</div><p>&#169; 2026 PawketPetsVT &nbsp;|&nbsp; Made with &#128150;</p></footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/twitch.js"></script>
+  <script>
+    injectShared('twitch');
+
+    function copyToken() {
+      var ta = document.getElementById('token-display');
+      ta.select();
+      document.execCommand('copy');
+      var btn = document.querySelector('.btn-copy');
+      if (btn) { btn.textContent = 'Copied!'; setTimeout(function(){ btn.textContent = 'Copy Token'; }, 2000); }
+    }
+
+    (async function() {
+      var session = await requireLogin();
+      if (!session) return;
+      await updateNav();
+
+      // Check if returning from Twitch OAuth
+      var hash = window.location.hash;
+      if (hash && hash.includes('access_token')) {
+
+        // Extract token and show it BEFORE processing
+        var params = {};
+        hash.substring(1).split('&').forEach(function(part) {
+          var pair = part.split('=');
+          params[pair[0]] = decodeURIComponent(pair[1] || '');
+        });
+
+        var token = params['access_token'];
+        if (token) {
+          // Show token box for broadcaster setup
+          document.getElementById('token-display').value = token;
+          document.getElementById('token-box').style.display = 'block';
+        }
+
+        // Process the callback to save to Supabase
+        await handleTwitchCallback(hash);
+
+        // Clear hash from URL so it doesn't show
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
+      await checkTwitchLinked();
+    })();
+  </script>
+</body>
+</html>

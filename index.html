@@ -1,0 +1,2515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="google-site-verification" content="PNDqKN38mIuTzp6-ZSfQpOxNB7cyucgDPtgeEQhvjQ4" />
+  <!-- Updated: Profile System v1.0 -->
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; connect-src 'self' https://hqzugbxutgefjilgmxqu.supabase.co https://*.supabase.co https://id.twitch.tv https://api.twitch.tv https://www.googletagmanager.com https://www.google-analytics.com data: blob:;">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="images/favicon.png" />
+  
+  <!-- SEO Meta Tags -->
+  <title>PawketPetsVT - Adopt Your Favorite VTuber's Digital Pet!</title>
+  <meta name="description" content="Adopt digital pets of your favorite VTubers! Play minigames, battle friends, earn rewards by watching Embertail & Pyxshuul's Twitch streams. Free virtual pet game with live Twitch integration.">
+  <meta name="keywords" content="virtual pet game, vtuber game, twitch game, pet simulator, online pet game, embertail, pyxshuul, pawketpets, digital pets, browser game, free game">
+  <meta name="author" content="PawketPetsVT">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://pawketpetsvt.github.io/">
+  
+  <!-- Open Graph / Facebook / Discord -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pawketpetsvt.github.io/">
+  <meta property="og:title" content="PawketPetsVT - Adopt Your Favorite VTuber's Pet!">
+  <meta property="og:description" content="Free virtual pet game! Adopt Embertail or Pyxshuul, play minigames, battle friends, and earn rewards watching Twitch streams.">
+  <meta property="og:image" content="https://pawketpetsvt.github.io/images/social-preview.png">
+  <meta property="og:site_name" content="PawketPetsVT">
+  
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://pawketpetsvt.github.io/">
+  <meta name="twitter:title" content="PawketPetsVT - VTuber Virtual Pet Game">
+  <meta name="twitter:description" content="Adopt Embertail & Pyxshuul! Earn rewards watching streams, battle friends, play minigames. Free!">
+  <meta name="twitter:image" content="https://pawketpetsvt.github.io/images/twitter-card.png">
+  
+  <!-- Theme Color -->
+  <meta name="theme-color" content="#b06aff">
+  
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-0BZB5MHSLQ"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-0BZB5MHSLQ');
+  </script>
+  
+  <link rel="stylesheet" href="style.css?v=20260504215426">
+
+  <!-- Tutorial System Styles -->
+  <style>
+/* ═══════════════════════════════════════════════════════════
+   TUTORIAL SYSTEM STYLES
+   ═══════════════════════════════════════════════════════════ */
+.tutorial-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:999999;pointer-events:none}
+.tutorial-backdrop{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(2px);pointer-events:none}
+.tutorial-mascot{position:fixed;right:100px;bottom:280px;z-index:1000001;text-align:center;pointer-events:none;animation:tutorial-mascot-bounce 2s ease-in-out infinite}
+.tutorial-mascot-image{width:180px;height:180px;object-fit:contain;filter:drop-shadow(0 8px 24px rgba(0,0,0,0.3));animation:tutorial-mascot-float 3s ease-in-out infinite}
+.tutorial-mascot-name{font-family:'Chewy',cursive;font-size:1.2rem;color:#fff;margin-top:12px;text-shadow:0 2px 8px rgba(0,0,0,0.5)}
+.tutorial-mascot-excited .tutorial-mascot-image{animation:tutorial-mascot-excited 0.5s ease-in-out infinite}
+.tutorial-mascot-concerned .tutorial-mascot-image{filter:drop-shadow(0 8px 24px rgba(255,165,0,0.3))}
+.tutorial-mascot-worried .tutorial-mascot-image{filter:drop-shadow(0 8px 24px rgba(255,100,100,0.3))}
+.tutorial-mascot-scared .tutorial-mascot-image{filter:drop-shadow(0 8px 24px rgba(255,0,0,0.5));animation:tutorial-mascot-shake 0.3s ease-in-out infinite}
+.tutorial-mascot-serious .tutorial-mascot-image{filter:grayscale(0.3) drop-shadow(0 8px 24px rgba(100,0,150,0.4))}
+.tutorial-dialogue-box{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);width:90%;max-width:700px;z-index:1000002;background:linear-gradient(135deg,#fff,#fff5ff);border:4px solid var(--purple);border-radius:24px;padding:30px;box-shadow:0 12px 48px rgba(153,102,255,0.4);animation:tutorial-dialogue-enter 0.3s ease-out;pointer-events:all}
+.tutorial-dialogue-content{position:relative}
+.tutorial-dialogue-text{font-family:'Chewy',cursive;font-size:1.3rem;color:var(--purple-dark);line-height:1.6;margin-bottom:20px;min-height:80px}
+.tutorial-progress{display:flex;justify-content:center;gap:8px;margin-bottom:20px}
+.tutorial-dot{width:10px;height:10px;border-radius:50%;background:var(--purple-light);opacity:0.3;transition:all 0.3s}
+.tutorial-dot.active{opacity:1;background:var(--purple);transform:scale(1.3)}
+.tutorial-buttons{display:flex;gap:12px;justify-content:flex-end;align-items:center}
+.tutorial-skip{background:transparent!important;color:var(--purple)!important;border:none!important;font-size:0.95rem!important;opacity:0.7}
+.tutorial-skip:hover{opacity:1;text-decoration:underline}
+.tutorial-next{min-width:140px}
+.tutorial-next:disabled{opacity:0.5;cursor:not-allowed}
+.tutorial-choice-buttons{display:flex;flex-direction:column;gap:12px;width:100%}
+.tutorial-choice-buttons .btn{width:100%;padding:16px 24px;font-size:1.1rem}
+@keyframes tutorial-dialogue-enter{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes tutorial-mascot-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes tutorial-mascot-float{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-15px) rotate(3deg)}}
+@keyframes tutorial-mascot-excited{0%,100%{transform:scale(1) rotate(0)}25%{transform:scale(1.1) rotate(-5deg)}75%{transform:scale(1.1) rotate(5deg)}}
+@keyframes tutorial-mascot-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+body.night-mode .tutorial-dialogue-box{background:linear-gradient(135deg,#2a2440,#3a3050);border-color:#9966ff;box-shadow:0 12px 48px rgba(153,102,255,0.6)}
+body.night-mode .tutorial-dialogue-text{color:#e8d5ff}
+body.night-mode .tutorial-dot{background:#9966ff}
+body.night-mode .tutorial-dot.active{background:#b589ff}
+body.night-mode .tutorial-skip{color:#b589ff!important}
+@media (max-width:768px){.tutorial-mascot{right:20px;bottom:220px;transform:scale(0.7)}.tutorial-mascot-image{font-size:6rem}.tutorial-dialogue-box{bottom:20px;width:95%;padding:20px}.tutorial-dialogue-text{font-size:1.1rem;min-height:60px}.tutorial-buttons{flex-direction:column;gap:8px}.tutorial-skip,.tutorial-next{width:100%}}
+@media (max-width:480px){.tutorial-mascot{right:10px;bottom:200px;transform:scale(0.5)}.tutorial-dialogue-text{font-size:1rem}}
+.settings-modal-item{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:24px;background:var(--cream);border:3px solid var(--purple);border-radius:16px;box-shadow:0 4px 12px rgba(153,102,255,0.2)}
+.settings-modal-label{flex:1}
+.settings-modal-label strong{font-size:1.3rem;color:var(--purple);display:block}
+.settings-modal-label p{font-size:0.9rem;color:var(--text-light);margin:4px 0 0 0}
+.toggle-switch{position:relative;display:inline-block;width:60px;height:34px;cursor:pointer;flex-shrink:0}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;top:0;left:0;right:0;bottom:0;background-color:#ccc;border-radius:34px;transition:0.3s}
+.toggle-slider:before{position:absolute;content:"";height:26px;width:26px;left:4px;bottom:4px;background-color:white;border-radius:50%;transition:0.3s}
+.toggle-switch input:checked+.toggle-slider{background:linear-gradient(135deg,var(--purple),var(--pink))}
+.toggle-switch input:checked+.toggle-slider:before{transform:translateX(26px)}
+body.night-mode .settings-modal-item{background:rgba(153,102,255,0.15);border-color:#9966ff}
+body.night-mode .settings-modal-label strong{color:#b589ff}
+body.night-mode .settings-modal-label p{color:#b399dd}
+@media (max-width:768px){.settings-modal-item{padding:20px}}
+/* ═══════════════════════════════════════════════════════════════
+   WEATHER EFFECTS
+   ═══════════════════════════════════════════════════════════════ */
+/* Clear weather - no effects */
+.weather-clear::before,.weather-clear::after{display:none}
+/* Rainy weather - falling rain */
+.weather-rainy::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(transparent 0%,rgba(135,206,250,0.3) 50%,transparent 100%),linear-gradient(90deg,transparent 0%,rgba(135,206,250,0.2) 50%,transparent 100%);background-size:2px 50px,100% 100%;background-position:0 0,0 0;animation:rain 0.5s linear infinite;pointer-events:none;z-index:1;opacity:0.6}
+@keyframes rain{0%{background-position:0 0,0 0}100%{background-position:10px 50px,0 0}}
+/* Foggy weather - drifting fog */
+.weather-foggy::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse at 20% 50%,rgba(200,200,220,0.4) 0%,transparent 50%),radial-gradient(ellipse at 80% 30%,rgba(180,180,200,0.3) 0%,transparent 50%),radial-gradient(ellipse at 50% 80%,rgba(190,190,210,0.35) 0%,transparent 50%);animation:fog 20s ease-in-out infinite;pointer-events:none;z-index:1}
+@keyframes fog{0%{opacity:0.3;transform:translateX(0)}50%{opacity:0.6;transform:translateX(20px)}100%{opacity:0.3;transform:translateX(0)}}
+/* Windy weather - floating leaves/particles */
+.weather-windy::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background-image:radial-gradient(circle,rgba(150,200,150,0.4) 2px,transparent 2px),radial-gradient(circle,rgba(180,220,180,0.3) 1px,transparent 1px);background-size:50px 50px,80px 80px;background-position:0 0,40px 40px;animation:wind 3s linear infinite;pointer-events:none;z-index:1;opacity:0.5}
+@keyframes wind{0%{background-position:0 0,40px 40px}100%{background-position:200px -50px,240px -10px}}
+/* Starry night - twinkling stars */
+.weather-starry::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background-image:radial-gradient(2px 2px at 20% 30%,white,transparent),radial-gradient(2px 2px at 60% 70%,white,transparent),radial-gradient(1px 1px at 50% 50%,white,transparent),radial-gradient(1px 1px at 80% 10%,white,transparent),radial-gradient(2px 2px at 90% 60%,white,transparent),radial-gradient(1px 1px at 33% 80%,white,transparent),radial-gradient(1px 1px at 15% 55%,white,transparent),radial-gradient(2px 2px at 70% 25%,white,transparent);background-size:200% 200%;animation:starry 4s ease-in-out infinite;pointer-events:none;z-index:1;opacity:0.8}
+@keyframes starry{0%,100%{opacity:0.6}50%{opacity:0.9}}
+/* Cursed fog - purple ominous fog */
+.weather-cursed::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse at 30% 40%,rgba(138,43,226,0.3) 0%,transparent 50%),radial-gradient(ellipse at 70% 60%,rgba(148,0,211,0.25) 0%,transparent 50%),radial-gradient(ellipse at 50% 90%,rgba(128,0,128,0.2) 0%,transparent 50%);animation:cursedFog 15s ease-in-out infinite;pointer-events:none;z-index:1}
+.weather-cursed::after{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(138,43,226,0.03) 2px,rgba(138,43,226,0.03) 4px);animation:cursedScan 8s linear infinite;pointer-events:none;z-index:2}
+@keyframes cursedFog{0%{opacity:0.4;transform:scale(1) rotate(0deg)}50%{opacity:0.7;transform:scale(1.1) rotate(5deg)}100%{opacity:0.4;transform:scale(1) rotate(0deg)}}
+@keyframes cursedScan{0%{transform:translateY(0)}100%{transform:translateY(20px)}}
+/* Event Announcement Ticker */
+.event-announcement{background:linear-gradient(135deg,#ff4444 0%,#cc0000 100%);color:#fff;font-weight:bold;padding:2px 12px;border-radius:6px;margin-right:8px;box-shadow:0 2px 8px rgba(255,68,68,0.4);animation:eventPulse 2s ease-in-out infinite}
+@keyframes eventPulse{0%,100%{box-shadow:0 2px 8px rgba(255,68,68,0.4)}50%{box-shadow:0 2px 12px rgba(255,68,68,0.7)}}
+/* Night Mode - Friends Page Fix */
+body.night .friends-tabs{border-bottom-color:rgba(153,102,255,0.3)!important}
+body.night .friends-tab{background:rgba(153,102,255,0.15)!important;color:var(--cream)!important;border:2px solid rgba(153,102,255,0.3)!important}
+body.night .friends-tab.active{background:rgba(153,102,255,0.3)!important;border-color:var(--purple)!important}
+body.night .friends-tab:hover{background:rgba(153,102,255,0.25)!important}
+body.night #friends-list,body.night #friend-requests-list,body.night #blocked-users-list{color:var(--cream)!important}
+body.night .friend-card,body.night .friend-request-card,body.night .blocked-user-card{background:rgba(153,102,255,0.1)!important;border-color:rgba(153,102,255,0.3)!important;color:var(--cream)!important}
+body.night .friend-name,body.night .blocked-username{color:var(--cream)!important}
+body.night .friend-pets,body.night .blocked-reason{color:rgba(255,245,230,0.7)!important}
+body.night .add-friend-section{background:rgba(153,102,255,0.1)!important;border-color:rgba(153,102,255,0.3)!important}
+body.night .add-friend-input{background:rgba(153,102,255,0.15)!important;border-color:rgba(153,102,255,0.3)!important;color:var(--cream)!important}
+body.night .add-friend-input::placeholder{color:rgba(255,245,230,0.5)!important}
+body.night .empty-state{color:rgba(255,245,230,0.7)!important}
+/* Leaderboard - Darker Numbers for Better Legibility */
+.leaderboard-rank{color:#6b4ba8!important;font-weight:bold}
+.leaderboard-points,.leaderboard-count,.leaderboard-stat{color:#7c5caa!important;font-weight:600}
+@media (max-width: 768px) {
+  .weather-rainy::before,
+  .weather-foggy::before,
+  .weather-windy::before,
+  .weather-cursed::before,
+  .weather-cursed::after { 
+    display: none !important; 
+  }
+}    
+  </style>
+
+</head>
+<body class="three-column-layout">
+
+<audio id="bg-music" loop><source src="music.mp3" type="audio/mpeg" /></audio>
+
+<!-- Consolidated Navigation Bar -->
+<nav class="navbar navbar-consolidated">
+  <div class="navbar-inner">
+    <!-- Left: Logo -->
+    <div class="navbar-logo" onclick="showTab('home')">
+      <img src="images/pawket-logo.png" alt="PawketPetsVT" /><span>Pawket</span>Pets
+    </div>
+    
+    <!-- Center: Beta Warning -->
+    <div class="navbar-center">
+      <span class="beta-tag-inline">BETA</span>
+      <span class="beta-text-inline">⚠️ Game in development. Progress may reset.</span>
+      <button class="beta-contact-inline" onclick="openContactModal()">Report Issues</button>
+    </div>
+    
+    <!-- Right: All User Controls -->
+    <div class="navbar-user">
+      <!-- Notification Bell -->
+      <div class="notification-bell" id="notification-bell" style="display:none;" onclick="toggleNotificationDropdown()">
+        <span class="bell-icon">🔔</span>
+        <span class="notification-badge" id="notification-badge" style="display:none;">0</span>
+      </div>
+      
+      <!-- Music Player Controls -->
+      <div class="music-controls-inline">
+        <span class="music-title-inline">🎵</span>
+        <button class="music-btn-inline" id="music-play-btn" onclick="toggleMusic()" title="Play/Pause Music">▶</button>
+        <button class="music-btn-inline" onclick="stopMusic()" title="Stop Music">⏹</button>
+        <input type="range" class="music-volume-inline" id="music-volume" min="0" max="1" step="0.05" value="0.4" oninput="setVolume(this.value)" title="Volume">
+      </div>
+      
+      <span id="nav-user"></span>
+      <span id="nav-points"></span>
+      <button class="btn-nav-action" id="nav-profile" style="display:none" onclick="showTab('myprofile')">👤 Profile</button>
+      <button class="btn-nav-action" id="nav-logout" style="display:none" onclick="handleLogout()">Logout</button>
+    </div>
+  </div>
+</nav>
+
+<!-- News Ticker (Second Bar) -->
+<div class="news-ticker">
+  <div class="news-ticker-inner">Welcome to PawketPetsVT! &nbsp;&nbsp; Adopt your first pet today! &nbsp;&nbsp; Watch Embertail &amp; Pyxshuul live on Twitch! &nbsp;&nbsp; New members coming soon... &nbsp;&nbsp; Earn PawketPoints by playing minigames! &nbsp;&nbsp; Stay tuned for updates! &nbsp;&nbsp;</div>
+</div>
+
+<!-- Notification Dropdown -->
+<div class="notification-dropdown" id="notification-dropdown" style="display:none;">
+  <div class="notification-dropdown-header">
+    <h3>Notifications</h3>
+    <button class="btn-text" onclick="markAllNotificationsRead()">Mark all read</button>
+  </div>
+  <div class="notification-list" id="notification-list">
+    <div class="notification-empty">No notifications</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+  <div class="app-container">
+  <div class="left-sidebar">
+    <!-- LEFT SIDEBAR CONTENT -->
+    <div class="sidebar-section">
+      <div class="sidebar-title">🐾 PawketPetsVT</div>
+      <!-- Activity Feed Box -->
+      <div class="activity-feed-box" id="activity-feed-box">
+        <div class="activity-feed-message" id="activity-feed-message">
+          Add friends to see their activity!
+        </div>
+      </div>
+      
+      <!-- Hamburger Menu Button (Mobile Only) -->
+      <button id="hamburger-menu-btn" class="hamburger-menu-btn" aria-label="Menu">☰</button>
+    </div>
+    
+    <!-- DESKTOP NAVIGATION (visible on desktop) -->
+    <div class="sidebar-section desktop-nav">
+      <div class="sidebar-title">📋 Menu</div>
+      <div class="sidebar-nav-links">
+        <button class="sidebar-nav-btn active" id="sidebar-btn-home" onclick="showTab('home')">🏠 Home</button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-adopt" onclick="showTab('adopt')">🐣 Adopt</button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-mypets" onclick="showTab('mypets')">💖 My Pets</button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-journal" onclick="showTab('journal')">📓 Pet Journal</button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-shop" onclick="showTab('shop')">🛍️ Shop</button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-minigames" onclick="showTab('minigames')">🎮 Minigames</button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-battle" onclick="showTab('battle')">⚔️ Battle Arena</button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-news" onclick="showTab('news')">📰 News</button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-twitch" onclick="showTab('twitch')">🎬 Twitch</button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-redeem" onclick="showTab('redeem')">🎟️ Redeem</button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-friends" onclick="showTab('friends')">
+          👥 Friends
+          <span class="friend-request-badge" id="friend-request-badge" style="display:none;">0</span>
+        </button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-stats" onclick="showTab('stats')">📊 Statistics</button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-team" onclick="showTab('team')">👥 Team</button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-forum" onclick="showTab('forum')">💬 Forum</button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-settings" onclick="showTab('settings')">⚙️ Settings</button>
+      </div>
+    </div>
+
+    <!-- Mobile Navigation Menu (hidden on desktop, visible on mobile via hamburger) -->
+    <nav id="mobile-nav-menu" class="mobile-nav-menu">
+      <button id="mobile-menu-close" class="mobile-menu-close" aria-label="Close menu">✕ Close</button>
+      <div class="sidebar-section">
+        <div class="sidebar-nav-links">
+          <button class="sidebar-nav-btn active" id="sidebar-btn-home" onclick="showTab('home')">🏠 Home</button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-adopt" onclick="showTab('adopt')">🐣 Adopt</button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-mypets" onclick="showTab('mypets')">💖 My Pets</button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-journal" onclick="showTab('journal')">📓 Pet Journal</button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-shop" onclick="showTab('shop')">🛍️ Shop</button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-minigames" onclick="showTab('minigames')">🎮 Minigames</button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-battle" onclick="showTab('battle')">⚔️ Battle Arena</button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-news" onclick="showTab('news')">📰 News</button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-twitch" onclick="showTab('twitch')">🎬 Twitch</button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-redeem" onclick="showTab('redeem')">🎟️ Redeem</button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-friends" onclick="showTab('friends')">
+            👥 Friends
+            <span class="friend-request-badge" id="friend-request-badge" style="display:none;">0</span>
+          </button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-stats" onclick="showTab('stats')">📊 Statistics</button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-team" onclick="showTab('team')">👥 Team</button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-forum" onclick="showTab('forum')">💬 Forum</button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-settings" onclick="showTab('settings')">⚙️ Settings</button>
+        </div>
+      </div>
+    </nav>
+    
+    <!-- DESKTOP STATS (visible on desktop) -->
+    <div class="sidebar-section desktop-nav">
+      <div class="sidebar-title">Your Stats</div>
+      <div class="sidebar-stats">
+        <div class="stat-row">
+          <span class="stat-label">Pets Owned</span>
+          <span class="stat-value" id="sidebar-pet-count">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Points</span>
+          <span class="stat-value" id="sidebar-points">0 PP</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Items</span>
+          <span class="stat-value" id="sidebar-items">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Day Streak</span>
+          <span class="stat-value" id="sidebar-streak">0</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- DESKTOP DAILY BONUS (visible on desktop) -->
+    <div class="sidebar-section desktop-nav" style="background:linear-gradient(135deg,var(--yellow),var(--orange));border-color:rgba(255,255,255,0.6);">
+      <button class="daily-bonus-btn" onclick="claimDailyBonus()">✨ Daily Bonus!</button>
+    </div>
+  </div>
+
+  <div class="center-content">
+    <!-- ALL YOUR EXISTING PAGE SECTIONS GO HERE -->
+    <!-- Keep everything from <div id="auth-gate"> through the footer -->
+
+
+<!-- AUTH GATE -->
+<div id="auth-gate">
+  <div class="page-section active" id="section-login">
+    <div class="page-wrap">
+      <div class="page-hero">
+        <div class="sparkle-row">&#10022; &#10023; &#10022;</div>
+        <h1>Welcome Back!</h1>
+        <p>Login to check on your pets &#10024;</p>
+      </div>
+      <div class="form-card">
+        <h2>Login</h2>
+        <p class="form-subtitle">No account? <a href="#" onclick="showAuthSection('register');return false;">Register here!</a></p>
+        <div class="alert alert-error" id="login-error"></div>
+        <div class="alert alert-success" id="login-success"></div>
+        <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="your@email.com" /></div>
+        <div class="form-group"><label>Password</label><input type="password" id="login-password" placeholder="Password" /></div>
+        <button class="btn btn-primary btn-lg form-submit" id="login-btn" onclick="handleLogin()">Login</button>
+        <div style="text-align:center;margin:10px 0 0;"><a href="#" onclick="showForgotPassword();return false;" style="font-size:0.85rem;color:var(--text-light);">Forgot your password?</a></div>
+        <div class="form-footer">New? <a href="#" onclick="showAuthSection('register');return false;">Create an account!</a></div>
+      </div>
+    </div>
+  </div>
+  <div class="page-section" id="section-register">
+    <div class="page-wrap">
+      <div class="page-hero">
+        <div class="sparkle-row">&#10022; &#10023; &#10022;</div>
+        <h1>Join PawketPetsVT!</h1>
+        <p>Create your account &#10024;</p>
+      </div>
+      <div class="form-card">
+        <h2>Register</h2>
+        <p class="form-subtitle">Have an account? <a href="#" onclick="showAuthSection('login');return false;">Login here!</a></p>
+        <div class="alert alert-error" id="reg-error"></div>
+        <div class="alert alert-success" id="reg-success"></div>
+        <div class="form-group"><label>Username</label><input type="text" id="reg-username" placeholder="CoolTrainer123" maxlength="30" /></div>
+        <div class="form-group"><label>Email</label><input type="email" id="reg-email" placeholder="your@email.com" /></div>
+        <div class="form-group"><label>Password</label><input type="password" id="reg-password" placeholder="At least 6 characters" /></div>
+        <div class="form-group"><label>Confirm Password</label><input type="password" id="reg-confirm" placeholder="Confirm password" /></div>
+        <button class="btn btn-primary btn-lg form-submit" id="reg-btn" onclick="handleRegister()">Create Account</button>
+        <div class="form-footer">Have an account? <a href="#" onclick="showAuthSection('login');return false;">Login!</a></div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="page-section" id="section-forgot">
+    <div class="page-wrap">
+      <div class="page-hero">
+        <div class="sparkle-row">✦ ✧ ✦</div>
+        <h1>Reset Password</h1>
+        <p>Enter your email and we'll send you a reset link ✨</p>
+      </div>
+      <div class="form-card">
+        <h2>🔑 Forgot Password</h2>
+        <p class="form-subtitle">Remember it? <a href="#" onclick="showAuthSection('login');return false;">Back to login!</a></p>
+        <div class="alert alert-error" id="forgot-error"></div>
+        <div class="alert alert-success" id="forgot-success"></div>
+        <div class="form-group"><label>Email Address</label><input type="email" id="forgot-email" placeholder="your@email.com" /></div>
+        <button class="btn btn-primary btn-lg form-submit" onclick="handleForgotPassword()">✉️ Send Reset Email</button>
+        <div class="form-footer"><a href="#" onclick="showAuthSection('login');return false;">← Back to Login</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RESET PASSWORD (after clicking email link) -->
+<div id="reset-password-gate" style="display:none;">
+  <div class="auth-container">
+    <div class="auth-header">
+      <img src="images/logo.png" alt="PawketPets" class="auth-logo" />
+      <h1>Set New Password</h1>
+      <p>Choose a secure password for your account 🔐</p>
+    </div>
+    <div class="form-card">
+      <h2>🔑 New Password</h2>
+      <div class="alert alert-error" id="reset-error"></div>
+      <div class="alert alert-success" id="reset-success"></div>
+      <div class="form-group">
+        <label>New Password</label>
+        <input type="password" id="reset-new-password" placeholder="Enter new password" />
+      </div>
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <input type="password" id="reset-confirm-password" placeholder="Confirm new password" />
+      </div>
+      <button class="btn btn-primary btn-lg form-submit" onclick="handleResetPassword()">🔐 Update Password</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP CONTENT -->
+<div id="app-content" style="display:none">
+
+  <!-- HOME -->
+  <div class="page-section active" id="section-home">
+    <div class="page-wrap">
+      <div class="welcome-panel">
+        <img src="images/logo.png" alt="PawketPetsVT" class="logo-hero" />
+        <h1>Welcome to PawketPetsVT!</h1>
+        <p>Adopt virtual pets based on your favourite VTubers, play games, and earn rewards &#10024;</p>
+        <div id="home-cta" style="margin-top:16px;"></div>
+      </div>
+      
+      <!-- Daily Tip Box -->
+      <div class="daily-tip-box">
+        <div class="daily-tip-header">💡 Did You Know?</div>
+        <div class="daily-tip-content" id="daily-tip-content">
+          Loading tip...
+        </div>
+      </div>
+      
+      <!-- Melon's Shop Promo -->
+      <div class="melon-promo">
+        <div class="melon-promo-text">
+          <span class="melon-promo-word">Visit</span>
+          <span class="melon-promo-word melon-promo-word-melons">Melon's</span>
+          <span class="melon-promo-word melon-promo-word-melons-2">Melons</span>
+          <span class="melon-promo-word">to buy treats for your pets!</span>
+        </div>
+        <div class="melon-promo-image" onclick="showTab('shop')">
+          <img src="images/Melon2.png" alt="" style="max-width: 300px; display: block; margin: 0 auto;" onerror="console.error('Image failed to load:', this.src); this.style.border='2px solid red';" onload="console.log('Image loaded successfully!');" />
+        </div>
+      </div>
+      
+      <!-- Referral System Card -->
+      <div class="referral-card" id="referral-card" style="display:none;">
+        <div class="referral-header">
+          <span class="referral-icon">📨</span>
+          <h3>Invite Friends & Earn Rewards!</h3>
+        </div>
+        <div class="referral-description">
+          Share your unique link and both you and your friend get bonus PawketPoints when they join!
+        </div>
+        <div class="referral-rewards">
+          <div class="referral-reward">
+            <div class="referral-reward-icon">🎁</div>
+            <div class="referral-reward-text">
+              <strong>You Earn:</strong> 200 PP per friend
+            </div>
+          </div>
+          <div class="referral-reward">
+            <div class="referral-reward-icon">🎁</div>
+            <div class="referral-reward-text">
+              <strong>They Earn:</strong> 100 PP bonus
+            </div>
+          </div>
+        </div>
+        <div class="referral-link-container">
+          <input type="text" class="referral-link-input" id="referral-link-input" readonly onclick="this.select()">
+          <button class="referral-copy-btn" onclick="copyReferralLink()">
+            <span id="copy-btn-text">Copy Link</span>
+          </button>
+        </div>
+        <div class="referral-stats">
+          <div class="referral-stat">
+            <span class="referral-stat-label">Total Referrals:</span>
+            <span class="referral-stat-value" id="referral-count">0</span>
+          </div>
+          <div class="referral-stat">
+            <span class="referral-stat-label">PP Earned:</span>
+            <span class="referral-stat-value" id="referral-pp-earned">0 PP</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="section-header"><h2>About PawketPetsVT</h2><div class="section-line"></div></div>
+      <div class="card" style="line-height:1.8;color:var(--text-light);">
+        <p><strong style="color:var(--purple-dark);">PawketPetsVT</strong> is a fan-interactive pet game inspired by the pet games of the early 2000s. Collect, raise, and care for little virtual versions of your favourite streamers.</p>
+        <br>
+        <p>Earn <strong style="color:var(--purple-dark);">PawketPoints</strong> by playing minigames, watching streams, and interacting with your pets!</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADOPT -->
+  <div class="page-section" id="section-adopt">
+    <div class="page-wrap">
+      <div class="page-hero"><div class="sparkle-row">&#128163; &#10022; &#128163;</div><h1>Adopt a Pet!</h1><p>Your first pet is always free! &#10024;</p></div>
+      <div class="points-banner"><span class="pb-label">Your PawketPoints</span><span class="pb-amount" id="adopt-points">0 PP</span></div>
+      <div id="pets-grid" class="pets-grid"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- MY PETS -->
+  <div class="page-section" id="section-mypets">
+    <div class="page-wrap">
+      <div class="page-hero"><div class="sparkle-row">&#128150; &#10022; &#128150;</div><h1>My Pets</h1><p>Feed them, play with them, watch them grow! &#10024;</p></div>
+      <div class="points-banner"><span class="pb-label">Your PawketPoints</span><span class="pb-amount" id="mypets-points">0 PP</span></div>
+      
+      <!-- Variant Gallery Button -->
+      <div style="text-align:center;margin:20px 0;">
+        <button class="btn btn-primary" onclick="showVariantGallery()" style="background:linear-gradient(135deg,#9966ff 0%,#ff66cc 100%);">
+          ✨ Variant Gallery
+        </button>
+      </div>
+      
+      <div id="mypets-container"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- PET JOURNAL -->
+  <div class="page-section" id="section-journal">
+    <div class="page-wrap">
+      <div class="page-hero">
+        <div class="sparkle-row">📓 ✦ 📓</div>
+        <h1>Pet Journal</h1>
+        <p>Discover your pets' favorite foods, hobbies, and secrets! ✨</p>
+      </div>
+      
+      <div class="journal-book">
+        <div class="journal-page" id="journal-page-content">
+          <div class="spinner"></div>
+        </div>
+        
+        <div class="journal-controls">
+          <button class="journal-nav-btn" id="journal-prev-btn" onclick="changeJournalPage(-1)">← Previous</button>
+          <span class="journal-page-indicator" id="journal-page-indicator">Page 1 of 8</span>
+          <button class="journal-nav-btn" id="journal-next-btn" onclick="changeJournalPage(1)">Next →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHOP -->
+  <div class="page-section" id="section-shop">
+    <!-- Melon Mascot -->
+    <div class="shop-mascot">
+      <img src="images/melon.png" alt="Melon" class="mascot-image">
+      <div class="mascot-speech-bubble" id="melon-dialogue">
+        Welcome to the Shop! I'm Melon! Buy whatever you need!
+      </div>
+    </div>
+    
+    <div class="page-wrap">
+      <div class="page-hero">
+        <div class="sparkle-row">&#128717; &#10022; &#128717;</div>
+        <h1 class="melons-title">
+          <span class="melon-title-word-1">Melon's</span>
+          <span class="melon-title-word-2">Melons</span>
+        </h1>
+        <p>Spend your PawketPoints! &#129689;</p>
+      </div>
+      <div class="points-banner"><span class="pb-label">Your PawketPoints</span><span class="pb-amount" id="shop-points">0 PP</span></div>
+      <div class="shop-tabs">
+        <button class="shop-tab active" id="shop-tab-btn" onclick="showShopTab('items')">Items</button>
+        <button class="shop-tab" id="equip-tab-btn" onclick="showShopTab('equipment')">⚔️ Equipment</button>
+        <button class="shop-tab" id="inv-tab-btn" onclick="showShopTab('inventory')">My Inventory</button>
+      </div>
+      <div id="shop-items-panel"><div id="shop-grid" class="shop-grid"><div class="spinner"></div></div></div>
+      
+      <!-- EQUIPMENT SHOP PANEL -->
+      <div id="shop-equipment-panel" style="display:none">
+        <div class="equipment-filter-tabs">
+          <button class="filter-tab active" onclick="filterEquipment('all', event)">All</button>
+          <button class="filter-tab" onclick="filterEquipment('weapon', event)">⚔️ Weapons</button>
+          <button class="filter-tab" onclick="filterEquipment('armor', event)">🛡️ Armor</button>
+        </div>
+        <div id="equipment-shop-grid" class="shop-grid"><div class="spinner"></div></div>
+      </div>
+      
+      <div id="shop-inv-panel" style="display:none"><div id="inventory-grid" class="inventory-grid"><div class="spinner"></div></div></div>
+    </div>
+  </div>
+
+  <!-- MINIGAMES -->
+  <div class="page-section" id="section-minigames">
+    <div class="page-wrap">
+      <div class="page-hero"><div class="sparkle-row">&#127918; &#10022; &#127918;</div><h1>Minigames</h1><p>Play daily games to earn PawketPoints! &#129689;</p></div>
+      <div class="points-banner"><span class="pb-label">Your PawketPoints</span><span class="pb-amount" id="games-points">0 PP</span></div>
+      <div class="games-grid">
+        <div class="game-card">
+          <div class="game-title">Lucky Dice</div>
+          <div class="game-desc">Roll two dice once per day! Whatever you roll is how many PP you earn. Doubles = triple!</div>
+          <span class="game-reward">Up to 36 PP per day</span>
+          <div class="game-area">
+            <div class="dice-wrap"><div class="die" id="die1">&#9856;</div><div class="die" id="die2">&#9856;</div></div>
+            <div id="dice-cooldown" class="cooldown-msg" style="display:none">Already played today! Come back tomorrow.</div>
+            <button class="btn btn-primary" id="roll-btn" onclick="rollDice()">Roll the Dice!</button>
+            <div class="game-result" id="dice-result"></div>
+          </div>
+        </div>
+        <div class="game-card">
+          <div class="game-title">Guess the Number</div>
+          <div class="game-desc">Guess a number between 1 and 10. 3 tries to win 25 PP!</div>
+          <span class="game-reward">25 PP if correct</span>
+          <div class="game-area">
+            <div id="guess-cooldown" class="cooldown-msg" style="display:none">Already played today! Come back tomorrow.</div>
+            <div id="guess-play">
+              <input type="number" class="guess-input" id="guess-input" min="1" max="10" placeholder="?" />
+              <br><br>
+              <button class="btn btn-primary" onclick="makeGuess()">Guess!</button>
+              <div class="attempts-left" id="attempts-left">3 guesses remaining</div>
+            </div>
+            <div class="game-result" id="guess-result"></div>
+          </div>
+        </div>
+        <div class="game-card" style="grid-column:1/-1">
+          <div class="game-title">Memory Match</div>
+          <div class="game-desc">Match all 6 pairs! 5 PP per pair, 15 tries, once per day.</div>
+          <span class="game-reward">Up to 30 PP per day</span>
+          <div class="game-area">
+            <div id="memory-cooldown" class="cooldown-msg" style="display:none">Already played today! Come back tomorrow.</div>
+            <div id="memory-play">
+              <div class="memory-stats">
+                <span>Matches: <strong id="match-count">0</strong>/6</span>
+                <span>Tries: <strong id="tries-left">15</strong></span>
+                <span>Earned: <strong id="memory-earned">0</strong> PP</span>
+              </div>
+              <div class="memory-grid" id="memory-grid"></div>
+              <button class="btn btn-outline btn-sm" onclick="initMemory()">New Game</button>
+            </div>
+            <div class="game-result" id="memory-result"></div>
+          </div>
+        </div>
+        <!-- Add this to the games-grid in the Minigames section -->
+
+<!-- SLOT MACHINE -->
+<div class="game-card">
+  <div class="game-title">🎰 Slot Machine</div>
+  <div class="game-desc">Bet your PP! Match 2 = get bet back. Match 3 = 4x profit!</div>
+  <span class="game-reward" style="color: var(--orange);">High risk, high reward!</span>
+  
+  <div class="game-area">
+    <!-- Bet selector -->
+    <div class="slot-bet-selector">
+      <label style="font-weight: bold; color: var(--purple);">Choose Your Bet:</label>
+      <div class="bet-buttons">
+        <button class="btn bet-btn" data-bet="10" onclick="selectSlotBet(10)">10 PP</button>
+        <button class="btn bet-btn active" data-bet="50" onclick="selectSlotBet(50)">50 PP</button>
+        <button class="btn bet-btn" data-bet="100" onclick="selectSlotBet(100)">100 PP</button>
+      </div>
+    </div>
+    
+    <!-- Slot machine display -->
+    <div class="slot-machine">
+      <div class="slot-reel" id="slot-reel-1">🍉</div>
+      <div class="slot-reel" id="slot-reel-2">🍉</div>
+      <div class="slot-reel" id="slot-reel-3">🍉</div>
+    </div>
+    
+    <!-- Spin button -->
+    <button class="btn btn-primary btn-lg" id="slot-spin-btn" onclick="spinSlots()">
+      🎰 Spin! (50 PP)
+    </button>
+    
+    <!-- Result message -->
+    <div class="game-result" id="slot-result"></div>
+  </div>
+</div>
+
+
+        <!-- TREASURE WHEEL -->
+        <div class="game-card">
+          <div class="game-title">🎰 Treasure Wheel</div>
+          <div class="game-desc">Spin the wheel once per day! Land on prizes from 10 to 100 PP!</div>
+          <span class="game-reward">10-100 PP per day</span>
+          <div class="game-area">
+            <div id="wheel-cooldown" class="cooldown-msg" style="display:none">Already played today! Come back tomorrow.</div>
+            <div id="wheel-play">
+              <canvas id="wheel-canvas" width="300" height="300"></canvas>
+              <button class="btn btn-primary" id="wheel-btn" onclick="spinWheel()">Spin the Wheel!</button>
+            </div>
+            <div class="game-result" id="wheel-result"></div>
+          </div>
+        </div>
+
+        <!-- WHACK-A-MOLE -->
+        <div class="game-card">
+          <div class="game-title">🔨 Whack-a-Mole</div>
+          <div class="game-desc">Whack the mascots! 30 seconds, 5 PP per whack. Once per day!</div>
+          <span class="game-reward">Up to 50 PP per day</span>
+          <div class="game-area">
+            <div id="whack-cooldown" class="cooldown-msg" style="display:none">Already played today! Come back tomorrow.</div>
+            <div id="whack-play">
+              <div class="whack-stats">
+                <span>Time: <strong id="whack-time">30</strong>s</span>
+                <span>Score: <strong id="whack-score">0</strong></span>
+                <span>Earned: <strong id="whack-earned">0</strong> PP</span>
+              </div>
+              <div class="whack-grid">
+                <div class="whack-hole" onclick="whackMole(0)"><div class="mole" id="mole-0"><img src="images/pets/ember.png" alt="Ember"></div></div>
+                <div class="whack-hole" onclick="whackMole(1)"><div class="mole" id="mole-1"><img src="images/pets/pyxie.png" alt="Pyxie"></div></div>
+                <div class="whack-hole" onclick="whackMole(2)"><div class="mole" id="mole-2"><img src="images/pets/ember.png" alt="Ember"></div></div>
+                <div class="whack-hole" onclick="whackMole(3)"><div class="mole" id="mole-3"><img src="images/pets/pyxie.png" alt="Pyxie"></div></div>
+                <div class="whack-hole" onclick="whackMole(4)"><div class="mole" id="mole-4"><img src="images/pets/ember.png" alt="Ember"></div></div>
+                <div class="whack-hole" onclick="whackMole(5)"><div class="mole" id="mole-5"><img src="images/pets/pyxie.png" alt="Pyxie"></div></div>
+              </div>
+              <button class="btn btn-primary" id="whack-btn" onclick="startWhack()">Start Game!</button>
+            </div>
+            <div class="game-result" id="whack-result"></div>
+          </div>
+        </div>
+
+        <!-- SHELL GAME -->
+        <div class="game-card">
+          <div class="game-title">🥚 Shell Game</div>
+          <div class="game-desc">Follow the egg! 3 rounds, guess correctly to win 30 PP!</div>
+          <span class="game-reward">30 PP per day</span>
+          <div class="game-area">
+            <div id="shell-cooldown" class="cooldown-msg" style="display:none">Already played today! Come back tomorrow.</div>
+            <div id="shell-play">
+              <div class="shell-stats">Round: <strong id="shell-round">1</strong>/3</div>
+              <div class="shell-row">
+                <div class="shell" id="shell-0" onclick="guessShell(0)">🥚</div>
+                <div class="shell" id="shell-1" onclick="guessShell(1)">🥚</div>
+                <div class="shell" id="shell-2" onclick="guessShell(2)">🥚</div>
+              </div>
+              <button class="btn btn-primary" id="shell-btn" onclick="startShellGame()">Start Shuffle!</button>
+            </div>
+            <div class="game-result" id="shell-result"></div>
+          </div>
+        </div>
+
+        <!-- TYPING CHALLENGE -->
+        <div class="game-card">
+          <div class="game-title">⌨️ Typing Challenge</div>
+          <div class="game-desc">Type the pet names as fast as you can! 60s timer, 3 PP per correct word!</div>
+          <span class="game-reward">Up to 60 PP per day</span>
+          <div class="game-area">
+            <div id="typing-cooldown" class="cooldown-msg" style="display:none">Already played today! Come back tomorrow.</div>
+            <div id="typing-play">
+              <div class="typing-stats">
+                <span>Time: <strong id="typing-time">60</strong>s</span>
+                <span>Score: <strong id="typing-score">0</strong></span>
+                <span>Earned: <strong id="typing-earned">0</strong> PP</span>
+              </div>
+              <div class="typing-target" id="typing-target">Click Start to begin!</div>
+              <input type="text" class="typing-input" id="typing-input" placeholder="Type here..." disabled />
+              <button class="btn btn-primary" id="typing-btn" onclick="startTyping()">Start Game!</button>
+            </div>
+            <div class="game-result" id="typing-result"></div>
+          </div>
+        </div>
+
+        <!-- FISHING GAME -->
+        <div class="game-card">
+          <div class="game-title">🎣 Fishing Pond</div>
+          <div class="game-desc">Cast your line! Catch fish for PP. 10 casts per day!</div>
+          <span class="game-reward">10-80 PP per day</span>
+          <div class="game-area">
+            <div id="fishing-cooldown" class="cooldown-msg" style="display:none">Already played today! Come back tomorrow.</div>
+            <div id="fishing-play">
+              <div class="fishing-stats">
+                <span>Casts Left: <strong id="fishing-casts">10</strong></span>
+                <span>Total: <strong id="fishing-earned">0</strong> PP</span>
+              </div>
+              <div class="fishing-pond">
+                <div class="fishing-line" id="fishing-line" style="display:none;">
+                  <div class="fishing-hook">🪝</div>
+                </div>
+                <div class="pond-text">🌊 Click Cast to fish! 🌊</div>
+              </div>
+              <button class="btn btn-primary" id="fishing-btn" onclick="castLine()">Cast Line!</button>
+            </div>
+            <div class="game-result" id="fishing-result"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- NEWS -->
+  <div class="page-section" id="section-news">
+    <div class="page-wrap">
+      <div class="page-hero"><div class="sparkle-row">&#128240; &#10022; &#128240;</div><h1>News &amp; Announcements</h1><p>Stay up to date! &#10024;</p></div>
+      <div id="news-container"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- TWITCH -->
+  <div class="page-section" id="section-twitch">
+    <div class="page-wrap">
+      <div class="page-hero"><div class="sparkle-row">&#128995; &#10022; &#128995;</div><h1>Twitch &amp; Rewards</h1><p>Connect your Twitch and check out our team! &#10024;</p></div>
+
+      <!-- Team Page Link -->
+      <a href="https://www.twitch.tv/team/vcutiez" target="_blank" class="team-page-link">
+        &#128995; Visit Our Official Twitch Team Page
+      </a>
+
+      <!-- Link account -->
+      <div class="section-header" style="margin-top:36px;"><h2>Link Your Account</h2><div class="section-line"></div></div>
+      <div class="token-box" id="token-box" style="display:none">
+        <h3>Authorization Successful!</h3>
+        <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:10px;">Streamers: copy this token for Cloudflare. Viewers can ignore this.</p>
+        <textarea class="token-textarea" id="token-display" readonly></textarea>
+        <br><button class="btn btn-primary btn-sm" onclick="copyToken()" style="margin-top:8px;">Copy Token</button>
+      </div>
+      <div class="twitch-card">
+        <h2>Connect Twitch Account</h2>
+        <p>Link your Twitch to unlock stream rewards! Earn PP for following and watching live.</p>
+        <div id="twitch-not-linked">
+          <button class="btn-twitch" onclick="linkTwitch()">&#128995; Connect with Twitch</button>
+          <p style="margin-top:14px;font-size:0.83rem;color:var(--text-light);">We only read public info. We never post on your behalf.</p>
+        </div>
+        <div id="twitch-linked" style="display:none">
+          <div class="linked-panel">
+            <h3>Twitch Linked!</h3>
+            <p style="color:var(--text-light);font-size:0.88rem;">Connected as: <strong id="twitch-username" style="color:var(--purple-dark)"></strong></p>
+            <ul class="reward-list">
+              <li>Follow Embertail <span class="status-badge" id="follow-ember-badge" style="display:none"></span></li>
+              <li>Follow Pyxshuul <span class="status-badge" id="follow-pyxs-badge" style="display:none"></span></li>
+              <li>+50 PP per follow (one time each)</li>
+            </ul>
+            <button class="btn btn-primary" id="check-follows-btn" onclick="checkFollows()">Check Follows &amp; Claim Rewards</button>
+          </div>
+          <br><button class="btn btn-outline btn-sm" onclick="unlinkTwitch()">Unlink Twitch</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- REDEEM -->
+  <div class="page-section" id="section-redeem">
+    <div class="page-wrap">
+      <div class="page-hero">
+        <div class="sparkle-row">🎟 ✦ 🎟</div>
+        <h1>Redeem a Code</h1>
+        <p>Got a special code? Enter it below to claim your reward! ✨</p>
+      </div>
+      <div class="points-banner">
+        <span class="pb-label">🪙 Your PawketPoints</span>
+        <span class="pb-amount" id="redeem-points">0 PP</span>
+      </div>
+
+      <div class="redeem-card" id="redeem-card">
+        <div class="redeem-icon">🎟</div>
+        <h2>Enter Your Code</h2>
+        <p>Codes are handed out during streams, events, and special ARG moments. Check our Twitch and socials!</p>
+        <div class="redeem-input-row">
+          <input
+            type="text"
+            id="redeem-code-input"
+            class="redeem-input"
+            placeholder="e.g. PAWKET2025"
+            maxlength="40"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="characters"
+            spellcheck="false"
+          />
+          <button class="btn btn-primary" id="redeem-btn" onclick="redeemCode()">✨ Redeem!</button>
+        </div>
+        <div class="alert alert-error" id="redeem-error" style="margin-top:16px;"></div>
+        <div class="redeem-success-panel" id="redeem-success-panel" style="display:none">
+          <div class="redeem-success-icon">🎉</div>
+          <div class="redeem-success-title" id="redeem-success-title">Code Redeemed!</div>
+          <div class="redeem-success-msg" id="redeem-success-msg">You earned some PawketPoints!</div>
+          <a id="redeem-lore-btn" href="#" class="redeem-lore-btn" style="display:none;margin-top:14px;">🔍 Something feels... off. Click here.</a>
+        </div>
+      </div>
+
+      <div class="redeem-history-wrap">
+        <div class="section-header"><h2>Recently Redeemed</h2><div class="section-line"></div></div>
+        <div id="redeem-history" class="redeem-history"><div class="spinner"></div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       BATTLE ARENA
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="page-section" id="section-battle">
+    <div class="page-wrap">
+      
+      <!-- Battle Screen (hidden by default) -->
+      <div id="battle-screen" style="display:none;">
+        <div class="battle-container">
+          
+          <!-- Player Side -->
+          <div class="battle-side battle-player">
+            <div class="battle-sprite-container">
+              <div class="battle-sprite player-sprite" id="player-battle-sprite">
+                🐾
+              </div>
+            </div>
+            <div class="battle-name" id="player-battle-name">Your Pet</div>
+            <div class="battle-hp-container">
+              <div class="battle-hp-label">
+                <span>HP</span>
+                <span id="player-hp-text">30/30</span>
+              </div>
+              <div class="battle-hp-bar">
+                <div class="battle-hp-fill" id="player-hp-fill" style="width: 100%"></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- VS Text -->
+          <div class="battle-vs">VS</div>
+          
+          <!-- Enemy Side -->
+          <div class="battle-side battle-enemy">
+            <div class="battle-sprite-container">
+              <div class="battle-sprite enemy-sprite" id="enemy-battle-sprite"></div>
+            </div>
+            <div class="battle-name" id="enemy-battle-name">Wild Animal</div>
+            <div class="battle-hp-container">
+              <div class="battle-hp-label">
+                <span>HP</span>
+                <span id="enemy-hp-text">20/20</span>
+              </div>
+              <div class="battle-hp-bar">
+                <div class="battle-hp-fill" id="enemy-hp-fill" style="width: 100%"></div>
+              </div>
+            </div>
+          </div>
+          
+        </div>
+        
+        <!-- Battle Log -->
+        <div class="battle-log-container">
+          <div class="battle-log" id="battle-log">
+            <div class="battle-log-entry">Battle starting...</div>
+          </div>
+        </div>
+        
+        <!-- Battle Controls -->
+        <div class="battle-controls">
+          <button class="btn btn-outline" id="battle-skip-btn" onclick="skipBattle()">Skip Animation</button>
+          <button class="btn btn-primary" id="battle-continue-btn" onclick="closeBattle()" style="display:none">Continue</button>
+        </div>
+        
+      </div>
+      
+      <!-- Exploration Result Modal -->
+      <div class="modal" id="exploration-modal" style="display:none;">
+        <div class="modal-content">
+          <h2 id="exploration-title">🌲 Exploring...</h2>
+          <div id="exploration-result" style="font-size: 1.1rem; line-height: 1.8; margin: 20px 0;"></div>
+          <div id="exploration-rewards" style="margin: 15px 0;"></div>
+          <button class="btn btn-primary" id="exploration-continue-btn" onclick="closeExplorationModal()">Continue</button>
+        </div>
+      </div>
+      
+      <!-- Forest Exploration (main view) -->
+      <div id="forest-exploration">
+        <div class="page-hero">
+          <div class="sparkle-row">🌲 ⚔️ 🌲</div>
+          <h1>Wildwood Forest</h1>
+          <p>Explore and battle wild creatures!</p>
+        </div>
+        
+        <!-- Zone Selection -->
+        <div class="zone-selector" style="margin: 20px 0;">
+          <h3 style="text-align: center; color: var(--purple); margin-bottom: 15px;">Choose Your Destination</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+            
+            <button class="zone-btn zone-selected" id="zone-outskirts" onclick="selectZone('outskirts')" style="padding: 20px; border: 3px solid var(--green); border-radius: 16px; background: linear-gradient(135deg, rgba(93,222,122,0.1), rgba(93,222,122,0.2)); cursor: pointer; transition: all 0.3s;">
+              <div style="font-size: 2rem; margin-bottom: 8px;">🏘️</div>
+              <div style="font-weight: bold; color: var(--purple); font-size: 1.1rem; margin-bottom: 4px;">City Outskirts</div>
+              <div style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 8px;">Perfect for beginners</div>
+              <div style="font-size: 0.75rem; color: var(--green); font-weight: bold;">⭐ EASY</div>
+              <div style="font-size: 0.7rem; color: var(--text-light); margin-top: 4px;">Birds, Bunnies, Squirrels</div>
+            </button>
+            
+            <button class="zone-btn" id="zone-glade" onclick="selectZone('glade')" style="padding: 20px; border: 3px solid var(--purple-light); border-radius: 16px; background: linear-gradient(135deg, rgba(176,106,255,0.05), rgba(176,106,255,0.1)); cursor: pointer; transition: all 0.3s;">
+              <div style="font-size: 2rem; margin-bottom: 8px;">🌳</div>
+              <div style="font-weight: bold; color: var(--purple); font-size: 1.1rem; margin-bottom: 4px;">Forest Glade</div>
+              <div style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 8px;">For experienced pets</div>
+              <div style="font-size: 0.75rem; color: #ffaa00; font-weight: bold;">⭐⭐ MEDIUM</div>
+              <div style="font-size: 0.7rem; color: var(--text-light); margin-top: 4px;">Foxes, Raccoons, Boars</div>
+            </button>
+            
+            <button class="zone-btn zone-btn" id="zone-deepwoods" onclick="selectZone('deepwoods')" style="padding: 20px; border: 3px solid #ff6b6b; border-radius: 16px; background: linear-gradient(135deg, rgba(255,107,107,0.1), rgba(255,107,107,0.2)); cursor: pointer; transition: all 0.3s;">
+              <div style="font-size: 2rem; margin-bottom: 8px;">🌲</div>
+              <div style="font-weight: bold; color: var(--purple); font-size: 1.1rem; margin-bottom: 4px;">Deep Woods</div>
+              <div style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 8px;">For champions only</div>
+              <div style="font-size: 0.75rem; color: #ff6b6b; font-weight: bold;">⭐⭐⭐ HARD</div>
+              <div style="font-size: 0.7rem; color: var(--text-light); margin-top: 4px;">Wolves, Bears, Deer</div>
+            </button>
+            
+            
+            <!-- STARTER DUNGEON -->
+            <button class="zone-btn" id="zone-dungeon" onclick="selectZone('dungeon')" style="padding: 20px; border: 3px solid #9d4edd; border-radius: 16px; background: linear-gradient(135deg, rgba(157,78,221,0.15), rgba(157,78,221,0.25)); cursor: pointer; transition: all 0.3s; position: relative;">
+              <div style="position: absolute; top: 8px; right: 8px; background: #ff6b9d; color: white; padding: 4px 8px; border-radius: 6px; font-size: 0.65rem; font-weight: bold;">CHALLENGE</div>
+              <div style="font-size: 2rem; margin-bottom: 8px;">⛰️</div>
+              <div style="font-weight: bold; color: var(--purple); font-size: 1.1rem; margin-bottom: 4px;">Shallow Cave</div>
+              <div style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 8px;">3 waves, no healing!</div>
+              <div style="font-size: 0.75rem; color: #9d4edd; font-weight: bold;">⚔️ GAUNTLET</div>
+              <div style="font-size: 0.7rem; color: var(--text-light); margin-top: 4px;">A dangerous challenge!</div>
+            </button>
+            
+            <!-- OUTSIDE THE RUINS -->
+            <button class="zone-btn" id="zone-ruins" onclick="selectZone('ruins')" style="padding: 20px; border: 3px solid #7209b7; border-radius: 16px; background: linear-gradient(135deg, rgba(114,9,183,0.15), rgba(114,9,183,0.25)); cursor: pointer; transition: all 0.3s;">
+              <div style="font-size: 2rem; margin-bottom: 8px;">🏛️</div>
+              <div style="font-weight: bold; color: var(--purple); font-size: 1.1rem; margin-bottom: 4px;">Outside The Ruins</div>
+              <div style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 8px;">Ancient and dangerous</div>
+              <div style="font-size: 0.75rem; color: #7209b7; font-weight: bold;">⭐⭐⭐⭐ EXTREME</div>
+              <div style="font-size: 0.7rem; color: var(--text-light); margin-top: 4px;">Mushrooms, Slimes</div>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Select Pet -->
+        <div class="battle-pet-selector">
+          <h3>Choose Your Fighter</h3>
+          <div id="battle-pet-select" class="battle-pet-grid">
+            <div class="spinner"></div>
+          </div>
+        </div>
+        
+        <!-- Encounter Button -->
+        <div style="text-align: center; margin-top: 30px;">
+          <button class="btn btn-primary btn-large" onclick="goExploring()" id="find-battle-btn" disabled>
+            🌲 Go Exploring
+          </button>
+          <p style="margin-top: 10px; color: var(--text-light); font-size: 0.9rem;" id="battle-helper-text">Select a pet first</p>
+        </div>
+        
+      </div>
+      
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       FRIENDS SYSTEM
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="page-section" id="section-friends">
+    <div class="page-wrap">
+      <div class="page-hero">
+        <div class="sparkle-row">👥 ✦ 👥</div>
+        <h1>Friends</h1>
+        <p>Connect with other PawketPets players! ✨</p>
+      </div>
+
+      <!-- Search Players -->
+      <div class="card" style="margin-bottom: 24px; padding: 20px;">
+        <h3 style="color: var(--purple-dark); margin-bottom: 12px;">🔍 Find Friends</h3>
+        <div style="display: flex; gap: 10px;">
+          <input 
+            type="text" 
+            id="friend-search-input" 
+            placeholder="Search by username..." 
+            style="flex: 1; padding: 10px 16px; border: 2px solid var(--border); border-radius: 12px; font-size: 0.95rem;"
+            onkeydown="if(event.key==='Enter') searchPlayers()"
+          />
+          <button class="btn btn-primary" onclick="searchPlayers()">Search</button>
+        </div>
+        <div id="friend-search-results" style="margin-top: 16px;"></div>
+      </div>
+
+      <!-- Friends Tabs -->
+      <div class="friends-tabs" style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border);">
+        <button class="friends-tab active" id="tab-friends-list" onclick="switchFriendsTab('list')">
+          👥 Friends <span id="friends-count-badge" style="background: var(--purple); color: white; border-radius: 12px; padding: 2px 8px; margin-left: 6px; font-size: 0.8rem;">0</span>
+        </button>
+        <button class="friends-tab" id="tab-friend-requests" onclick="switchFriendsTab('requests')">
+          📬 Requests <span id="requests-count-badge" style="background: var(--pink); color: white; border-radius: 12px; padding: 2px 8px; margin-left: 6px; font-size: 0.8rem; display: none;">0</span>
+        </button>
+        <button class="friends-tab" id="tab-blocked-users" onclick="switchFriendsTab('blocked')">
+          🚫 Blocked <span id="blocked-count-badge" style="background: var(--red); color: white; border-radius: 12px; padding: 2px 8px; margin-left: 6px; font-size: 0.8rem; display: none;">0</span>
+        </button>
+      </div>
+
+      <!-- Friends List Tab -->
+      <div id="friends-list-container" class="friends-container">
+        <div class="spinner"></div>
+      </div>
+
+      <!-- Friend Requests Tab -->
+      <div id="friend-requests-container" class="friends-container" style="display:none;">
+        <div class="spinner"></div>
+      </div>
+
+      <!-- Blocked Users Tab -->
+      <div id="blocked-users-container" class="friends-container" style="display:none;">
+        <div class="spinner"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       LEADERBOARDS
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="page-section" id="section-leaderboard">
+    <div class="page-wrap">
+      <div class="page-hero">
+        <div class="sparkle-row">🏆 ✦ 🏆</div>
+        <h1>Leaderboards</h1>
+        <p>See who's at the top of PawketPetsVT! 🌟</p>
+      </div>
+
+      <!-- Leaderboard Tabs -->
+      <div class="leaderboard-tabs">
+        <button class="leaderboard-tab active" onclick="switchLeaderboard('points')">💰 Most Points</button>
+        <button class="leaderboard-tab" onclick="switchLeaderboard('pets')">🐾 Most Pets</button>
+        <button class="leaderboard-tab" onclick="switchLeaderboard('levels')">⭐ Highest Levels</button>
+        <button class="leaderboard-tab" onclick="switchLeaderboard('badges')">🎖️ Most Badges</button>
+      </div>
+
+      <!-- Leaderboard Content -->
+      <div class="leaderboard-container">
+        <div id="leaderboard-points" class="leaderboard-list active">
+          <div class="spinner"></div>
+        </div>
+        <div id="leaderboard-pets" class="leaderboard-list">
+          <div class="spinner"></div>
+        </div>
+        <div id="leaderboard-levels" class="leaderboard-list">
+          <div class="spinner"></div>
+        </div>
+        <div id="leaderboard-badges" class="leaderboard-list">
+          <div class="spinner"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       STATISTICS PAGE
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="page-section" id="section-stats">
+    <div class="page-wrap">
+      <div class="page-hero">
+        <div class="sparkle-row">📊 ✦ 📊</div>
+        <h1>Statistics</h1>
+        <p>Track your progress and see community achievements! 📈</p>
+      </div>
+      
+      <!-- Share Button -->
+      <div style="text-align:center;margin:20px 0;">
+        <button class="btn btn-primary" onclick="shareProgress()" style="background:linear-gradient(135deg,#ff6eb4 0%,#9966ff 100%);">
+          📤 Share My Progress
+        </button>
+      </div>
+
+      <div id="stats-container">
+        <div class="spinner"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       TEAM PROFILES
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="page-section" id="section-team">
+    <div class="page-wrap">
+      <div class="page-hero">
+        <div class="sparkle-row">👥 ✦ 👥</div>
+        <h1>Meet the Team</h1>
+        <p>Get to know the streamers behind PawketPetsVT! 🌟</p>
+      </div>
+
+      <!-- Team Members Grid -->
+      <div class="team-profiles-grid">
+        
+        <!-- Embertail Profile -->
+        <div class="team-profile-card">
+          <div class="team-profile-header">
+            <div class="team-profile-avatar">
+              <img src="images/pets/ember.png" alt="Embertail" onerror="this.style.display='none';" />
+            </div>
+            <div class="team-profile-info">
+              <h2 class="team-profile-name">Embertail</h2>
+              <div class="team-profile-role">🦊 Founder & Lead Dev</div>
+            </div>
+          </div>
+          
+          <div class="team-profile-body">
+            <p class="team-profile-bio">
+              Creator of PawketPetsVT! A fiery fox VTuber who loves building community-driven projects and cozy games. 
+              Passionate about bringing VTubers together through fun, interactive experiences!
+            </p>
+            
+            <div class="team-profile-stats">
+              <div class="team-stat">
+                <span class="team-stat-label">Streaming Since</span>
+                <span class="team-stat-value">2015</span>
+              </div>
+              <div class="team-stat">
+                <span class="team-stat-label">Favorite Game</span>
+                <span class="team-stat-value">Deadlock</span>
+              </div>
+            </div>
+            
+            <div class="team-profile-socials">
+              <a href="https://twitch.tv/embertail" target="_blank" class="team-social-btn twitch">
+                <span class="social-icon">📺</span> Twitch
+              </a>
+              <a href="https://bsky.app/profile/embertail.bsky.social" target="_blank" class="team-social-btn bluesky">
+                <span class="social-icon">🦋</span> Bluesky
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pyxshuul Profile -->
+        <div class="team-profile-card">
+          <div class="team-profile-header">
+            <div class="team-profile-avatar">
+              <img src="images/pets/pyxie.png" alt="Pyxshuul" onerror="this.style.display='none';" />
+            </div>
+            <div class="team-profile-info">
+              <h2 class="team-profile-name">Pyxshuul</h2>
+              <div class="team-profile-role">🐰 Co-Founder & Community Manager</div>
+            </div>
+          </div>
+          
+          <div class="team-profile-body">
+            <p class="team-profile-bio">
+              Co-creator of PawketPetsVT! A Sparkledog VTuber who brings joy and nostalgia to every stream! 
+              Loves connecting with the community and making everyone feel welcome.
+            </p>
+            
+            <div class="team-profile-stats">
+              <div class="team-stat">
+                <span class="team-stat-label">Streaming Since</span>
+                <span class="team-stat-value">2023</span>
+              </div>
+              <div class="team-stat">
+                <span class="team-stat-label">Favorite Game</span>
+                <span class="team-stat-value">Mama's Sleeping Angels</span>
+              </div>
+            </div>
+            
+            <div class="team-profile-socials">
+              <a href="https://twitch.tv/pyxshuul" target="_blank" class="team-social-btn twitch">
+                <span class="social-icon">📺</span> Twitch
+              </a>
+              <a href="https://bsky.app/profile/pyxshuul.bsky.social" target="_blank" class="team-social-btn bluesky"">
+                <span class="social-icon">🦋</span> Bluesky
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aria Profile -->
+        <div class="team-profile-card">
+          <div class="team-profile-header">
+            <div class="team-profile-avatar">
+              <img src="images/pets/aria.png" alt="Aria" onerror="this.style.display='none';" />
+            </div>
+            <div class="team-profile-info">
+              <h2 class="team-profile-name">Aria</h2>
+              <div class="team-profile-role">??? WIP</div>
+            </div>
+          </div>
+          
+          <div class="team-profile-body">
+            <p class="team-profile-bio">
+              ??? WIP
+            </p>
+            
+            <div class="team-profile-stats">
+              <div class="team-stat">
+                <span class="team-stat-label">Streaming Since</span>
+                <span class="team-stat-value">2026</span>
+              </div>
+              <div class="team-stat">
+                <span class="team-stat-label">Favorite Game</span>
+                <span class="team-stat-value">Ori & The Blind Forest</span>
+              </div>
+            </div>
+            
+            <div class="team-profile-socials">
+              <a href="https://twitch.tv/ariadoestwitch" target="_blank" class="team-social-btn twitch">
+                <span class="social-icon">📺</span> Twitch
+              </a>
+              <a href="#" target="_blank" class="team-social-btn twitter">
+                <span class="social-icon">🐦</span> Twitter
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Blushimia Profile -->
+        <div class="team-profile-card">
+          <div class="team-profile-header">
+            <div class="team-profile-avatar">
+              <img src="images/pets/blushimia.png" alt="Blushimia" onerror="this.style.display='none';" />
+            </div>
+            <div class="team-profile-info">
+              <h2 class="team-profile-name">Blushimia</h2>
+              <div class="team-profile-role">??? WIP</div>
+            </div>
+          </div>
+          
+          <div class="team-profile-body">
+            <p class="team-profile-bio">
+              ??? WIP
+            </p>
+            
+            <div class="team-profile-stats">
+              <div class="team-stat">
+                <span class="team-stat-label">Streaming Since</span>
+                <span class="team-stat-value">??? WIP</span>
+              </div>
+              <div class="team-stat">
+                <span class="team-stat-label">Favorite Game</span>
+                <span class="team-stat-value">??? WIP</span>
+              </div>
+            </div>
+            
+            <div class="team-profile-socials">
+              <a href="https://twitch.tv/realblushimia" target="_blank" class="team-social-btn twitch">
+                <span class="social-icon">📺</span> Twitch
+              </a>
+              <a href="#" target="_blank" class="team-social-btn twitter">
+                <span class="social-icon">🐦</span> Twitter
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cowbee Profile -->
+        <div class="team-profile-card">
+          <div class="team-profile-header">
+            <div class="team-profile-avatar">
+              <img src="images/pets/cowbee.png" alt="Cowbee" onerror="this.style.display='none';" />
+            </div>
+            <div class="team-profile-info">
+              <h2 class="team-profile-name">Cowbee</h2>
+              <div class="team-profile-role">??? WIP</div>
+            </div>
+          </div>
+          
+          <div class="team-profile-body">
+            <p class="team-profile-bio">
+              ??? WIP
+            </p>
+            
+            <div class="team-profile-stats">
+              <div class="team-stat">
+                <span class="team-stat-label">Streaming Since</span>
+                <span class="team-stat-value">2016</span>
+              </div>
+              <div class="team-stat">
+                <span class="team-stat-label">Favorite Game</span>
+                <span class="team-stat-value">Marvel Rivals</span>
+              </div>
+            </div>
+            
+            <div class="team-profile-socials">
+              <a href="https://twitch.tv/cowbeevt" target="_blank" class="team-social-btn twitch">
+                <span class="social-icon">📺</span> Twitch
+              </a>
+              <a href="https://bsky.app/profile/cowbeevt.vtubers.social" target="_blank" class="team-social-btn bluesky"">
+                <span class="social-icon">🦋</span> Bluesky
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kelta Profile -->
+        <div class="team-profile-card">
+          <div class="team-profile-header">
+            <div class="team-profile-avatar">
+              <img src="images/pets/kelta.png" alt="Kelta" onerror="this.style.display='none';" />
+            </div>
+            <div class="team-profile-info">
+              <h2 class="team-profile-name">Kelta</h2>
+              <div class="team-profile-role">??? WIP</div>
+            </div>
+          </div>
+          
+          <div class="team-profile-body">
+            <p class="team-profile-bio">
+              ??? WIP
+            </p>
+            
+            <div class="team-profile-stats">
+              <div class="team-stat">
+                <span class="team-stat-label">Streaming Since</span>
+                <span class="team-stat-value">2022</span>
+              </div>
+              <div class="team-stat">
+                <span class="team-stat-label">Favorite Game</span>
+                <span class="team-stat-value">Pokemon</span>
+              </div>
+            </div>
+            
+            <div class="team-profile-socials">
+              <a href="https://twitch.tv/keltathepomeranian" target="_blank" class="team-social-btn twitch">
+                <span class="social-icon">📺</span> Twitch
+              </a>
+              <a href="https://bsky.app/profile/keltathepomeranian.bsky.social" target="_blank" class="team-social-btn bluesky"">
+                <span class="social-icon">🦋</span> Bluesky
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Jess Profile -->
+        <div class="team-profile-card">
+          <div class="team-profile-header">
+            <div class="team-profile-avatar">
+              <img src="images/pets/jess.png" alt="Jess" onerror="this.style.display='none';" />
+            </div>
+            <div class="team-profile-info">
+              <h2 class="team-profile-name">Jess</h2>
+              <div class="team-profile-role">??? WIP</div>
+            </div>
+          </div>
+          
+          <div class="team-profile-body">
+            <p class="team-profile-bio">
+              ??? WIP
+            </p>
+            
+            <div class="team-profile-stats">
+              <div class="team-stat">
+                <span class="team-stat-label">Streaming Since</span>
+                <span class="team-stat-value">??? WIP</span>
+              </div>
+              <div class="team-stat">
+                <span class="team-stat-label">Favorite Game</span>
+                <span class="team-stat-value">??? WIP</span>
+              </div>
+            </div>
+            
+            <div class="team-profile-socials">
+              <a href="https://twitch.tv/teatimejess" target="_blank" class="team-social-btn twitch">
+                <span class="social-icon">📺</span> Twitch
+              </a>
+              <a href="#" target="_blank" class="team-social-btn twitter">
+                <span class="social-icon">🐦</span> Twitter
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gnarly Profile -->
+        <div class="team-profile-card">
+          <div class="team-profile-header">
+            <div class="team-profile-avatar">
+              <img src="images/pets/gnarly.png" alt="Gnarly" onerror="this.style.display='none';" />
+            </div>
+            <div class="team-profile-info">
+              <h2 class="team-profile-name">Gnarly</h2>
+              <div class="team-profile-role">??? WIP</div>
+            </div>
+          </div>
+          
+          <div class="team-profile-body">
+            <p class="team-profile-bio">
+              ??? WIP
+            </p>
+            
+            <div class="team-profile-stats">
+              <div class="team-stat">
+                <span class="team-stat-label">Streaming Since</span>
+                <span class="team-stat-value">??? WIP</span>
+              </div>
+              <div class="team-stat">
+                <span class="team-stat-label">Favorite Game</span>
+                <span class="team-stat-value">??? WIP</span>
+              </div>
+            </div>
+            
+            <div class="team-profile-socials">
+              <a href="https://twitch.tv/gnarly_neon_smilodon" target="_blank" class="team-social-btn twitch">
+                <span class="social-icon">📺</span> Twitch
+              </a>
+              <a href="#" target="_blank" class="team-social-btn twitter">
+                <span class="social-icon">🐦</span> Twitter
+              </a>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Placeholder for future members -->
+        <div class="team-profile-card team-join-card">
+          <div class="team-join-content">
+            <div style="font-size:4rem;margin-bottom:20px;">✨</div>
+            <h3>Want to Join?</h3>
+            <p>We're looking for VTubers to join the PawketPetsVT team!</p>
+            <button class="btn btn-primary" onclick="openContactModal()">Get in Touch</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       FORUM
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="page-section" id="section-forum">
+    <div class="page-wrap">
+      <div class="page-hero">
+        <div class="sparkle-row">💬 ✦ 💬</div>
+        <h1>Community Forum</h1>
+        <p>Chat, share, and discuss all things PawketPets! 🐾</p>
+      </div>
+
+      <!-- Forum Navigation: Categories View or Thread View -->
+      <div id="forum-categories-view">
+        <!-- Admin Panel Button (only visible to mods) -->
+        <div id="forum-admin-panel-btn" style="display:none; margin-bottom:20px;">
+          <button class="btn btn-danger" onclick="toggleAdminPanel()">
+            🛡️ Moderator Panel
+          </button>
+        </div>
+        
+        <!-- Debug button - remove after testing -->
+        <div style="margin-bottom:20px;">
+          <button class="btn btn-outline" onclick="console.log('Manual forum load triggered'); initForum();">
+            🔄 Reload Forum (Debug)
+          </button>
+        </div>
+
+        <!-- Forum Categories List -->
+        <div class="forum-categories-list" id="forum-categories-list">
+          <div class="spinner"></div>
+        </div>
+      </div>
+
+      <!-- Single Category View -->
+      <div id="forum-category-view" style="display:none;">
+        <button class="btn btn-outline" onclick="showForumCategories()" style="margin-bottom:20px;">
+          ← Back to Categories
+        </button>
+        
+        <div class="forum-category-header">
+          <h2 id="forum-category-name">Category</h2>
+          <button class="btn btn-primary" onclick="showNewThreadModal()">
+            ✏️ New Thread
+          </button>
+        </div>
+        
+        <div class="forum-threads-list" id="forum-threads-list">
+          <div class="spinner"></div>
+        </div>
+      </div>
+
+      <!-- Single Thread View -->
+      <div id="forum-thread-view" style="display:none;">
+        <button class="btn btn-outline" onclick="backToCategory()" style="margin-bottom:20px;">
+          ← Back to Threads
+        </button>
+        
+        <div class="forum-thread-container" id="forum-thread-container">
+          <div class="spinner"></div>
+        </div>
+        
+        <!-- Reply Box -->
+        <div class="forum-reply-box" id="forum-reply-box">
+          <h3>Post a Reply</h3>
+          <div class="emoji-picker-container">
+            <button type="button" class="emoji-picker-btn" onclick="toggleEmojiPicker('reply')">😀 Add Emoji</button>
+            <div class="emoji-picker" id="emoji-picker-reply" style="display:none;">
+              <div class="emoji-grid">
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '😀')">😀</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '😂')">😂</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '😊')">😊</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '😍')">😍</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '🤔')">🤔</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '😎')">😎</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '😢')">😢</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '😭')">😭</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '😤')">😤</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '🥰')">🥰</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '🤗')">🤗</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '🤩')">🤩</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '🦊')">🦊</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '🐰')">🐰</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '🐾')">🐾</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '💖')">💖</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '❤️')">❤️</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '✨')">✨</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '🎮')">🎮</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '🎨')">🎨</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '🎉')">🎉</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '👍')">👍</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '👎')">👎</span>
+                <span class="emoji-option" onclick="insertEmoji('forum-reply-textarea', '🔥')">🔥</span>
+              </div>
+            </div>
+          </div>
+          <textarea id="forum-reply-textarea" placeholder="Write your reply here..." rows="5"></textarea>
+          <button class="btn btn-primary" onclick="submitReply()">Post Reply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       PUBLIC PROFILE
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="page-section" id="section-profile">
+    <div class="page-wrap">
+      
+      <!-- Back Button -->
+      <button class="btn btn-outline" onclick="showTab('leaderboard')" style="margin-bottom: 20px;">
+        ← Back to Leaderboards
+      </button>
+
+      <!-- Profile Header -->
+      <div class="profile-header">
+        <div class="profile-avatar" id="profile-avatar">?</div>
+        <div class="profile-info">
+          <h1 class="profile-username" id="profile-username">Loading...</h1>
+          <div class="profile-joined" id="profile-joined">Joined: ...</div>
+          <div class="profile-bio" id="profile-bio" style="margin-top: 12px; color: var(--text-light); font-style: italic;"></div>
+          
+          <!-- Friend/Block Actions (hidden for own profile) -->
+          <div id="profile-actions" style="margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; display: none;">
+            <button class="btn btn-primary" id="add-friend-btn" onclick="sendFriendRequest()" style="display:none;">
+              ➕ Add Friend
+            </button>
+            <button class="btn btn-outline" id="pending-friend-btn" disabled style="display:none;">
+              ⏳ Request Pending
+            </button>
+            <button class="btn btn-success" id="already-friends-btn" disabled style="display:none;">
+              ✅ Friends
+            </button>
+            <button class="btn btn-outline" id="remove-friend-btn" onclick="removeFriend()" style="display:none;">
+              ❌ Remove Friend
+            </button>
+            <button class="btn btn-outline btn-danger" id="block-user-btn" onclick="blockUser()" style="display:none;">
+              🚫 Block User
+            </button>
+            <button class="btn btn-outline" id="unblock-user-btn" onclick="unblockUser()" style="display:none;">
+              ✅ Unblock User
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profile Stats Grid -->
+      <div class="profile-stats-grid">
+        <div class="profile-stat-card">
+          <div class="profile-stat-icon">🪙</div>
+          <div class="profile-stat-value" id="profile-points">0</div>
+          <div class="profile-stat-label">PawketPoints</div>
+        </div>
+        <div class="profile-stat-card">
+          <div class="profile-stat-icon">🐾</div>
+          <div class="profile-stat-value" id="profile-pet-count">0</div>
+          <div class="profile-stat-label">Pets Owned</div>
+        </div>
+        <div class="profile-stat-card">
+          <div class="profile-stat-icon">⭐</div>
+          <div class="profile-stat-value" id="profile-total-level">0</div>
+          <div class="profile-stat-label">Total Levels</div>
+        </div>
+        <div class="profile-stat-card">
+          <div class="profile-stat-icon">🏆</div>
+          <div class="profile-stat-value" id="profile-rank">-</div>
+          <div class="profile-stat-label">Rank</div>
+        </div>
+        <div class="profile-stat-card">
+          <div class="profile-stat-icon">🎖️</div>
+          <div class="profile-stat-value" id="profile-badge-count">0</div>
+          <div class="profile-stat-label">Badges</div>
+        </div>
+      </div>
+      
+      <!-- Badges Display -->
+      <div class="section-header" style="margin-top: 40px;">
+        <h2>Badges</h2>
+        <div class="section-line"></div>
+      </div>
+      <div id="profile-badges-grid" class="badges-grid">
+        <div class="spinner"></div>
+      </div>
+
+      <!-- Pet Collection -->
+      <div class="section-header" style="margin-top: 40px;">
+        <h2>Pet Collection</h2>
+        <div class="section-line"></div>
+      </div>
+      <div id="profile-pets-grid" class="pets-grid">
+        <div class="spinner"></div>
+      </div>
+
+      <!-- Guestbook Section -->
+      <div class="section-header" style="margin-top: 40px;">
+        <h2>📖 Guestbook</h2>
+        <div class="section-line"></div>
+      </div>
+      
+      <div class="guestbook-section">
+        <!-- Post new message (hidden if viewing own profile or if blocked) -->
+        <div id="guestbook-post-form" style="display:none; margin-bottom: 24px;">
+          <div class="card" style="padding: 20px;">
+            <h3 style="color: var(--purple-dark); margin-bottom: 12px;">Leave a Message</h3>
+            <textarea 
+              id="guestbook-message-input" 
+              placeholder="Write something nice... 💖" 
+              maxlength="500"
+              style="width: 100%; min-height: 100px; padding: 12px; border: 2px solid var(--border); border-radius: 12px; font-family: inherit; resize: vertical; font-size: 0.95rem;"
+            ></textarea>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+              <span id="guestbook-char-count" style="font-size: 0.85rem; color: var(--text-light);">0 / 500</span>
+              <button class="btn btn-primary" onclick="postGuestbookMessage()">✨ Post Message</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Guestbook entries -->
+        <div id="guestbook-entries">
+          <div class="spinner"></div>
+        </div>
+        
+        <!-- Load more button (if needed later) -->
+        <div id="guestbook-load-more" style="text-align: center; margin-top: 20px; display: none;">
+          <button class="btn btn-outline" onclick="loadMoreGuestbookEntries()">Load More Messages</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       MY PROFILE (Edit Your Profile)
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="page-section" id="section-myprofile">
+    <div class="page-wrap">
+      <div class="page-hero">
+        <div class="sparkle-row">👤 ✦ 👤</div>
+        <h1>My Profile</h1>
+        <p>Customize how others see you! 🌟</p>
+      </div>
+
+      <!-- Profile Preview Card -->
+      <div class="profile-preview-card">
+        <h3>Profile Preview</h3>
+        <div class="profile-header">
+          <div class="profile-avatar large" id="myprofile-avatar-preview">?</div>
+          <div class="profile-info">
+            <h2 class="profile-username" id="myprofile-username-preview">Loading...</h2>
+            <div class="profile-joined" id="myprofile-joined-preview">Joined: ...</div>
+            <div class="profile-bio" id="myprofile-bio-preview" style="margin-top: 12px; color: var(--text-light); font-style: italic;"></div>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="viewMyPublicProfile()" style="margin-top: 12px;">
+          🔗 View My Public Profile
+        </button>
+      </div>
+
+      <!-- Edit Form -->
+      <div class="profile-edit-card">
+        <h3>✏️ Edit Profile</h3>
+        
+        <div class="form-group">
+          <label for="edit-username">Username</label>
+          <input type="text" id="edit-username" class="form-input" maxlength="20" placeholder="Your username" />
+          <small class="form-hint">Max 20 characters. Letters, numbers, and underscores only.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-bio">Bio</label>
+          <textarea id="edit-bio" class="form-input" rows="3" maxlength="200" placeholder="Tell others about yourself..."></textarea>
+          <small class="form-hint">Max 200 characters.</small>
+        </div>
+
+        <!-- Player Title Selector -->
+        <div class="form-group">
+          <div id="player-title-selector-container"></div>
+        </div>
+
+        <div id="profile-edit-error" class="alert alert-error" style="display:none;"></div>
+        <div id="profile-edit-success" class="alert alert-success" style="display:none;"></div>
+
+        <button class="btn btn-primary btn-lg" id="save-profile-btn" onclick="saveProfile()">💾 Save Changes</button>
+      </div>
+
+      <!-- Stats Overview -->
+      <div class="section-header" style="margin-top: 40px;">
+        <h2>Your Stats</h2>
+        <div class="section-line"></div>
+      </div>
+      
+      <div class="profile-stats-grid">
+        <div class="profile-stat-card">
+          <div class="stat-icon">🪙</div>
+          <div class="stat-value" id="myprofile-points">0</div>
+          <div class="stat-label">PawketPoints</div>
+        </div>
+        <div class="profile-stat-card">
+          <div class="stat-icon">🐾</div>
+          <div class="stat-value" id="myprofile-pets">0</div>
+          <div class="stat-label">Pets Owned</div>
+        </div>
+        <div class="profile-stat-card">
+          <div class="stat-icon">⭐</div>
+          <div class="stat-value" id="myprofile-levels">0</div>
+          <div class="stat-label">Total Levels</div>
+        </div>
+        <div class="profile-stat-card">
+          <div class="stat-icon">🏆</div>
+          <div class="stat-value" id="myprofile-rank">-</div>
+          <div class="stat-label">Leaderboard Rank</div>
+        </div>
+        <div class="profile-stat-card">
+          <div class="stat-icon">🎖️</div>
+          <div class="stat-value" id="myprofile-badges">0</div>
+          <div class="stat-label">Badges</div>
+        </div>
+      </div>
+      
+      <!-- Badges Display -->
+      <div class="section-header" style="margin-top: 40px;">
+        <h2>Your Badges</h2>
+        <div class="section-line"></div>
+      </div>
+      <div id="myprofile-badges-grid" class="badges-grid">
+        <div class="spinner"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════
+       SETTINGS PAGE
+       ═════════════════════════════════════════════════════════ -->
+  <div class="page-section" id="section-settings">
+    <div class="page-wrap">
+      <div class="page-hero">
+        <div class="sparkle-row">⚙️ ✦ ⚙️</div>
+        <h1>Settings</h1>
+        <p>Customize your experience</p>
+      </div>
+      
+      <div style="max-width: 500px; margin: 40px auto;">
+        <!-- Spooky Content -->
+        <div class="settings-modal-item">
+          <div class="settings-modal-label">
+            <strong>👻 Spooky Content</strong>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="setting-spooky" onchange="saveSettings()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- Music Toggle -->
+        <div class="settings-modal-item" style="margin-top: 15px;">
+          <div class="settings-modal-label">
+            <strong>🎵 Music</strong>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="setting-music-enabled" onchange="saveSettings()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- Music Volume -->
+        <div class="settings-modal-item" style="margin-top: 15px;">
+          <div class="settings-modal-label">
+            <strong>🎼 Music Volume</strong>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="range" id="setting-music-volume" min="0" max="100" value="70" 
+                   style="width: 150px;" onchange="saveSettings()">
+            <span id="music-volume-display" style="min-width: 40px; font-weight: bold;">70%</span>
+          </div>
+        </div>
+        
+        <!-- SFX Volume -->
+        <div class="settings-modal-item" style="margin-top: 15px;">
+          <div class="settings-modal-label">
+            <strong>🔊 Sound Effects Volume</strong>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="range" id="setting-sfx-volume" min="0" max="100" value="80" 
+                   style="width: 150px;" onchange="saveSettings()">
+            <span id="sfx-volume-display" style="min-width: 40px; font-weight: bold;">80%</span>
+          </div>
+        </div>
+        
+        <!-- Day/Night Effects -->
+        <div class="settings-modal-item" style="margin-top: 15px;">
+          <div class="settings-modal-label">
+            <strong>🌙 Day/Night Effects</strong>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="setting-daynight" checked onchange="saveSettings()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- Weather Effects -->
+        <div class="settings-modal-item" style="margin-top: 15px;">
+          <div class="settings-modal-label">
+            <strong>🌦️ Weather Effects</strong>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="setting-weather" checked onchange="saveSettings()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- Referral System -->
+        <div style="margin-top:40px;padding-top:30px;border-top:2px solid var(--border);">
+          <h3 style="text-align:center;color:var(--purple);margin-bottom:15px;">💰 Invite Friends</h3>
+          <p style="text-align:center;color:var(--text-light);margin-bottom:20px;">
+            Earn 250 PP for each friend who adopts their first pet!
+          </p>
+          <button class="btn btn-primary" onclick="showReferralModal()" style="display:block;margin:0 auto;background:linear-gradient(135deg,#9966ff 0%,#ff66cc 100%);">
+            📤 Get Referral Link
+          </button>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
+
+</div><!-- end app-content -->
+
+<!-- MODALS -->
+<div class="modal-overlay" id="adopt-modal">
+  <div class="modal">
+    <div class="modal-image" id="modal-image">&#128062;</div>
+    <h2 id="modal-title">Adopt this pet?</h2>
+    <p id="modal-desc">Give your new pet a nickname!</p>
+    <div class="modal-nickname-group">
+      <label>Nickname <span style="color:var(--text-light);font-weight:400">(or leave blank)</span></label>
+      <input type="text" id="nickname-input" placeholder="e.g. Ember the Brave" maxlength="30" />
+    </div>
+    <div class="modal-buttons">
+      <button class="btn btn-outline" onclick="closeAdoptModal()">Cancel</button>
+      <button class="btn btn-primary" id="confirm-adopt-btn" onclick="confirmAdopt()">Adopt!</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="success-modal">
+  <div class="modal">
+    <div style="font-size:3.5rem;margin-bottom:12px;">&#127881;</div>
+    <h2 style="color:var(--purple-dark)">Welcome home!</h2>
+    <p id="success-message">Your new pet has been adopted!</p>
+    
+    <!-- Social Share Buttons -->
+    <div class="social-share-buttons" id="adoption-share-buttons" style="margin: 16px 0;">
+      <p style="font-size:0.9rem;color:var(--text-light);margin-bottom:8px;">Share your new pet!</p>
+      <div style="display:flex;gap:8px;justify-content:center;">
+        <button class="btn-social btn-twitter" onclick="shareAdoptionToTwitter()">
+          <span class="social-icon">🐦</span> Tweet
+        </button>
+        <button class="btn-social btn-bluesky" onclick="shareAdoptionToBluesky()">
+          <span class="social-icon">🦋</span> Post
+        </button>
+      </div>
+    </div>
+    
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <button class="btn btn-outline" onclick="closeSuccessModal()">Adopt More</button>
+      <button class="btn btn-primary" onclick="closeSuccessModal();showTab('mypets')">My Pets</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="bonus-modal">
+  <div class="modal">
+    <div class="bonus-coins">&#129689;</div>
+    <h2 style="color:var(--purple-dark);margin-bottom:8px;">Daily Bonus!</h2>
+    <p>You earned <strong style="color:var(--purple);font-size:1.2rem;" id="bonus-amount">50 PP</strong> for logging in today!</p>
+    <p style="font-size:0.88rem;color:var(--text-light);margin-bottom:18px;">Come back tomorrow! &#10024;</p>
+    <button class="btn btn-primary btn-lg" onclick="closeBonusModal()">Awesome!</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="use-modal">
+  <div class="modal">
+    <h2 id="use-modal-title">Use item</h2>
+    <p id="use-modal-desc">Which pet?</p>
+    <div class="pet-select-list" id="pet-select-list"></div>
+    <button class="btn btn-outline" onclick="closeUseModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- Contact Options Modal -->
+<div class="modal-overlay" id="contact-modal">
+  <div class="modal contact-modal">
+    <h2>📞 Contact Us</h2>
+    <p>Need help or found a bug? Reach out to us!</p>
+    
+    <div class="contact-options">
+      <a href="mailto:PawketPetsVT@gmail.com" class="contact-option" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+        <div class="contact-icon">✉️</div>
+        <div class="contact-text">
+          <strong style="color: white; font-size: 1.1rem;">Email Us</strong>
+          <span style="color: rgba(255,255,255,0.95); font-weight: 600;">PawketPetsVT@gmail.com</span>
+        </div>
+      </a>
+      
+      <a href="https://discord.com/users/embertail" target="_blank" class="contact-option" style="background: linear-gradient(135deg, #5865F2 0%, #7289DA 100%); color: white; border: none;">
+        <div class="contact-icon">💬</div>
+        <div class="contact-text">
+          <strong style="color: white; font-size: 1.1rem;">Discord</strong>
+          <span style="color: rgba(255,255,255,0.95); font-weight: 600;">Embertail</span>
+        </div>
+      </a>
+    </div>
+    
+    <button class="btn btn-outline" onclick="closeContactModal()">Close</button>
+  </div>
+</div>
+
+<!-- New Thread Modal -->
+<div class="modal-overlay" id="new-thread-modal">
+  <div class="modal">
+    <h2>✏️ Create New Thread</h2>
+    <div class="form-group">
+      <label>Thread Title</label>
+      <input type="text" id="new-thread-title" placeholder="What's your thread about?" maxlength="100" />
+    </div>
+    <div class="form-group">
+      <label>Your Message</label>
+      <div class="emoji-picker-container">
+        <button type="button" class="emoji-picker-btn" onclick="toggleEmojiPicker('thread')">😀</button>
+        <div class="emoji-picker" id="emoji-picker-thread" style="display:none;">
+          <div class="emoji-grid">
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '😀')">😀</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '😂')">😂</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '😊')">😊</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '😍')">😍</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '🤔')">🤔</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '😎')">😎</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '😢')">😢</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '😭')">😭</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '😤')">😤</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '🥰')">🥰</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '🤗')">🤗</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '🤩')">🤩</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '🦊')">🦊</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '🐰')">🐰</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '🐾')">🐾</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '💖')">💖</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '❤️')">❤️</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '✨')">✨</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '🎮')">🎮</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '🎨')">🎨</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '🎉')">🎉</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '👍')">👍</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '👎')">👎</span>
+            <span class="emoji-option" onclick="insertEmoji('new-thread-content', '🔥')">🔥</span>
+          </div>
+        </div>
+      </div>
+      <textarea id="new-thread-content" placeholder="Write your message here..." rows="6"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn btn-outline" onclick="closeNewThreadModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitNewThread()">Create Thread</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Panel Modal -->
+<div class="modal-overlay" id="admin-panel-modal">
+  <div class="modal" style="max-width:700px;">
+    <h2>🛡️ Moderator Panel</h2>
+    
+    <div class="admin-tabs">
+      <button class="admin-tab active" onclick="switchAdminTab('bans')">🚫 Banned Users</button>
+      <button class="admin-tab" onclick="switchAdminTab('recent')">📝 Recent Posts</button>
+    </div>
+    
+    <div id="admin-bans-view" class="admin-panel-view">
+      <h3>Banned Users</h3>
+      <div id="banned-users-list"></div>
+      <div style="margin-top:20px;">
+        <h4>Ban a User</h4>
+        <input type="text" id="ban-username-input" placeholder="Enter username" />
+        <input type="text" id="ban-reason-input" placeholder="Reason (optional)" />
+        <button class="btn btn-danger" onclick="banUser()">Ban User</button>
+      </div>
+    </div>
+    
+    <div id="admin-recent-view" class="admin-panel-view" style="display:none;">
+      <h3>Recent Forum Activity</h3>
+      <div id="recent-posts-list"></div>
+    </div>
+    
+    <button class="btn btn-outline" onclick="closeAdminPanel()" style="margin-top:20px;">Close</button>
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="footer-sparkles">&#10022; &#10023; &#9733; &#10022; &#10023; &#9733; &#10022;</div>
+  <p>&#169; 2026 PawketPetsVT &nbsp;|&nbsp; Made with &#128150; &nbsp;|&nbsp; <a href="https://twitch.tv/Embertail" target="_blank">Twitch</a></p>
+</footer>
+    </div><!-- close center-content -->
+
+  <div class="right-sidebar">
+    <!-- OUR STREAMERS -->
+    <!-- OUR STREAMERS -->
+    <div class="streamers-widget">
+      <div class="sidebar-title">Our Streamers</div>
+      
+      <!-- Embertail -->
+      <div class="streamer-item" id="streamer-embertail">
+        <div class="streamer-avatar">
+          <img src="images/pets/ember.png" alt="Embertail" onerror="this.src='images/pets/ember.png'" />
+        </div>
+        <div class="streamer-info">
+          <div class="streamer-name">
+            Embertail
+            <span class="live-indicator" id="ember-live-badge" style="display: none;">🔴 LIVE</span>
+          </div>
+          <div class="streamer-status" id="ember-status">OFFLINE</div>
+          <a href="https://twitch.tv/embertail" target="_blank" class="watch-stream-btn" id="ember-watch-btn" style="display: none;">
+            Watch Stream →
+          </a>
+        </div>
+      </div>
+      
+      <!-- Pyxshuul -->
+      <div class="streamer-item" id="streamer-pyxshuul">
+        <div class="streamer-avatar">
+          <img src="images/pets/pyxie.png" alt="Pyxshuul" onerror="this.src='images/pets/pyxie.png'" />
+        </div>
+        <div class="streamer-info">
+          <div class="streamer-name">
+            Pyxshuul
+            <span class="live-indicator" id="pyxs-live-badge" style="display: none;">🔴 LIVE</span>
+          </div>
+          <div class="streamer-status" id="pyxs-status">OFFLINE</div>
+          <a href="https://twitch.tv/pyxshuul" target="_blank" class="watch-stream-btn" id="pyxs-watch-btn" style="display: none;">
+            Watch Stream →
+          </a>
+        </div>
+      </div>
+      
+      <!-- Aria -->
+      <div class="streamer-item" id="streamer-aria">
+        <div class="streamer-avatar">
+          <img src="images/pets/aria.png" alt="Aria" onerror="this.src='images/pets/aria.png'" />
+        </div>
+        <div class="streamer-info">
+          <div class="streamer-name">
+            Aria
+            <span class="live-indicator" id="aria-live-badge" style="display: none;">🔴 LIVE</span>
+          </div>
+          <div class="streamer-status" id="aria-status">OFFLINE</div>
+          <a href="https://twitch.tv/ariadoestwitch" target="_blank" class="watch-stream-btn" id="aria-watch-btn" style="display: none;">
+            Watch Stream →
+          </a>
+        </div>
+      </div>
+      
+      <!-- Blushimia -->
+      <div class="streamer-item" id="streamer-blushimia">
+        <div class="streamer-avatar">
+          <img src="images/pets/blushimia.png" alt="Blushimia" onerror="this.src='images/pets/blushimia.png'" />
+        </div>
+        <div class="streamer-info">
+          <div class="streamer-name">
+            Blushimia
+            <span class="live-indicator" id="blushimia-live-badge" style="display: none;">🔴 LIVE</span>
+          </div>
+          <div class="streamer-status" id="blushimia-status">OFFLINE</div>
+          <a href="https://twitch.tv/realblushimia" target="_blank" class="watch-stream-btn" id="blushimia-watch-btn" style="display: none;">
+            Watch Stream →
+          </a>
+        </div>
+      </div>
+      
+      <!-- Cowbee -->
+      <div class="streamer-item" id="streamer-cowbee">
+        <div class="streamer-avatar">
+          <img src="images/pets/cowbee.png" alt="Cowbee" onerror="this.src='images/pets/cowbee.png'" />
+        </div>
+        <div class="streamer-info">
+          <div class="streamer-name">
+            Cowbee
+            <span class="live-indicator" id="cowbee-live-badge" style="display: none;">🔴 LIVE</span>
+          </div>
+          <div class="streamer-status" id="cowbee-status">OFFLINE</div>
+          <a href="https://twitch.tv/cowbeevt" target="_blank" class="watch-stream-btn" id="cowbee-watch-btn" style="display: none;">
+            Watch Stream →
+          </a>
+        </div>
+      </div>
+      
+      <!-- Kelta -->
+      <div class="streamer-item" id="streamer-kelta">
+        <div class="streamer-avatar">
+          <img src="images/pets/kelta.png" alt="Kelta" onerror="this.src='images/pets/kelta.png'" />
+        </div>
+        <div class="streamer-info">
+          <div class="streamer-name">
+            Kelta
+            <span class="live-indicator" id="kelta-live-badge" style="display: none;">🔴 LIVE</span>
+          </div>
+          <div class="streamer-status" id="kelta-status">OFFLINE</div>
+          <a href="https://twitch.tv/keltathepomeranian" target="_blank" class="watch-stream-btn" id="kelta-watch-btn" style="display: none;">
+            Watch Stream →
+          </a>
+        </div>
+      </div>
+      
+      <!-- Jess -->
+      <div class="streamer-item" id="streamer-jess">
+        <div class="streamer-avatar">
+          <img src="images/pets/jess.png" alt="Jess" onerror="this.src='images/pets/jess.png'" />
+        </div>
+        <div class="streamer-info">
+          <div class="streamer-name">
+            Jess
+            <span class="live-indicator" id="jess-live-badge" style="display: none;">🔴 LIVE</span>
+          </div>
+          <div class="streamer-status" id="jess-status">OFFLINE</div>
+          <a href="https://twitch.tv/teatimejess" target="_blank" class="watch-stream-btn" id="jess-watch-btn" style="display: none;">
+            Watch Stream →
+          </a>
+        </div>
+      </div>
+      
+      <!-- Gnarly -->
+      <div class="streamer-item" id="streamer-gnarly">
+        <div class="streamer-avatar">
+          <img src="images/pets/gnarly.png" alt="Gnarly" onerror="this.src='images/pets/gnarly.png'" />
+        </div>
+        <div class="streamer-info">
+          <div class="streamer-name">
+            Gnarly
+            <span class="live-indicator" id="gnarly-live-badge" style="display: none;">🔴 LIVE</span>
+          </div>
+          <div class="streamer-status" id="gnarly-status">OFFLINE</div>
+          <a href="https://twitch.tv/gnarly_neon_smilodon" target="_blank" class="watch-stream-btn" id="gnarly-watch-btn" style="display: none;">
+            Watch Stream →
+          </a>
+        </div>
+      </div>
+      
+      <!-- View All Button -->
+      <button class="btn btn-outline" onclick="showTab('team')" style="width:100%;margin-top:12px;">
+        👥 View All Team Members
+      </button>
+    </div>
+
+    <!-- LATEST NEWS -->
+    <div class="news-widget">
+      <div class="sidebar-title">Latest News</div>
+      <div id="sidebar-news-container">
+        <div style="text-align:center;padding:20px;color:var(--text-light);">Loading news...</div>
+      </div>
+    </div>
+
+
+  </div>
+</div><!-- close app-container -->
+
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+<script src="game.js" defer></script>
+<script>
+// ═══════════════════════════════════════════════════════════
+// TUTORIAL SYSTEM
+// ═══════════════════════════════════════════════════════════
+var Tutorial={active:false,currentStep:0,overlay:null,waitingForPet:false,steps:[{id:'welcome',tab:'home',dialogue:[{text:"Hi there! I'm Melon, your guide to PawketPets! 🍈",mascot:"happy"},{text:"This is your Home page. You can always come back here to see what's new!",mascot:"explaining"},{text:"Ready to meet your first pet? Let's go!",mascot:"excited"}]},{id:'adoption',tab:'adopt',dialogue:[{text:"Welcome to the Adoption Center! This is where you'll find your new companion.",mascot:"happy"},{text:"Your FIRST pet is completely FREE! But each pet after that costs PawketPoints.",mascot:"explaining"},{text:"Pets have different personalities and looks. Choose one you like!",mascot:"happy"},{text:"Go ahead - click on a pet to adopt them! I'll wait here while you choose! 😊",mascot:"excited",waitForPet:true}]},{id:'mypets',tab:'mypets',requiresPet:true,dialogue:[{text:"Aww, what a cutie! Welcome to your new friend! 💕",mascot:"happy"},{text:"This is your My Pets page. You can see all your pets here!",mascot:"explaining"},{text:"Pets have Hunger and Energy levels. Keep them fed and rested to keep them happy!",mascot:"explaining"},{text:"You can play with them, feed them items, and even equip them with gear!",mascot:"excited"}]},{id:'shop',tab:'shop',dialogue:[{text:"The Shop is where you buy items with PawketPoints (PP).",mascot:"explaining"},{text:"You can buy food, toys, equipment, and more!",mascot:"happy"},{text:"But how do you earn PP? Let me show you!",mascot:"excited"}]},{id:'minigames',tab:'minigames',dialogue:[{text:"The Minigames page is where you earn PP!",mascot:"excited"},{text:"Play games like Memory Match, Dice Roll, and more!",mascot:"happy"},{text:"Each game gives you PP as a reward. You can play most of them once per day!",mascot:"explaining"},{text:"Try them out whenever you like! The more you play, the more you earn!",mascot:"excited"}]},{id:'battle',tab:'battle',dialogue:[{text:"The Battle Arena lets your pets fight opponents and earn rewards!",mascot:"explaining"},{text:"Battles are automatic - just click Battle and watch! Your pet's stats determine who wins.",mascot:"happy"},{text:"Win battles to earn PP, items, and level up your pets!",mascot:"excited"},{text:"That covers the basics! You're all set to play! But... there's one more thing...",mascot:"concerned"}]},{id:'spooky',tab:null,dialogue:[{text:"I've been here a while, and... something feels off about this place.",mascot:"worried"},{text:"Sometimes I see things. Shadows. Glitches in the code. Strange encounters...",mascot:"scared"},{text:"There are rumors of creepy bosses, unsettling events, and hidden secrets.",mascot:"serious"},{text:"Are you okay with things that go bump in the night?",mascot:"serious",showChoice:true}]}],start:function(){console.log('🎓 Starting tutorial...');this.active=true;this.currentStep=0;this.createOverlay();this.runStep()},createOverlay:function(){var overlay=document.createElement('div');overlay.id='tutorial-overlay';overlay.className='tutorial-overlay';overlay.innerHTML='<div class="tutorial-backdrop"></div><div class="tutorial-mascot" id="tutorial-mascot"><div class="tutorial-mascot-image"><img src="images/melon.png" alt="Melon" style="width:100%;height:100%;object-fit:contain;"></div><div class="tutorial-mascot-name">Melon</div></div><div class="tutorial-dialogue-box"><div class="tutorial-dialogue-content"><div class="tutorial-dialogue-text" id="tutorial-text">Welcome to PawketPets!</div><div class="tutorial-progress" id="tutorial-progress"></div><div class="tutorial-buttons" id="tutorial-buttons"><button class="btn tutorial-skip" onclick="Tutorial.skip()">Skip Tutorial</button><button class="btn btn-primary tutorial-next" onclick="Tutorial.next()">Continue</button></div></div></div>';document.body.appendChild(overlay);this.overlay=overlay},runStep:function(){var step=this.steps[this.currentStep];if(!step){console.error('Invalid tutorial step:',this.currentStep);return}console.log('📖 Tutorial step:',step.id);if(step.tab&&typeof showTab==='function'){showTab(step.tab)}setTimeout(function(){Tutorial.showDialogue(0)},500)},showDialogue:function(dialogueIndex){var step=this.steps[this.currentStep];if(!step||!step.dialogue[dialogueIndex])return;var dialogue=step.dialogue[dialogueIndex];var textEl=document.getElementById('tutorial-text');var progressEl=document.getElementById('tutorial-progress');var buttonsEl=document.getElementById('tutorial-buttons');if(textEl){textEl.textContent=dialogue.text}var mascotEl=document.getElementById('tutorial-mascot');if(mascotEl){mascotEl.className='tutorial-mascot tutorial-mascot-'+(dialogue.mascot||'happy')}if(progressEl){var dots='';for(var i=0;i<step.dialogue.length;i++){dots+='<span class="tutorial-dot'+(i===dialogueIndex?' active':'')+'"></span>'}progressEl.innerHTML=dots}if(dialogue.showChoice){buttonsEl.innerHTML='<div class="tutorial-choice-buttons"><button class="btn btn-primary btn-lg" onclick="Tutorial.makeChoice(true)">👻 YES - Bring on the spooky!</button><button class="btn btn-outline btn-lg" onclick="Tutorial.makeChoice(false)">🌈 NO - Keep it cozy</button></div>'}else if(dialogue.waitForPet){this.waitingForPet=true;buttonsEl.innerHTML='<button class="btn tutorial-skip" onclick="Tutorial.skip()">Skip Tutorial</button><button class="btn btn-primary tutorial-next" disabled>⏳ Adopt a pet to continue...</button>'}else{this.waitingForPet=false;buttonsEl.innerHTML='<button class="btn tutorial-skip" onclick="Tutorial.skip()">Skip Tutorial</button><button class="btn btn-primary tutorial-next" onclick="Tutorial.next()">Continue</button>'}this.currentDialogueIndex=dialogueIndex},next:function(){var step=this.steps[this.currentStep];var nextDialogueIndex=(this.currentDialogueIndex||0)+1;if(nextDialogueIndex<step.dialogue.length){this.showDialogue(nextDialogueIndex)}else{this.currentStep++;if(this.currentStep>=this.steps.length){this.complete(false)}else{this.runStep()}}},onPetAdopted:function(){if(this.active&&this.waitingForPet){console.log('🐾 Pet adopted! Continuing tutorial...');this.waitingForPet=false;var buttonsEl=document.getElementById('tutorial-buttons');if(buttonsEl){buttonsEl.innerHTML='<button class="btn tutorial-skip" onclick="Tutorial.skip()">Skip Tutorial</button><button class="btn btn-primary tutorial-next" onclick="Tutorial.next()">Continue</button>'}setTimeout(function(){Tutorial.next()},1500)}},makeChoice:function(enableSpooky){console.log('👻 Spooky choice:',enableSpooky);this.complete(enableSpooky)},complete:async function(spookyEnabled){console.log('✅ Tutorial complete! Spooky:',spookyEnabled);if(currentUser&&typeof supabaseClient!=='undefined'){try{var ppReward=100;await supabaseClient.from('players').update({tutorial_completed:true,spooky_enabled:spookyEnabled,pawketpoints:currentPoints+ppReward}).eq('id',currentUser.id);currentPoints+=ppReward;if(typeof updatePointsDisplay==='function'){updatePointsDisplay()}if(typeof playerSettings!=='undefined'){playerSettings.tutorial_completed=true;playerSettings.spooky_enabled=spookyEnabled}console.log('💾 Tutorial progress saved!');console.log('🎁 Awarded '+ppReward+' PP!')}catch(err){console.error('Error saving tutorial progress:',err)}}var textEl=document.getElementById('tutorial-text');var buttonsEl=document.getElementById('tutorial-buttons');if(textEl){if(spookyEnabled){textEl.innerHTML="Brave choice! Here's <strong>100 PP</strong> to get you started. Keep your eyes open... you never know what you might find. 👁️✨"}else{textEl.innerHTML="A wise choice! Here's <strong>100 PP</strong> to get you started. Enjoy your cozy adventure with your new pet! 🌈✨"}}if(buttonsEl){buttonsEl.innerHTML='<button class="btn btn-primary btn-lg" onclick="Tutorial.close()">Lets Go! 🚀</button>'}setTimeout(function(){Tutorial.close()},4000)},skip:function(){if(!confirm('Are you sure you want to skip the tutorial? You can replay it later from Settings.')){return}console.log('⏭️ Tutorial skipped');this.complete(false)},close:function(){console.log('🎓 Closing tutorial...');this.active=false;var existingOverlay=document.getElementById('tutorial-overlay');if(existingOverlay&&existingOverlay.parentNode){existingOverlay.parentNode.removeChild(existingOverlay)}if(this.overlay&&this.overlay.parentNode){this.overlay.parentNode.removeChild(this.overlay)}this.overlay=null;document.body.style.overflow='';console.log('✅ Tutorial closed - overlay removed')}};window.Tutorial=Tutorial;console.log('🎓 Tutorial system loaded!');
+</script>
+  <script>
+// Sync sidebar navigation with main tab switching
+var originalShowTab = window.showTab;
+window.showTab = function(tabName) {
+  // Call original showTab function
+  if (originalShowTab) originalShowTab(tabName);
+  
+  // Update sidebar buttons
+  document.querySelectorAll('.sidebar-nav-btn').forEach(function(btn) {
+    btn.classList.remove('active');
+  });
+  var sidebarBtn = document.getElementById('sidebar-btn-' + tabName);
+  if (sidebarBtn) sidebarBtn.classList.add('active');
+};
+
+// Quick redeem function
+function quickRedeem() {
+  var input = document.getElementById('quick-redeem-input');
+  if (!input || !input.value.trim()) return;
+  var code = input.value.trim();
+  document.getElementById('redeem-code-input').value = code;
+  showTab('redeem');
+  setTimeout(function() {
+    var btn = document.getElementById('redeem-btn');
+    if (btn) btn.click();
+  }, 100);
+}
+
+// Update sidebar stats when points/pets change
+function updateSidebarStats() {
+  if (!currentUser) return;
+  
+  // Update points
+  var pointsEl = document.getElementById('sidebar-points');
+  if (pointsEl && typeof currentPoints !== 'undefined') {
+    pointsEl.textContent = currentPoints + ' PP';
+  }
+  
+  // Update pet count
+  var petCountEl = document.getElementById('sidebar-pet-count');
+  if (petCountEl && typeof petState !== 'undefined') {
+    petCountEl.textContent = Object.keys(petState).length;
+  }
+  
+  // Header updates now handled by game.js (nav-points, nav-user)
+}
+
+// Call updateSidebarStats whenever the app loads
+if (typeof init === 'function') {
+  var originalInit = init;
+  init = function() {
+    originalInit();
+    updateSidebarStats();
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// SPOOKY EFFECT FOR THEYWENTMISSING CODE
+// ══════════════════════════════════════════════════════════════════════════
+function triggerSpookyEffect() {
+  console.log('🎃 SPOOKY EFFECT TRIGGERED!');
+  
+  // PAUSE BACKGROUND MUSIC
+  var bgMusic = document.getElementById('bg-music');
+  var wasMusicPlaying = false;
+  
+  if (bgMusic) {
+    console.log('Music found, current state:', bgMusic.paused ? 'paused' : 'playing');
+    if (!bgMusic.paused) {
+      wasMusicPlaying = true;
+      bgMusic.pause();
+      console.log('Music paused for spooky effect');
+    }
+  } else {
+    console.log('⚠️ Music element not found!');
+  }
+  
+  // Play creepy sound effect FIRST
+  var audio = new Audio('sounds/glitch.mp3');
+  audio.volume = 0.6;
+  audio.play()
+    .then(function() { console.log('✅ Glitch sound playing'); })
+    .catch(function(e) { console.log('❌ Audio blocked:', e); });
+  
+  var body = document.body;
+  
+  // Create dark vignette overlay (no flashing)
+  var vignetteDiv = document.createElement('div');
+  vignetteDiv.style.cssText = `
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at center, transparent 0%, rgba(10,0,0,0.7) 50%, rgba(0,0,0,0.95) 100%);
+    z-index: 99998;
+    pointer-events: none;
+    animation: creepy-vignette 3s ease-in-out forwards;
+  `;
+  
+  // Create static/noise overlay (subtle)
+  var noiseDiv = document.createElement('div');
+  noiseDiv.style.cssText = `
+    position: fixed;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.3'/%3E%3C/svg%3E");
+    z-index: 99999;
+    pointer-events: none;
+    opacity: 0;
+    animation: noise-fade 3s ease-in-out forwards;
+  `;
+  
+  // Add CSS animations
+  var style = document.createElement('style');
+  style.textContent = `
+    @keyframes creepy-vignette {
+      0% { opacity: 0; }
+      20% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    
+    @keyframes noise-fade {
+      0% { opacity: 0; }
+      10% { opacity: 0.4; }
+      30% { opacity: 0.2; }
+      50% { opacity: 0.5; }
+      70% { opacity: 0.3; }
+      90% { opacity: 0.4; }
+      100% { opacity: 0; }
+    }
+    
+    @keyframes body-desaturate {
+      0% { filter: saturate(1) contrast(1); }
+      20% { filter: saturate(0.3) contrast(1.2) brightness(0.8); }
+      50% { filter: saturate(0) contrast(1.5) brightness(0.7); }
+      80% { filter: saturate(0.3) contrast(1.2) brightness(0.8); }
+      100% { filter: saturate(1) contrast(1) brightness(1); }
+    }
+    
+    @keyframes text-corrupt {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+  `;
+  document.head.appendChild(style);
+  document.body.appendChild(vignetteDiv);
+  document.body.appendChild(noiseDiv);
+  
+  // Apply desaturation effect (no flashing, just gradual color drain)
+  body.style.animation = 'body-desaturate 3s ease-in-out';
+  
+  // Corrupt random text elements (more subtle)
+  var textElements = document.querySelectorAll('h1, h2, h3, p, button, .sidebar-title, .nav-tab');
+  var corruptedElements = [];
+  var glitchChars = '█▓▒░▄▀■□▪▫◘◙';
+  
+  // Corrupt 5-8 random elements
+  var numToCorrupt = Math.floor(Math.random() * 4) + 5;
+  for (var i = 0; i < numToCorrupt; i++) {
+    var randomEl = textElements[Math.floor(Math.random() * textElements.length)];
+    if (!corruptedElements.includes(randomEl) && randomEl.textContent.trim().length > 0) {
+      corruptedElements.push(randomEl);
+      
+      (function(element) {
+        var originalText = element.textContent;
+        var corruptDelay = Math.random() * 2000; // Spread out over 2 seconds
+        
+        setTimeout(function() {
+          // Corrupt 20-40% of characters
+          var corrupted = originalText.split('').map(function(c) {
+            if (c === ' ') return c; // Keep spaces
+            return Math.random() > 0.7 ? glitchChars[Math.floor(Math.random() * glitchChars.length)] : c;
+          }).join('');
+          
+          element.textContent = corrupted;
+          element.style.animation = 'text-corrupt 0.3s ease-in-out';
+          
+          // Restore after 300-800ms
+          setTimeout(function() {
+            element.textContent = originalText;
+            element.style.animation = '';
+          }, Math.random() * 500 + 300);
+        }, corruptDelay);
+      })(randomEl);
+    }
+  }
+  
+  // Add a creepy red glow to the edges
+  var glowDiv = document.createElement('div');
+  glowDiv.style.cssText = `
+    position: fixed;
+    inset: 0;
+    box-shadow: inset 0 0 100px rgba(139, 0, 0, 0.3);
+    z-index: 99997;
+    pointer-events: none;
+    opacity: 0;
+    animation: red-glow 3s ease-in-out forwards;
+  `;
+  var glowStyle = document.createElement('style');
+  glowStyle.textContent = `
+    @keyframes red-glow {
+      0% { opacity: 0; }
+      30% { opacity: 1; }
+      70% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+  `;
+  document.head.appendChild(glowStyle);
+  document.body.appendChild(glowDiv);
+  
+  console.log('Spooky effects applied, will clean up in 3 seconds...');
+  
+  // Clean up after 3 seconds
+  setTimeout(function() {
+    body.style.animation = '';
+    body.style.filter = '';
+    vignetteDiv.remove();
+    noiseDiv.remove();
+    glowDiv.remove();
+    style.remove();
+    glowStyle.remove();
+    
+    // RESUME BACKGROUND MUSIC
+    if (wasMusicPlaying && bgMusic) {
+      bgMusic.play()
+        .then(function() { console.log('✅ Music resumed'); })
+        .catch(function(e) { console.log('❌ Music resume blocked:', e); });
+    }
+    
+    console.log('Spooky effect complete!');
+  }, 3000);
+}
+</script>
+
+<script src="cursor-trail.js"></script>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     COMPANION BUDDY - Pet in Corner
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div id="companion-buddy" style="display:none;">
+  <div class="companion-sprite" id="companion-sprite"></div>
+  <div class="companion-bubble" id="companion-bubble">
+    <div class="companion-message" id="companion-message">Hello! 🐾</div>
+  </div>
+</div>
+
+</body>
+</html>

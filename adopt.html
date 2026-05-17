@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; connect-src 'self' https://hqzugbxutgefjilgmxqu.supabase.co https://*.supabase.co data: blob:;">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PawketPetsVT — Adopt a Pet</title>
+  <link rel="stylesheet" href="css/style.css?t=12345" />
+  <link rel="stylesheet" href="css/style-additions.css?t=12345" />
+  
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-hero">
+      <div class="sparkle-row">🐣 ✦ 🐣</div>
+      <h1>Adopt a Pet!</h1>
+      <p>Choose a VTuber pet to add to your collection. Your first pet is always free! ✨</p>
+    </div>
+    <div class="points-banner">
+      <span class="pb-label">🪙 Your PawketPoints</span>
+      <span class="pb-amount" id="points-display">0 PP</span>
+    </div>
+    <div id="pets-grid" class="pets-grid"><div class="spinner"></div></div>
+  </div>
+
+  <div class="modal-overlay" id="adopt-modal">
+    <div class="modal">
+      <div class="modal-image" id="modal-image">🐾</div>
+      <h2 id="modal-title">Adopt this pet?</h2>
+      <p id="modal-desc">Give your new pet a nickname!</p>
+      <div class="modal-nickname-group">
+        <label>Nickname <span style="color:var(--text-light);font-weight:400">(or leave blank to use their name)</span></label>
+        <input type="text" id="nickname-input" placeholder="e.g. Ember the Brave" maxlength="30" onkeydown="if(event.key==='Enter'){event.preventDefault();}" />
+      </div>
+      <div class="modal-buttons">
+        <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" id="confirm-adopt-btn" onclick="confirmAdopt()">💖 Adopt!</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="success-modal">
+    <div class="modal">
+      <div style="font-size:4rem;margin-bottom:12px;">🎉</div>
+      <h2 style="color:var(--purple-dark)">Welcome home!</h2>
+      <p id="success-message">Your new pet has been adopted!</p>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button class="btn btn-outline" onclick="closeSuccessModal()">Adopt More</button>
+        <a href="mypets.html" class="btn btn-primary">💖 My Pets</a>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer"><div class="footer-sparkles">✦ ✧ ★ ✦ ✧ ★ ✦</div><p>© 2025 PawketPetsVT &nbsp;|&nbsp; Made with 💖</p></footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/shared.js"></script>
+  <script>
+    injectShared('adopt');
+    var currentUser = null, currentPoints = 0, ownedPetIds = [], selectedPet = null, totalOwnedCount = 0;
+
+    async function init() {
+      var session = await requireLogin(); if (!session) return;
+      await updateNav(); currentUser = session.user;
+      var pr = await supabaseClient.from('players').select('pawketpoints').eq('id', currentUser.id).single();
+      if (pr.data) { currentPoints = pr.data.pawketpoints; document.getElementById('points-display').textContent = currentPoints + ' PP'; }
+      var owned = await supabaseClient.from('user_pets').select('pet_id').eq('user_id', currentUser.id);
+      if (owned.data) { ownedPetIds = owned.data.map(function(p){return p.pet_id;}); totalOwnedCount = owned.data.length; }
+      await loadPets();
+    }
+
+    async function loadPets() {
+      var grid = document.getElementById('pets-grid');
+      var res = await supabaseClient.from('pets').select('*').order('created_at', {ascending:true});
+      if (res.error || !res.data) { grid.innerHTML = '<p style="text-align:center;color:var(--text-light);">Could not load pets.</p>'; return; }
+      grid.innerHTML = res.data.map(function(pet){ return renderPetCard(pet); }).join('');
+    }
+
+    function renderPetCard(pet) {
+      var isPlaceholder = pet.name === '???';
+      var isOwned = ownedPetIds.indexOf(pet.id) !== -1;
+      var isFree = totalOwnedCount === 0;
+      var effectivePrice = isFree ? 0 : pet.price;
+      var canAfford = currentPoints >= effectivePrice;
+      var imageHtml = (pet.image_file && !isPlaceholder)
+        ? '<img src="images/' + pet.image_file + '" alt="' + pet.name + '" onerror="this.parentElement.innerHTML=\'<span class=pet-image-placeholder>🐾</span>\'">'
+        : '<span class="pet-image-placeholder">' + (isPlaceholder ? '❓' : '🐾') + '</span>';
+      var priceHtml = isPlaceholder ? '' : (effectivePrice === 0 ? '<span class="pet-price free">✨ FREE</span>' : '<span class="pet-price">🪙 ' + pet.price + ' PP</span>');
+      var buttonHtml = '';
+      if (isPlaceholder) { buttonHtml = '<button class="btn-locked">🔒 Coming Soon</button>'; }
+      else if (isOwned) { buttonHtml = '<button class="btn-owned">✅ Already Adopted!</button>'; }
+      else if (!canAfford) { buttonHtml = '<button class="btn-locked">Need ' + pet.price + ' PP</button>'; }
+      else { buttonHtml = '<button class="btn btn-primary btn-adopt" onclick="openAdoptModal(\'' + pet.id + '\',\'' + pet.name.replace(/'/g,"\\'") + '\',\'' + (pet.description||'').replace(/'/g,"\\'") + '\',\'' + (pet.image_file||'') + '\',' + effectivePrice + ')">🐣 Adopt!</button>'; }
+      return '<div class="pet-card' + (isPlaceholder?' placeholder':'') + (isOwned?' already-owned':'') + '">' +
+        '<div class="pet-image-wrap">' + imageHtml + '</div>' +
+        '<div class="pet-name">' + (isPlaceholder?'???':pet.name) + '</div>' +
+        (pet.vtuber_name && !isPlaceholder ? '<div class="pet-vtuber">🎭 ' + pet.vtuber_name + '</div>' : '') +
+        '<div class="pet-description">' + (isPlaceholder ? 'A mystery pet shrouded in shadow... who could it be? 👀' : (pet.description||'')) + '</div>' +
+        priceHtml + buttonHtml + '</div>';
+    }
+
+    function openAdoptModal(petId, petName, petDesc, imageFile, price) {
+      selectedPet = {id:petId, name:petName, description:petDesc, image_file:imageFile, price:price};
+      var modalImage = document.getElementById('modal-image');
+      modalImage.innerHTML = imageFile ? '<img src="images/' + imageFile + '" alt="' + petName + '" onerror="this.parentElement.innerHTML=\'🐾\'">' : '🐾';
+      document.getElementById('modal-title').textContent = 'Adopt ' + petName + '?';
+      document.getElementById('modal-desc').textContent = price === 0 ? 'Your first pet is free! Give them a nickname. 🎉' : 'This will cost ' + price + ' PawketPoints.';
+      document.getElementById('nickname-input').value = '';
+      document.getElementById('adopt-modal').classList.add('show');
+    }
+
+    function closeModal() { document.getElementById('adopt-modal').classList.remove('show'); selectedPet = null; }
+    function closeSuccessModal() { document.getElementById('success-modal').classList.remove('show'); window.location.reload(); }
+
+    async function confirmAdopt() {
+      if (!selectedPet || !currentUser) return;
+      var btn = document.getElementById('confirm-adopt-btn');
+      var nickname = document.getElementById('nickname-input').value.trim() || selectedPet.name;
+      btn.textContent = 'Adopting...'; btn.disabled = true;
+      try {
+        var res = await supabaseClient.from('user_pets').insert([{user_id:currentUser.id, pet_id:selectedPet.id, nickname:nickname, level:1, xp:0, hunger:50, energy:50, happiness:50, max_hunger:100, max_energy:100, max_happiness:100}]);
+        if (res.error) throw new Error(res.error.message);
+        if (selectedPet.price > 0) {
+          var np = currentPoints - selectedPet.price;
+          await supabaseClient.from('players').update({pawketpoints:np}).eq('id', currentUser.id);
+          currentPoints = np;
+        }
+        closeModal();
+        
+        // Log adoption activity
+        try {
+          await supabaseClient.from('activity_feed').insert([{
+            user_id: currentUser.id,
+            activity_type: 'pet_adopted',
+            activity_data: { pet_name: nickname },
+            is_public: true
+          }]);
+        } catch(actErr) {
+          console.log('Activity log error (non-critical):', actErr);
+        }
+        
+        document.getElementById('success-message').textContent = nickname + ' has joined your collection! 💖';
+        document.getElementById('success-modal').classList.add('show');
+        ownedPetIds.push(selectedPet.id); totalOwnedCount++;
+      } catch(err) {
+        showToast('Error: ' + err.message);
+        btn.textContent = '💖 Adopt!'; btn.disabled = false;
+      }
+    }
+    init();
+  </script>
+</body>
+</html>

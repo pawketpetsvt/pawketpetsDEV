@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; connect-src 'self' https://hqzugbxutgefjilgmxqu.supabase.co https://*.supabase.co data: blob:;">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PawketPetsVT — News</title>
+  <link rel="stylesheet" href="css/style.css?t=12345" />
+  <link rel="stylesheet" href="css/style-additions.css?t=12345" />
+  <style>
+    .news-post { background: var(--white); border: 2.5px solid var(--border); border-radius: var(--radius-lg); padding: 28px 32px; margin-bottom: 20px; box-shadow: 0 4px 16px var(--shadow); transition: transform 0.2s; }
+    .news-post:hover { transform: translateY(-3px); }
+    .news-post-date { font-size: 0.82rem; color: var(--text-light); font-weight: 700; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .news-post h3 { font-size: 1.4rem; color: var(--purple-dark); margin-bottom: 10px; font-family: 'Fredoka One', cursive; }
+    .news-post p { color: var(--text); line-height: 1.7; font-size: 0.97rem; white-space: pre-wrap; }
+    .news-author { margin-top: 12px; font-size: 0.82rem; color: var(--text-light); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-hero">
+      <div class="sparkle-row">📰 ✦ 📰</div>
+      <h1>News & Announcements</h1>
+      <p>Stay up to date with everything happening in PawketPetsVT! ✨</p>
+    </div>
+    <div id="news-container"><div class="spinner"></div></div>
+  </div>
+  <footer class="footer"><div class="footer-sparkles">✦ ✧ ★ ✦ ✧ ★ ✦</div><p>© 2025 PawketPetsVT &nbsp;|&nbsp; Made with 💖</p></footer>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/shared.js"></script>
+  <script>
+    injectShared('news');
+    (async function() {
+      var session = await requireLogin(); if (!session) return;
+      await updateNav();
+      var container = document.getElementById('news-container');
+      var res = await supabaseClient.from('news').select('*').eq('is_published', true).order('published_at', {ascending:false});
+      if (res.error || !res.data || !res.data.length) {
+        container.innerHTML = '<div class="card" style="text-align:center;padding:60px 40px;"><div style="font-size:3rem;margin-bottom:16px;">📭</div><h2 style="color:var(--purple-dark);margin-bottom:12px;">No news yet!</h2><p style="color:var(--text-light);">Check back soon! ✨</p></div>';
+        return;
+      }
+      container.innerHTML = res.data.map(function(post) {
+        var date = new Date(post.published_at || post.created_at).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'});
+        return '<div class="news-post"><div class="news-post-date">📅 ' + date + '</div><h3>' + (post.title||'Untitled') + '</h3><p>' + (post.content||'') + '</p>' + (post.author ? '<div class="news-author">— ' + post.author + '</div>' : '') + '</div>';
+      }).join('');
+    })();
+  </script>
+</body>
+</html>

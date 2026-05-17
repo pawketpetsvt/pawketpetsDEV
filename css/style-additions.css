@@ -1,0 +1,505 @@
+/* PawketPetsVT - Style Additions for Multi-Page App */
+/* Add this file to fix components missing from the main Phase 1 CSS */
+
+/* ══ SPINNER / LOADING ══ */
+.spinner {
+  border: 4px solid rgba(153,102,255,0.2);
+  border-top: 4px solid var(--purple);
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin: 40px auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ══ PETS GRID - FOR ADOPT PAGE ══ */
+.pets-grid { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); 
+  gap: 24px; 
+  margin-top: 24px; 
+}
+
+.pet-card { 
+  background: var(--white); 
+  border: 4px solid var(--border); 
+  border-radius: var(--radius-xl); 
+  padding: 24px 20px; 
+  text-align: center; 
+  box-shadow: 0 8px 24px rgba(153,102,255,0.25); 
+  transition: all 0.3s; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  gap: 10px; 
+}
+
+.pet-card:hover { 
+  transform: translateY(-8px) scale(1.02); 
+  box-shadow: 0 16px 40px rgba(153,102,255,0.35); 
+}
+
+.pet-card.placeholder { 
+  background: linear-gradient(135deg, #f0e8ff, #ffe8f5); 
+  border-style: dashed; 
+  opacity: 0.7;
+}
+
+.pet-card.already-owned { 
+  border-color: var(--green); 
+  background: linear-gradient(135deg, #f0fff4, #e8fff0); 
+}
+
+.pet-image-wrap { 
+  width: 140px; 
+  height: 140px; 
+  border-radius: 50%; 
+  overflow: hidden; 
+  border: 4px solid var(--purple-light); 
+  background: linear-gradient(135deg, var(--purple-light), var(--pink-light)); 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  margin: 0 auto; 
+  box-shadow: 0 6px 20px rgba(153,102,255,0.3); 
+}
+
+.pet-image-wrap img { 
+  width: 100%; 
+  height: 100%; 
+  object-fit: cover; 
+}
+
+.pet-image-placeholder { 
+  font-size: 4rem; 
+  line-height: 1; 
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.pet-name { 
+  font-family: 'Chewy', cursive; 
+  font-size: 1.5rem; 
+  color: var(--purple-dark); 
+  margin: 8px 0 4px; 
+  text-shadow: 1px 1px 0 var(--pink-light);
+}
+
+.pet-vtuber { 
+  font-size: 0.85rem; 
+  font-weight: 700; 
+  color: var(--text-light); 
+  text-transform: uppercase; 
+  letter-spacing: 0.5px; 
+  background: rgba(153,102,255,0.1);
+  padding: 4px 12px;
+  border-radius: 15px;
+}
+
+.pet-description { 
+  font-size: 0.95rem; 
+  color: var(--text); 
+  line-height: 1.6; 
+  flex: 1; 
+  font-weight: 500;
+}
+
+.pet-price { 
+  font-family: 'Chewy', cursive; 
+  font-size: 1.1rem; 
+  color: var(--purple-dark); 
+  background: var(--purple-light); 
+  padding: 6px 18px; 
+  border-radius: 25px; 
+  border: 2px solid var(--purple);
+  font-weight: 600;
+}
+
+.pet-price.free { 
+  color: var(--white); 
+  background: linear-gradient(135deg, var(--green), #3ab85a); 
+  border-color: var(--green);
+  box-shadow: 0 4px 12px rgba(93,222,122,0.3);
+}
+
+.btn-adopt { 
+  width: 100%; 
+  margin-top: 8px; 
+}
+
+.btn-owned { 
+  width: 100%; 
+  margin-top: 8px; 
+  background: linear-gradient(135deg, var(--green), #3ab85a); 
+  color: var(--white); 
+  font-family: 'Chewy', cursive; 
+  font-size: 1.05rem; 
+  padding: 12px 24px; 
+  border-radius: 30px; 
+  border: 3px solid rgba(255,255,255,0.3);
+  cursor: default;
+  box-shadow: 0 4px 12px rgba(93,222,122,0.3);
+}
+
+.btn-locked { 
+  width: 100%; 
+  margin-top: 8px; 
+  background: #ddd; 
+  color: #999; 
+  font-family: 'Chewy', cursive; 
+  font-size: 1.05rem; 
+  padding: 12px 24px; 
+  border-radius: 30px; 
+  border: 3px solid #ccc;
+  cursor: not-allowed; 
+}
+
+/* ══ MODALS ══ */
+.modal-overlay { 
+  display: none; 
+  position: fixed; 
+  inset: 0; 
+  background: rgba(60,20,100,0.6); 
+  backdrop-filter: blur(6px); 
+  z-index: 200; 
+  align-items: center; 
+  justify-content: center; 
+}
+
+.modal-overlay.show { 
+  display: flex; 
+}
+
+.modal { 
+  background: var(--white); 
+  border: 4px solid var(--border); 
+  border-radius: var(--radius-xl); 
+  padding: 40px 36px; 
+  max-width: 450px; 
+  width: 90%; 
+  text-align: center; 
+  box-shadow: 0 20px 60px rgba(60,20,100,0.4); 
+  animation: modal-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+}
+
+@keyframes modal-pop { 
+  from { 
+    transform: scale(0.8) translateY(-20px); 
+    opacity: 0; 
+  } 
+  to { 
+    transform: scale(1) translateY(0); 
+    opacity: 1; 
+  } 
+}
+
+.modal h2 { 
+  font-size: 2rem; 
+  color: var(--purple-dark); 
+  margin-bottom: 12px; 
+  font-family: 'Chewy', cursive;
+  text-shadow: 2px 2px 0 var(--pink-light);
+}
+
+.modal p { 
+  color: var(--text); 
+  margin-bottom: 24px; 
+  line-height: 1.7; 
+  font-size: 1.05rem;
+}
+
+.modal-image { 
+  width: 110px; 
+  height: 110px; 
+  border-radius: 50%; 
+  border: 4px solid var(--purple-light); 
+  background: linear-gradient(135deg, var(--purple-light), var(--pink-light)); 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  margin: 0 auto 20px; 
+  font-size: 3.5rem; 
+  overflow: hidden; 
+  box-shadow: 0 6px 20px rgba(153,102,255,0.3);
+}
+
+.modal-image img { 
+  width: 100%; 
+  height: 100%; 
+  object-fit: cover; 
+}
+
+.modal-nickname-group { 
+  text-align: left; 
+  margin-bottom: 24px; 
+}
+
+.modal-nickname-group label { 
+  display: block; 
+  font-weight: 700; 
+  font-size: 1rem; 
+  margin-bottom: 8px; 
+  color: var(--text); 
+  font-family: 'Chewy', cursive;
+}
+
+.modal-nickname-group input { 
+  width: 100%; 
+  padding: 12px 16px; 
+  border: 3px solid var(--border); 
+  border-radius: 20px; 
+  font-family: 'Fredoka', cursive; 
+  font-size: 1.05rem; 
+  color: var(--text); 
+  background: rgba(255,255,255,0.9);
+  outline: none; 
+  transition: all 0.2s; 
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.modal-nickname-group input:focus { 
+  border-color: var(--purple); 
+  background: var(--white);
+  box-shadow: 
+    inset 0 2px 4px rgba(0,0,0,0.05),
+    0 0 0 3px rgba(153,102,255,0.2);
+}
+
+.modal-buttons { 
+  display: flex; 
+  gap: 12px; 
+}
+
+.modal-buttons button { 
+  flex: 1; 
+}
+
+/* ══ NEWS POSTS ══ */
+.news-post { 
+  background: var(--white); 
+  border: 4px solid var(--border); 
+  border-radius: var(--radius-xl); 
+  padding: 32px 36px; 
+  margin-bottom: 24px; 
+  box-shadow: 0 6px 20px rgba(153,102,255,0.25); 
+  transition: all 0.3s; 
+}
+
+.news-post:hover { 
+  transform: translateY(-4px); 
+  box-shadow: 0 12px 30px rgba(153,102,255,0.35);
+}
+
+.news-post-date { 
+  font-size: 0.85rem; 
+  color: var(--text-light); 
+  font-weight: 700; 
+  margin-bottom: 10px; 
+  text-transform: uppercase; 
+  letter-spacing: 1px; 
+  background: rgba(153,102,255,0.1);
+  padding: 4px 12px;
+  border-radius: 15px;
+  display: inline-block;
+}
+
+.news-post h3 { 
+  font-size: 1.6rem; 
+  color: var(--purple-dark); 
+  margin-bottom: 12px; 
+  font-family: 'Chewy', cursive; 
+  text-shadow: 1px 1px 0 var(--pink-light);
+}
+
+.news-post p { 
+  color: var(--text); 
+  line-height: 1.8; 
+  font-size: 1.05rem; 
+  white-space: pre-wrap; 
+  font-weight: 500;
+}
+
+.news-author { 
+  margin-top: 16px; 
+  font-size: 0.9rem; 
+  color: var(--purple-dark); 
+  font-weight: 700; 
+  font-style: italic;
+}
+
+/* ══ TWITCH PAGE STYLES ══ */
+.twitch-card { 
+  background: var(--white); 
+  border: 4px solid var(--border); 
+  border-radius: var(--radius-xl); 
+  padding: 40px; 
+  box-shadow: 0 8px 28px rgba(153,102,255,0.3); 
+  max-width: 550px; 
+  margin: 0 auto; 
+  text-align: center; 
+}
+
+.twitch-card h2 { 
+  color: var(--purple-dark); 
+  margin-bottom: 12px; 
+  font-size: 2rem;
+  font-family: 'Chewy', cursive;
+  text-shadow: 2px 2px 0 var(--pink-light);
+}
+
+.twitch-card p { 
+  color: var(--text); 
+  line-height: 1.7; 
+  margin-bottom: 24px; 
+  font-size: 1.05rem;
+}
+
+.btn-twitch { 
+  background: linear-gradient(135deg, #9146ff, #772ce8); 
+  color: white; 
+  font-family: 'Chewy', cursive; 
+  font-size: 1.15rem; 
+  padding: 14px 36px; 
+  border-radius: 30px; 
+  border: 3px solid rgba(255,255,255,0.3);
+  cursor: pointer; 
+  transition: all 0.2s; 
+  display: inline-flex; 
+  align-items: center; 
+  gap: 12px; 
+  box-shadow: 0 6px 20px rgba(145,70,255,0.4);
+  font-weight: 600;
+}
+
+.btn-twitch:hover { 
+  transform: translateY(-4px) scale(1.05); 
+  box-shadow: 0 10px 30px rgba(145,70,255,0.5); 
+}
+
+.linked-panel { 
+  background: linear-gradient(135deg, rgba(204,170,255,0.3), rgba(255,179,230,0.3)); 
+  border: 3px solid var(--border); 
+  border-radius: var(--radius-lg); 
+  padding: 28px; 
+  margin-top: 24px; 
+}
+
+.linked-panel h3 { 
+  color: var(--purple-dark); 
+  margin-bottom: 10px; 
+  font-family: 'Chewy', cursive;
+  font-size: 1.4rem;
+}
+
+.reward-list { 
+  list-style: none; 
+  padding: 0; 
+  margin: 16px 0; 
+}
+
+.reward-list li { 
+  padding: 10px 0; 
+  border-bottom: 2px solid rgba(153,102,255,0.2); 
+  font-size: 1rem; 
+  color: var(--text); 
+  display: flex; 
+  align-items: center; 
+  gap: 10px; 
+  font-weight: 600;
+}
+
+.reward-list li:last-child { 
+  border-bottom: none; 
+}
+
+.status-badge { 
+  display: inline-block; 
+  font-family: 'Chewy', cursive; 
+  font-size: 0.8rem; 
+  padding: 3px 12px; 
+  border-radius: 20px; 
+  font-weight: 600;
+}
+
+.status-done { 
+  background: var(--green); 
+  color: white; 
+  box-shadow: 0 2px 6px rgba(93,222,122,0.3);
+}
+
+.status-pending { 
+  background: var(--yellow); 
+  color: var(--text); 
+  box-shadow: 0 2px 6px rgba(255,221,0,0.3);
+}
+
+.token-box { 
+  background: rgba(255,255,255,0.9); 
+  border: 4px solid var(--purple); 
+  border-radius: var(--radius-xl); 
+  padding: 24px; 
+  margin: 0 auto 28px; 
+  max-width: 550px; 
+  text-align: center; 
+  box-shadow: 0 6px 20px rgba(153,102,255,0.3);
+}
+
+.token-box h3 { 
+  color: var(--purple-dark); 
+  font-family: 'Chewy', cursive; 
+  margin-bottom: 10px; 
+  font-size: 1.4rem;
+}
+
+.token-box p { 
+  font-size: 0.9rem; 
+  color: var(--text-light); 
+  margin-bottom: 14px; 
+  font-weight: 500;
+}
+
+.token-textarea { 
+  width: 100%; 
+  height: 80px; 
+  border: 3px solid var(--border); 
+  border-radius: 15px; 
+  padding: 10px; 
+  font-size: 0.75rem; 
+  font-family: monospace; 
+  resize: none; 
+  background: var(--white); 
+  color: var(--text); 
+}
+
+.btn-copy { 
+  background: linear-gradient(135deg, var(--purple), var(--pink)); 
+  color: white; 
+  border: 2px solid rgba(255,255,255,0.3);
+  padding: 10px 24px; 
+  border-radius: 25px; 
+  font-family: 'Chewy', cursive; 
+  font-size: 1rem; 
+  cursor: pointer; 
+  margin-top: 12px; 
+  transition: all 0.2s; 
+  box-shadow: 0 4px 12px rgba(153,102,255,0.3);
+  font-weight: 600;
+}
+
+.btn-copy:hover { 
+  transform: translateY(-3px); 
+  box-shadow: 0 6px 16px rgba(153,102,255,0.4);
+}
+
+/* ══ FOOTER SPARKLES ══ */
+.footer-sparkles {
+  font-size: 1.2rem;
+  margin-bottom: 10px;
+  letter-spacing: 8px;
+  opacity: 0.7;
+  animation: sparkle-pulse 2.5s ease-in-out infinite;
+}

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; connect-src 'self' https://hqzugbxutgefjilgmxqu.supabase.co https://*.supabase.co data: blob:;">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PawketPetsVT — My Pets</title>
+  <link rel="stylesheet" href="css/style.css?t=12345" />
+  <link rel="stylesheet" href="css/style-additions.css?t=12345" />
+  <style>
+    .pets-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; margin-top: 24px; }
+    .my-pet-card { background: var(--white); border: 2.5px solid var(--border); border-radius: var(--radius-lg); padding: 24px; box-shadow: 0 6px 24px var(--shadow); transition: transform 0.2s; display: flex; flex-direction: column; gap: 14px; }
+    .my-pet-card:hover { transform: translateY(-4px); }
+    .pet-card-header { display: flex; align-items: center; gap: 16px; }
+    .pet-avatar { width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--purple-light); background: var(--purple-light); display: flex; align-items: center; justify-content: center; font-size: 2.2rem; flex-shrink: 0; overflow: hidden; box-shadow: 0 4px 12px var(--shadow); }
+    .pet-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .pet-card-info { flex: 1; min-width: 0; }
+    .pet-card-nickname { font-family: 'Fredoka One', cursive; font-size: 1.3rem; color: var(--purple-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pet-card-species { font-size: 0.82rem; color: var(--text-light); font-weight: 700; }
+    .pet-card-level { display: inline-block; background: linear-gradient(135deg, var(--purple), var(--pink)); color: var(--white); font-family: 'Fredoka One', cursive; font-size: 0.8rem; padding: 2px 10px; border-radius: 20px; margin-top: 4px; }
+    .stat-bars { display: flex; flex-direction: column; gap: 8px; }
+    .stat-row { display: flex; align-items: center; gap: 8px; }
+    .stat-label { font-size: 0.82rem; font-weight: 700; color: var(--text-light); width: 90px; flex-shrink: 0; }
+    .stat-bar-wrap { flex: 1; height: 14px; background: var(--purple-light); border-radius: 10px; overflow: hidden; }
+    .stat-bar-fill { height: 100%; border-radius: 10px; transition: width 0.5s ease; }
+    .stat-bar-fill.hunger { background: linear-gradient(90deg, #ff9f43, #ffcc70); }
+    .stat-bar-fill.happiness { background: linear-gradient(90deg, var(--pink), #ffb3d9); }
+    .stat-bar-fill.energy { background: linear-gradient(90deg, var(--cyan), #a0f0ff); }
+    .stat-value { font-size: 0.8rem; font-weight: 700; color: var(--text-light); width: 44px; text-align: right; flex-shrink: 0; }
+    .xp-row { display: flex; align-items: center; gap: 8px; }
+    .xp-label { font-size: 0.78rem; color: var(--text-light); font-weight: 700; width: 90px; flex-shrink: 0; }
+    .xp-bar-wrap { flex: 1; height: 10px; background: var(--purple-light); border-radius: 10px; overflow: hidden; }
+    .xp-bar-fill { height: 100%; border-radius: 10px; background: linear-gradient(90deg, var(--purple), var(--pink)); transition: width 0.5s ease; }
+    .xp-value { font-size: 0.78rem; color: var(--text-light); font-weight: 700; width: 60px; text-align: right; flex-shrink: 0; }
+    .pet-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .btn-action { font-family: 'Fredoka One', cursive; font-size: 0.95rem; padding: 9px 12px; border-radius: 24px; border: none; cursor: pointer; transition: transform 0.15s, opacity 0.2s; text-align: center; }
+    .btn-action:hover:not(:disabled) { transform: translateY(-2px); }
+    .btn-action:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-feed { background: linear-gradient(135deg, #ff9f43, #ffcc70); color: var(--white); }
+    .btn-play { background: linear-gradient(135deg, var(--pink), var(--purple)); color: var(--white); }
+    .stat-flash { font-size: 0.82rem; font-weight: 700; text-align: center; min-height: 18px; transition: opacity 0.4s; }
+    .sadness-warning { background: #fff0f0; border: 2px solid #ffb3b3; border-radius: var(--radius); padding: 6px 12px; font-size: 0.82rem; color: #cc4444; font-weight: 700; text-align: center; }
+    .use-item-section { border-top: 2px solid var(--border); padding-top: 12px; }
+    .use-item-label { font-family: 'Fredoka One', cursive; font-size: 0.9rem; color: var(--purple-dark); margin-bottom: 8px; }
+    .use-item-row { display: flex; gap: 8px; }
+    .item-select { flex: 1; padding: 8px 12px; border: 2.5px solid var(--border); border-radius: var(--radius); font-family: 'Nunito', sans-serif; font-size: 0.88rem; color: var(--text); background: var(--cream); outline: none; min-width: 0; }
+    .item-select:focus { border-color: var(--purple); }
+    .btn-use-item { font-family: 'Fredoka One', cursive; font-size: 0.88rem; padding: 8px 16px; border-radius: var(--radius); border: none; cursor: pointer; background: linear-gradient(135deg, var(--green), #3ab85a); color: var(--white); white-space: nowrap; transition: transform 0.15s, opacity 0.2s; flex-shrink: 0; }
+    .btn-use-item:hover:not(:disabled) { transform: translateY(-2px); }
+    .btn-use-item:disabled { opacity: 0.4; cursor: not-allowed; }
+    .item-effect-preview { font-size: 0.82rem; color: var(--purple); margin-top: 6px; min-height: 18px; font-weight: 700; }
+    .empty-state { text-align: center; padding: 60px 40px; background: var(--white); border: 2.5px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 6px 24px var(--shadow); }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(60,20,100,0.5); backdrop-filter: blur(4px); z-index: 200; align-items: center; justify-content: center; }
+    .modal-overlay.show { display: flex; }
+    .modal { background: var(--white); border: 2.5px solid var(--border); border-radius: var(--radius-lg); padding: 40px 32px; max-width: 380px; width: 90%; text-align: center; box-shadow: 0 20px 60px rgba(60,20,100,0.3); animation: modal-pop 0.25s ease-out; }
+    @keyframes modal-pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .bonus-coins { font-size: 3.5rem; margin-bottom: 8px; animation: bounce 0.6s ease infinite alternate; }
+    @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-10px); } }
+  </style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-hero">
+      <div class="sparkle-row">💖 ✦ 💖</div>
+      <h1>My Pets</h1>
+      <p>Feed them, play with them, and watch them grow! ✨</p>
+    </div>
+    <div class="points-banner">
+      <span class="pb-label">🪙 Your PawketPoints</span>
+      <span class="pb-amount" id="points-display">0 PP</span>
+    </div>
+    <div id="pets-container"><div class="spinner"></div></div>
+  </div>
+
+  <div class="modal-overlay" id="bonus-modal">
+    <div class="modal">
+      <div class="bonus-coins">🪙</div>
+      <h2 style="color:var(--purple-dark);margin-bottom:8px;">Daily Bonus!</h2>
+      <p style="color:var(--text-light);margin-bottom:20px;">Welcome back! You earned <strong style="color:var(--purple);font-size:1.2rem;" id="bonus-amount">50 PP</strong> for logging in today!</p>
+      <p style="color:var(--text-light);font-size:0.9rem;margin-bottom:20px;">Come back tomorrow for another bonus! ✨</p>
+      <button class="btn btn-primary btn-lg" onclick="closeBonusModal()">✨ Awesome!</button>
+    </div>
+  </div>
+
+  <footer class="footer"><div class="footer-sparkles">✦ ✧ ★ ✦ ✧ ★ ✦</div><p>© 2026 PawketPetsVT &nbsp;|&nbsp; Made with 💖</p></footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/shared.js"></script>
+  <script>
+    injectShared('mypets');
+    var currentUser = null, currentPoints = 0;
+    var petState = {};
+    var inventoryItems = [];
+
+    async function init() {
+      var session = await requireLogin(); if (!session) return;
+      await updateNav(); currentUser = session.user;
+      var bonus = await checkDailyBonus(currentUser.id);
+      if (bonus.awarded) {
+        document.getElementById('bonus-amount').textContent = bonus.amount + ' PP';
+        document.getElementById('bonus-modal').classList.add('show');
+        currentPoints = bonus.newTotal;
+      } else {
+        var pr = await supabaseClient.from('players').select('pawketpoints').eq('id', currentUser.id).single();
+        if (pr.data) currentPoints = pr.data.pawketpoints;
+      }
+      updatePointsDisplay();
+      await loadInventory();
+      await loadMyPets();
+    }
+
+    function updatePointsDisplay() {
+      var el = document.getElementById('points-display'); if (el) el.textContent = currentPoints + ' PP';
+      var nav = document.getElementById('nav-points'); if (nav) nav.textContent = '🪙 ' + currentPoints + ' PP';
+    }
+
+    function closeBonusModal() { document.getElementById('bonus-modal').classList.remove('show'); }
+
+    async function loadInventory() {
+      inventoryItems = [];
+      var invRes = await supabaseClient.from('user_inventory').select('id, item_id, quantity').eq('user_id', currentUser.id).gt('quantity', 0);
+      if (invRes.error || !invRes.data || !invRes.data.length) return;
+      var itemIds = invRes.data.map(function(r){ return r.item_id; });
+      var itemsRes = await supabaseClient.from('items').select('id, name, hunger_effect, energy_effect, happiness_effect, xp_effect').in('id', itemIds);
+      var itemMap = {};
+      if (itemsRes.data) itemsRes.data.forEach(function(i){ itemMap[i.id] = i; });
+      invRes.data.forEach(function(row) {
+        var item = itemMap[row.item_id] || {};
+        inventoryItems.push({ invId:row.id, itemId:row.item_id, name:item.name||'Item', qty:row.quantity, h:item.hunger_effect||0, e:item.energy_effect||0, hap:item.happiness_effect||0, xp:item.xp_effect||0 });
+      });
+    }
+
+    function getEffectText(item) {
+      var p = [];
+      if (item.h > 0) p.push('+' + item.h + ' Hunger');
+      if (item.e > 0) p.push('+' + item.e + ' Energy');
+      if (item.hap > 0) p.push('+' + item.hap + ' Happiness');
+      if (item.xp > 0) p.push('+' + item.xp + ' XP');
+      return p.join('  ');
+    }
+
+    function buildDropdown(petId) {
+      if (!inventoryItems.length) return '<div class="use-item-section"><div class="use-item-label">🎒 Use an Item</div><p style="font-size:0.82rem;color:var(--text-light);">No items. <a href="shop.html">Visit the shop!</a></p></div>';
+      var opts = '<option value="">— Choose an item —</option>';
+      inventoryItems.forEach(function(item){ opts += '<option value="' + item.invId + '">' + item.name + ' (x' + item.qty + ') — ' + getEffectText(item) + '</option>'; });
+      return '<div class="use-item-section"><div class="use-item-label">🎒 Use an Item</div>' +
+        '<div class="use-item-row"><select class="item-select" id="sel-' + petId + '" onchange="previewItem(\'' + petId + '\')">' + opts + '</select>' +
+        '<button class="btn-use-item" id="usebtn-' + petId + '" onclick="useItem(\'' + petId + '\')" disabled>✨ Use</button></div>' +
+        '<div class="item-effect-preview" id="preview-' + petId + '"></div></div>';
+    }
+
+    function previewItem(petId) {
+      var sel = document.getElementById('sel-' + petId);
+      var preview = document.getElementById('preview-' + petId);
+      var btn = document.getElementById('usebtn-' + petId);
+      if (!sel || !sel.value) { if (preview) preview.textContent = ''; if (btn) btn.disabled = true; return; }
+      var item = inventoryItems.find(function(i){ return i.invId === sel.value; });
+      if (!item) { if (preview) preview.textContent = ''; if (btn) btn.disabled = true; return; }
+      preview.textContent = '✨ Will give: ' + getEffectText(item);
+      btn.disabled = false;
+    }
+
+    async function useItem(petId) {
+      var sel = document.getElementById('sel-' + petId);
+      if (!sel || !sel.value) return;
+      var idx = inventoryItems.findIndex(function(i){ return i.invId === sel.value; });
+      if (idx === -1) return;
+      var item = inventoryItems[idx];
+      var pet = petState[petId]; if (!pet) return;
+      var btn = document.getElementById('usebtn-' + petId);
+      btn.disabled = true; btn.textContent = '...';
+
+      var updates = {};
+      if (item.h > 0) updates.hunger = Math.min(pet.hunger + item.h, pet.max_hunger);
+      if (item.e > 0) updates.energy = Math.min(pet.energy + item.e, pet.max_energy);
+      if (item.hap > 0) updates.happiness = Math.min(pet.happiness + item.hap, pet.max_happiness);
+      if (item.xp > 0) updates.xp = pet.xp + item.xp;
+
+      if (!Object.keys(updates).length) { showToast('This item has no effects yet.'); btn.disabled = false; btn.textContent = '✨ Use'; return; }
+
+      var res = await supabaseClient.from('user_pets').update(updates).eq('id', petId);
+      if (res.error) { showToast('Error: ' + res.error.message); btn.disabled = false; btn.textContent = '✨ Use'; return; }
+
+      if (item.qty <= 1) { await supabaseClient.from('user_inventory').delete().eq('id', item.invId); inventoryItems.splice(idx, 1); }
+      else { await supabaseClient.from('user_inventory').update({quantity: item.qty - 1}).eq('id', item.invId); inventoryItems[idx].qty = item.qty - 1; }
+
+      if (updates.hunger !== undefined) { petState[petId].hunger = updates.hunger; updateBar(petId,'hunger',updates.hunger,pet.max_hunger); }
+      if (updates.energy !== undefined) { petState[petId].energy = updates.energy; updateBar(petId,'energy',updates.energy,pet.max_energy); }
+      if (updates.happiness !== undefined) { petState[petId].happiness = updates.happiness; updateBar(petId,'happiness',updates.happiness,pet.max_happiness); }
+      if (updates.xp !== undefined) { petState[petId].xp = updates.xp; updateXpBar(petId, updates.xp, pet.level); }
+
+      showFlash(petId, '✨ ' + item.name + ': ' + getEffectText(item), '#b06aff');
+      showToast('Used ' + item.name + ' on ' + pet.nickname + '!');
+
+      var card = document.getElementById('petcard-' + petId);
+      if (card) { var old = card.querySelector('.use-item-section'); if (old) { var d = document.createElement('div'); d.innerHTML = buildDropdown(petId); old.replaceWith(d.firstElementChild); } }
+      btn.disabled = false; btn.textContent = '✨ Use';
+    }
+
+    async function loadMyPets() {
+      var container = document.getElementById('pets-container');
+      var res = await supabaseClient.from('user_pets').select('*, pets(name, image_file, vtuber_name, twitch_url)').eq('user_id', currentUser.id).order('adopted_at', {ascending:true});
+      if (res.error) { container.innerHTML = '<p style="text-align:center;color:var(--text-light);">Could not load pets.</p>'; return; }
+      if (!res.data || !res.data.length) {
+        container.innerHTML = '<div class="empty-state"><div style="font-size:3.5rem;margin-bottom:16px;">🐾</div><h2 style="color:var(--purple-dark);margin-bottom:10px;">No pets yet!</h2><p style="color:var(--text-light);margin-bottom:20px;">Head to the adoption centre!</p><a href="adopt.html" class="btn btn-primary btn-lg">🐣 Adopt a Pet</a></div>';
+        return;
+      }
+      res.data.forEach(function(pet) {
+        petState[pet.id] = Object.assign({}, pet, {
+          energy: calculateEnergyRegen(pet.energy, pet.max_energy, pet.last_played),
+          hunger: calculateHungerDecay(pet.hunger, pet.last_fed),
+          happiness: calculateHappinessDecay(pet.happiness, pet.last_fed, pet.last_played)
+        });
+      });
+      container.innerHTML = '<div class="pets-grid">' + Object.values(petState).map(renderCard).join('') + '</div>';
+    }
+
+    function renderCard(pet) {
+      var info = pet.pets || {};
+      var xpNext = pet.level * 100;
+      var hungerPct = Math.round(pet.hunger / pet.max_hunger * 100);
+      var happPct = Math.round(pet.happiness / pet.max_happiness * 100);
+      var energyPct = Math.round(pet.energy / pet.max_energy * 100);
+      var xpPct = Math.min(pet.xp / xpNext * 100, 100);
+      var canFeed = pet.hunger < pet.max_hunger;
+      var canPlay = pet.energy >= 10;
+      var imgHtml = info.image_file ? '<img src="images/' + info.image_file + '" alt="' + pet.nickname + '" onerror="this.parentElement.innerHTML=\'🐾\'">' : '🐾';
+      return '<div class="my-pet-card" id="petcard-' + pet.id + '">' +
+        '<div class="pet-card-header"><div class="pet-avatar">' + imgHtml + '</div>' +
+        '<div class="pet-card-info"><div class="pet-card-nickname">' + pet.nickname + '</div>' +
+        '<div class="pet-card-species">' + (info.vtuber_name ? '🎭 ' + info.vtuber_name : '') + (info.twitch_url ? ' &nbsp;<a href="' + info.twitch_url + '" target="_blank" style="font-size:0.78rem;background:#9146ff;color:white;padding:2px 8px;border-radius:10px;font-family:Fredoka One,cursive;text-decoration:none;">Watch Live</a>' : '') + '</div>' +
+        '<div class="pet-card-level">Lv. ' + pet.level + ' &nbsp;|&nbsp; Max: ' + pet.max_hunger + '</div></div></div>' +
+        (pet.happiness <= 20 || pet.hunger <= 10 ? '<div class="sadness-warning">😢 Your pet needs attention!</div>' : '') +
+        '<div class="stat-bars">' +
+        statRow('hunger', pet.id, pet.hunger, pet.max_hunger, hungerPct, '🍖 Hunger') +
+        statRow('happiness', pet.id, pet.happiness, pet.max_happiness, happPct, '💖 Happiness') +
+        statRow('energy', pet.id, pet.energy, pet.max_energy, energyPct, '⚡ Energy') +
+        '<div class="xp-row"><span class="xp-label">✨ XP</span><div class="xp-bar-wrap"><div class="xp-bar-fill" id="xp-bar-' + pet.id + '" style="width:' + xpPct + '%"></div></div><span class="xp-value" id="xp-val-' + pet.id + '">' + pet.xp + '/' + xpNext + '</span></div>' +
+        '</div>' +
+        '<div class="pet-actions">' +
+        '<button class="btn-action btn-feed" id="feed-' + pet.id + '" onclick="feed(\'' + pet.id + '\')"' + (!canFeed ? ' disabled' : '') + '>' + (canFeed ? '🍖 Feed' : '🍖 Full!') + '</button>' +
+        '<button class="btn-action btn-play" id="play-' + pet.id + '" onclick="play(\'' + pet.id + '\')"' + (!canPlay ? ' disabled' : '') + '>' + (canPlay ? '🎾 Play' : '⚡ Tired!') + '</button>' +
+        '</div>' +
+        buildDropdown(pet.id) +
+        '<div class="stat-flash" id="flash-' + pet.id + '"></div></div>';
+    }
+
+    function statRow(stat, petId, val, max, pct, label) {
+      return '<div class="stat-row"><span class="stat-label">' + label + '</span><div class="stat-bar-wrap"><div class="stat-bar-fill ' + stat + '" id="' + stat + '-bar-' + petId + '" style="width:' + pct + '%"></div></div><span class="stat-value" id="' + stat + '-val-' + petId + '">' + val + '/' + max + '</span></div>';
+    }
+
+    async function feed(petId) {
+      var pet = petState[petId]; if (!pet || pet.hunger >= pet.max_hunger) return;
+      var btn = document.getElementById('feed-' + petId); btn.disabled = true; btn.textContent = '...';
+      var nh = Math.min(pet.hunger + 20, pet.max_hunger);
+      var nhap = Math.min(pet.happiness + 5, pet.max_happiness);
+      var nxp = pet.xp + 10;
+      var lu = calculateLevelUp(nxp, pet.level, pet.max_hunger, pet.max_energy, pet.max_happiness);
+      var updates = { hunger:nh, happiness:nhap, xp:lu.xp, level:lu.level, last_fed:new Date().toISOString() };
+      if (lu.leveled) { updates.max_hunger = lu.maxHunger; updates.max_energy = lu.maxEnergy; updates.max_happiness = lu.maxHappiness; }
+      var res = await supabaseClient.from('user_pets').update(updates).eq('id', petId);
+      if (res.error) { showFlash(petId, 'Error!', '#ff6eb4'); btn.disabled = false; btn.textContent = '🍖 Feed'; return; }
+      Object.assign(petState[petId], updates);
+      updateBar(petId,'hunger',nh,lu.maxHunger); updateBar(petId,'happiness',nhap,lu.maxHappiness); updateXpBar(petId,lu.xp,lu.level);
+      if (lu.leveled) { showFlash(petId, '🎉 Level ' + lu.level + '! Max stats +5!', '#b06aff'); updateLevelDisplay(petId, lu.level, lu.maxHunger); }
+      else { showFlash(petId, '+20 Hunger  +5 Happiness  +10 XP', '#5dde7a'); }
+      if (nh >= lu.maxHunger) { btn.textContent = '🍖 Full!'; } else { btn.disabled = false; btn.textContent = '🍖 Feed'; }
+    }
+
+    async function play(petId) {
+      var pet = petState[petId]; if (!pet || pet.energy < 10) return;
+      var btn = document.getElementById('play-' + petId); btn.disabled = true; btn.textContent = '...';
+      var ne = Math.max(pet.energy - 10, 0);
+      var nhap = Math.min(pet.happiness + 15, pet.max_happiness);
+      var nxp = pet.xp + 15;
+      var lu = calculateLevelUp(nxp, pet.level, pet.max_hunger, pet.max_energy, pet.max_happiness);
+      var updates = { energy:ne, happiness:nhap, xp:lu.xp, level:lu.level, last_played:new Date().toISOString() };
+      if (lu.leveled) { updates.max_hunger = lu.maxHunger; updates.max_energy = lu.maxEnergy; updates.max_happiness = lu.maxHappiness; }
+      var res = await supabaseClient.from('user_pets').update(updates).eq('id', petId);
+      if (res.error) { showFlash(petId, 'Error!', '#ff6eb4'); btn.disabled = false; btn.textContent = '🎾 Play'; return; }
+      Object.assign(petState[petId], updates);
+      updateBar(petId,'energy',ne,lu.maxEnergy); updateBar(petId,'happiness',nhap,lu.maxHappiness); updateXpBar(petId,lu.xp,lu.level);
+      if (lu.leveled) { showFlash(petId, '🎉 Level ' + lu.level + '! Max stats +5!', '#b06aff'); updateLevelDisplay(petId, lu.level, lu.maxHunger); }
+      else { showFlash(petId, '-10 Energy  +15 Happiness  +15 XP', '#5dde7a'); }
+      if (ne < 10) { btn.textContent = '⚡ Tired!'; } else { btn.disabled = false; btn.textContent = '🎾 Play'; }
+    }
+
+    function updateLevelDisplay(petId, level, maxHunger) {
+      var card = document.getElementById('petcard-' + petId);
+      if (!card) return;
+      var lvl = card.querySelector('.pet-card-level');
+      if (lvl) lvl.textContent = 'Lv. ' + level + ' | Max: ' + maxHunger;
+    }
+
+    function updateBar(petId, stat, val, max) {
+      var pct = Math.round(val / max * 100);
+      var bar = document.getElementById(stat+'-bar-'+petId); if (bar) bar.style.width = pct+'%';
+      var v = document.getElementById(stat+'-val-'+petId); if (v) v.textContent = val+'/'+max;
+    }
+
+    function updateXpBar(petId, xp, level) {
+      var next = level*100; var pct = Math.min(xp/next*100, 100);
+      var bar = document.getElementById('xp-bar-'+petId); if (bar) bar.style.width = pct+'%';
+      var v = document.getElementById('xp-val-'+petId); if (v) v.textContent = xp+'/'+next;
+    }
+
+    function showFlash(petId, msg, color) {
+      var el = document.getElementById('flash-'+petId); if (!el) return;
+      el.textContent = msg; el.style.color = color||'var(--green)'; el.style.opacity = '1';
+      setTimeout(function(){ el.style.opacity = '0'; }, 3000);
+    }
+
+    init();
+  </script>
+</body>
+</html>
