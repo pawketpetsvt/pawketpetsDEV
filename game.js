@@ -1438,12 +1438,33 @@ async function loadMyPets() {
   if (!currentUser) return;
   container.innerHTML = '<div class="spinner"></div>';
   await loadInventoryData();
-  var res = await supabaseClient.from('user_pets').select('*, pets(name, image_file, vtuber_name, twitch_url), variant, variant_unlocked_at_level, active_pet_title_id').eq('user_id',currentUser.id).order('adopted_at',{ascending:true});
-  if (res.error) { container.textContent='Could not load pets.'; return; }
+  
+  // OPTIMIZATION 2: Single JOIN query instead of N+1 queries
+  // Fetch pets WITH titles in one query instead of 1 + N queries
+  var res = await supabaseClient
+    .from('user_pets')
+    .select(`
+      *,
+      pets(name, image_file, vtuber_name, twitch_url),
+      user_pet_titles(
+        pet_title_id,
+        pet_titles(*)
+      )
+    `)
+    .eq('user_id', currentUser.id)
+    .order('adopted_at', {ascending: true});
+  
+  if (res.error) { 
+    console.error('Error loading pets:', res.error);
+    container.textContent='Could not load pets.'; 
+    return; 
+  }
+  
   if (!res.data || !res.data.length) {
     container.innerHTML='<div class="empty-state"><div style="font-size:3rem;margin-bottom:14px;">&#128062;</div><h2 style="color:var(--purple-dark);margin-bottom:10px;">No pets yet!</h2><p style="color:var(--text-light);margin-bottom:18px;">Head to the adoption centre!</p><button class="btn btn-primary btn-lg" onclick="showTab(\'adopt\')">Adopt a Pet</button></div>';
     return;
   }
+  
   // Process pets and calculate decay for DISPLAY ONLY (don't save back to DB!)
   res.data.forEach(function(pet) {
     var decayedEnergy = calculateEnergyRegen(pet.energy, pet.max_energy, pet.last_played);
@@ -1466,16 +1487,28 @@ async function loadMyPets() {
       happiness: decayedHappiness,
       current_hp: regenedHP
     });
+    
+    // OPTIMIZATION 2: Cache titles from joined query (already loaded above)
+    if (pet.user_pet_titles && pet.user_pet_titles.length > 0) {
+      petTitlesCache[pet.id] = pet.user_pet_titles.map(function(upt) {
+        return upt.pet_titles;
+      });
+    } else {
+      petTitlesCache[pet.id] = [];
+    }
   });
   
-  // Load titles for each pet
-  for (var petId in petState) {
-    await loadPetTitles(petId);
-  }
-  
+  // OPTIMIZATION 1: Use DocumentFragment for batch DOM operations
+  // Build all cards in memory, then append once (1 reflow instead of N reflows)
   var grid = document.createElement('div');
   grid.className = 'mypets-grid';
-  Object.values(petState).forEach(function(pet) { grid.appendChild(makeMyPetCard(pet)); });
+  
+  var fragment = document.createDocumentFragment();
+  Object.values(petState).forEach(function(pet) { 
+    fragment.appendChild(makeMyPetCard(pet)); 
+  });
+  grid.appendChild(fragment);
+  
   container.innerHTML = '';
   container.appendChild(grid);
   
@@ -3355,6 +3388,9 @@ async function loadShop() {
     header.appendChild(desc);
     grid.appendChild(header);
     
+    // OPTIMIZATION 1: Use DocumentFragment for batch append
+    var fragment = document.createDocumentFragment();
+    
     // Render items in this category
     items.forEach(function(item) {
       var card=makeEl('div',{class:'shop-card'});
@@ -3401,8 +3437,11 @@ async function loadShop() {
       if(!canAfford)buyBtn.disabled=true;
       buyBtn.onclick=function(){buyItem(item.id,item.name,displayPrice);};
       card.appendChild(buyBtn);
-      grid.appendChild(card);
+      fragment.appendChild(card);
     });
+    
+    // Append all items at once
+    grid.appendChild(fragment);
   });
   
   // Add any uncategorized items at the end
@@ -3411,6 +3450,9 @@ async function loadShop() {
     header.style.cssText = 'grid-column: 1 / -1; padding: 20px 10px 10px; border-bottom: 3px solid var(--purple-light); margin-bottom: 10px;';
     header.innerHTML = '<div style="font-size: 1.4rem; font-weight: bold; color: var(--purple);">📦 Other Items</div>';
     grid.appendChild(header);
+    
+    // OPTIMIZATION 1: Use DocumentFragment for batch append
+    var fragment = document.createDocumentFragment();
     
     categories.other.forEach(function(item) {
       var card=makeEl('div',{class:'shop-card'});
@@ -3436,8 +3478,11 @@ async function loadShop() {
       if(!canAfford)buyBtn.disabled=true;
       buyBtn.onclick=function(){buyItem(item.id,item.name,displayPrice);};
       card.appendChild(buyBtn);
-      grid.appendChild(card);
+      fragment.appendChild(card);
     });
+    
+    // Append all at once
+    grid.appendChild(fragment);
   }
 }
 
