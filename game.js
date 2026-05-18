@@ -32,6 +32,86 @@ var audioCache = {};
 var lastSoundTime = 0;
 var soundCooldown = 300; // Minimum 300ms between sounds to avoid spam
 
+// ═══════════════════════════════════════════════════════════════════════
+// AUDIO PRELOADING - Load once, reuse forever
+// ═══════════════════════════════════════════════════════════════════════
+function preloadBattleAudio() {
+  Object.keys(battleSounds).forEach(function(key) {
+    var audio = new Audio(battleSounds[key]);
+    audio.volume = 0.35;
+    audio.preload = 'auto';
+    audio.onerror = function() {
+      console.log('Sound file not available:', battleSounds[key]);
+      audioCache[key] = null; // Mark as missing
+    };
+    audioCache[key] = audio;
+  });
+  console.log('✅ Battle audio preloaded');
+}
+
+// Preload on page load (after user interaction)
+var audioPreloaded = false;
+document.addEventListener('click', function preloadOnClick() {
+  if (!audioPreloaded) {
+    preloadBattleAudio();
+    audioPreloaded = true;
+  }
+}, { once: true });
+
+// ═══════════════════════════════════════════════════════════════════════
+// TIMER CLEANUP SYSTEM - Prevents memory leaks
+// ═══════════════════════════════════════════════════════════════════════
+var activeTimers = {
+  intervals: [],
+  timeouts: []
+};
+
+function safeSetInterval(fn, delay) {
+  var id = setInterval(fn, delay);
+  activeTimers.intervals.push(id);
+  return id;
+}
+
+function safeSetTimeout(fn, delay) {
+  var id = setTimeout(fn, delay);
+  activeTimers.timeouts.push(id);
+  return id;
+}
+
+function safeClearInterval(id) {
+  clearInterval(id);
+  var index = activeTimers.intervals.indexOf(id);
+  if (index > -1) {
+    activeTimers.intervals.splice(index, 1);
+  }
+}
+
+function safeClearTimeout(id) {
+  clearTimeout(id);
+  var index = activeTimers.timeouts.indexOf(id);
+  if (index > -1) {
+    activeTimers.timeouts.splice(index, 1);
+  }
+}
+
+function cleanupAllTimers() {
+  // Clear all tracked intervals
+  activeTimers.intervals.forEach(function(id) {
+    clearInterval(id);
+  });
+  
+  // Clear all tracked timeouts
+  activeTimers.timeouts.forEach(function(id) {
+    clearTimeout(id);
+  });
+  
+  // Reset arrays
+  activeTimers.intervals = [];
+  activeTimers.timeouts = [];
+  
+  console.log('✅ All timers cleaned up');
+}
+
 function playBattleSound(soundKey, volume, forceBoss) {
   // Rate limiting - prevent sound spam
   var now = Date.now();
@@ -40,23 +120,16 @@ function playBattleSound(soundKey, volume, forceBoss) {
   }
   lastSoundTime = now;
   
-  // Check if file exists by trying to load it
-  if (!audioCache[soundKey]) {
-    var audio = new Audio(battleSounds[soundKey]);
-    audio.volume = volume || 0.35;
-    audio.onerror = function() {
-      console.log('Sound file not found:', battleSounds[soundKey]);
-      audioCache[soundKey] = null; // Mark as missing
-    };
-    audioCache[soundKey] = audio;
+  // Get audio from pool (preloaded on first user interaction)
+  var audio = audioCache[soundKey];
+  
+  // If audio not in cache yet or is null (missing file), skip
+  if (!audio) {
+    return;
   }
   
-  if (audioCache[soundKey] === null) {
-    return; // File doesn't exist, skip silently
-  }
-  
-  // Clone to allow overlapping sounds
-  var sound = audioCache[soundKey].cloneNode();
+  // Clone audio node to allow overlapping sounds
+  var sound = audio.cloneNode();
   sound.volume = volume || 0.35;
   
   sound.play().catch(function(err) {
@@ -423,6 +496,9 @@ function initLeaderboardTab() {
 
 // ── TAB NAVIGATION ───────────────────────
 function showTab(tab) {
+  // CRITICAL: Clean up all timers when switching tabs to prevent memory leaks
+  cleanupAllTimers();
+  
   document.querySelectorAll('#app-content .page-section').forEach(function(s){ s.classList.remove('active'); });
   var sec = el('section-' + tab); if (sec) sec.classList.add('active');
   document.querySelectorAll('.nav-tab').forEach(function(b){ b.classList.remove('active'); });
@@ -438,7 +514,7 @@ function showTab(tab) {
     initLeaderboardTab();
   } else if (tab === 'forum') {
     // Ensure forum initializes properly
-    setTimeout(function() {
+    safeSetTimeout(function() {
       initForum();
     }, 100);
   } else if (tab === 'settings') {
@@ -4981,20 +5057,24 @@ function triggerSpookyEffect() {
   
   // Play spooky audio (Piper's flute)
   try {
-    var spookyAudio = new Audio('/sounds/piper-flute-normal.mp3');
-    spookyAudio.volume = 0.3;
-    spookyAudio.play().catch(function(err) {
-      console.log('Spooky audio failed to play:', err);
-    });
+    // Reuse cached Piper audio instead of creating new Audio() each time
+    var piperKey = 'bossNormal'; // Already in battleSounds
+    if (audioCache[piperKey]) {
+      var spookyAudio = audioCache[piperKey].cloneNode();
+      spookyAudio.volume = 0.3;
+      spookyAudio.play().catch(function(err) {
+        console.log('Spooky audio failed to play:', err);
+      });
+    }
   } catch (err) {
     console.log('Could not load spooky audio');
   }
   
   // Remove effects after 3 seconds
-  setTimeout(function() {
+  safeSetTimeout(function() {
     overlay.style.animation = 'spooky-fade-out 1s ease-out';
     crtLines.style.animation = 'spooky-fade-out 1s ease-out';
-    setTimeout(function() {
+    safeSetTimeout(function() {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       if (crtLines.parentNode) crtLines.parentNode.removeChild(crtLines);
     }, 1000);
@@ -10382,9 +10462,17 @@ var CompanionBuddy = {
   },
   
   hide: function() {
+    // CRITICAL: Clean up timers to prevent memory leaks
+    this.stopMessageRotation();
+    
+    // Clear bubble timeout
+    if (this.bubbleTimeout) {
+      clearTimeout(this.bubbleTimeout);
+      this.bubbleTimeout = null;
+    }
+    
     var buddy = document.getElementById('companion-buddy');
     if (buddy) buddy.style.display = 'none';
-    this.stopMessageRotation();
   },
   
   showMessage: function(message) {
@@ -10401,7 +10489,7 @@ var CompanionBuddy = {
     bubble.classList.add('show');
     
     // Hide after 5 seconds
-    this.bubbleTimeout = setTimeout(function() {
+    this.bubbleTimeout = safeSetTimeout(function() {
       bubble.classList.remove('show');
     }, 5000);
   },
@@ -10432,14 +10520,14 @@ var CompanionBuddy = {
     var self = this;
     
     // Show first message after 3 seconds
-    setTimeout(function() {
+    safeSetTimeout(function() {
       var context = self.getCurrentContext();
       var message = self.getRandomMessage(context);
       self.showMessage(message);
     }, 3000);
     
     // Then show messages every 60-90 seconds
-    this.messageInterval = setInterval(function() {
+    this.messageInterval = safeSetInterval(function() {
       var context = self.getCurrentContext();
       var message = self.getRandomMessage(context);
       self.showMessage(message);
@@ -10448,7 +10536,7 @@ var CompanionBuddy = {
   
   stopMessageRotation: function() {
     if (this.messageInterval) {
-      clearInterval(this.messageInterval);
+      safeClearInterval(this.messageInterval);
       this.messageInterval = null;
     }
   },
