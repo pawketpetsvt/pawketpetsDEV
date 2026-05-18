@@ -9589,23 +9589,29 @@ body.night-mode .btn-outline:hover {
 .hamburger-menu-btn {
   display: none;
   position: fixed;
-  top: 20px;
-  left: 20px;
-  z-index: 2000;
-  background: linear-gradient(135deg, var(--purple) 0%, var(--pink) 100%);
+  top: 15px;
+  left: 15px;
+  z-index: 1001;
+  background: #ff6b35; /* Brand orange */
   color: white;
   border: none;
-  border-radius: 12px;
-  width: 50px;
-  height: 50px;
-  font-size: 2rem;
+  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  font-size: 28px;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(153, 102, 255, 0.4);
-  transition: transform 0.2s ease;
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
 }
 
 .hamburger-menu-btn:hover {
-  transform: scale(1.1);
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.5);
 }
 
 .hamburger-menu-btn:active {
@@ -9616,39 +9622,39 @@ body.night-mode .btn-outline:hover {
 .mobile-nav-menu {
   position: fixed;
   top: 0;
-  left: 0;
+  left: -280px;
   width: 280px;
   height: 100vh;
-  background: linear-gradient(180deg, #ffddee 0%, #e6ccff 100%);
-  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2);
-  z-index: 1999;
+  background: #1a1a2e; /* Dark background */
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
   overflow-y: auto;
-  transition: transform 0.3s ease;
-  transform: translateX(-100%);
+  transition: left 0.3s ease;
   padding: 20px;
+  box-sizing: border-box;
 }
 
 .mobile-nav-menu.open {
-  transform: translateX(0);
+  left: 0;
 }
 
 .mobile-menu-close {
   display: block;
   width: 100%;
-  padding: 12px;
+  padding: 16px;
   margin-bottom: 20px;
-  background: linear-gradient(135deg, var(--pink-dark) 0%, var(--purple-dark) 100%);
+  background: #ff6b35;
   color: white;
   border: none;
-  border-radius: 12px;
+  border-radius: 8px;
   font-size: 1.1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.2s ease;
+  transition: background 0.2s ease;
 }
 
 .mobile-menu-close:hover {
-  transform: scale(1.02);
+  background: #ff5722;
 }
 
 .mobile-nav-overlay {
@@ -9659,7 +9665,7 @@ body.night-mode .btn-outline:hover {
   width: 100vw;
   height: 100vh;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 1998;
+  z-index: 999;
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -9671,31 +9677,34 @@ body.night-mode .btn-outline:hover {
 
 /* ========== MOBILE LAYOUT (width < 900px) ========== */
 @media (max-width: 900px) {
+  /* CRITICAL: Prevent horizontal scroll */
+  html, body {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+  }
+  
+  * {
+    max-width: 100% !important;
+  }
+  
   /* Show Hamburger Button on mobile */
   .hamburger-menu-btn {
     display: block !important;
   }
   
+  /* HIDE ALL DESKTOP NAVIGATION */
+  .navbar,
+  .nav-tabs,
+  .tabs,
+  .top-nav,
+  .desktop-nav,
+  .left-sidebar > .sidebar-section .sidebar-nav-links {
+    display: none !important;
+  }
+  
   /* Hide the DESKTOP left sidebar navigation buttons */
-  /* Keep the stats section visible, hide the nav section */
   .left-sidebar > .sidebar-section:first-of-type + .sidebar-section {
     display: none !important;
-  }
-  
-  /* Hide all desktop-nav sections on mobile */
-  .desktop-nav {
-    display: none !important;
-  }
-  
-  /* Alternatively, more precisely target the nav section */
-  .left-sidebar .sidebar-section .sidebar-nav-links {
-    display: none !important;
-  }
-  
-  /* But keep the stats and daily bonus sections visible in mobile sidebar */
-  .left-sidebar .sidebar-section:has(.sidebar-stats),
-  .left-sidebar .sidebar-section:has(.daily-bonus-btn) {
-    display: block !important;
   }
   
   /* App Container - Stack Vertically */
@@ -9703,7 +9712,16 @@ body.night-mode .btn-outline:hover {
     display: flex !important;
     flex-direction: column !important;
     width: 100% !important;
+    max-width: 100vw !important;
     padding: 10px !important;
+    box-sizing: border-box !important;
+  }
+  
+  /* Main content area - add padding for hamburger */
+  #app-content {
+    padding-top: 70px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
   
   /* Left Sidebar - Compact header with stats only */
@@ -9718,6 +9736,7 @@ body.night-mode .btn-outline:hover {
     flex-direction: row !important;
     flex-wrap: wrap !important;
     gap: 10px !important;
+    box-sizing: border-box !important;
   }
   
   /* Make sidebar sections horizontal on mobile */
@@ -9725,60 +9744,108 @@ body.night-mode .btn-outline:hover {
     flex: 1 !important;
     min-width: 120px !important;
     margin: 0 !important;
+    box-sizing: border-box !important;
   }
   
   /* Center Content - Full Width */
   .center-content {
     width: 100% !important;
+    max-width: 100vw !important;
     margin: 0 !important;
     padding: 10px !important;
     order: 2;
+    box-sizing: border-box !important;
   }
   
   /* Right Sidebar - Below Content */
   .right-sidebar {
     position: static !important;
     width: 100% !important;
+    max-width: 100vw !important;
     height: auto !important;
     padding: 20px !important;
     border-top: 2px solid var(--border);
     order: 3;
+    box-sizing: border-box !important;
   }
   
   /* Mobile Nav Menu Sidebar Buttons */
   .mobile-nav-menu .sidebar-nav-btn {
     display: block !important;
     width: 100% !important;
-    padding: 16px !important;
-    margin-bottom: 8px !important;
-    font-size: 1.1rem !important;
+    padding: 20px !important;
+    margin-bottom: 0 !important;
+    font-size: 18px !important;
     text-align: left !important;
-    border-radius: 12px !important;
+    border-radius: 0 !important;
+    min-height: 48px !important; /* Touch target */
+    box-sizing: border-box !important;
+    background: transparent !important;
+    color: white !important;
+    border: none !important;
+    border-bottom: 1px solid #333 !important;
+    transition: background 0.2s ease !important;
+  }
+  
+  .mobile-nav-menu .sidebar-nav-btn:hover {
+    background: rgba(255, 107, 53, 0.1) !important;
+    transform: none !important;
+  }
+  
+  .mobile-nav-menu .sidebar-nav-btn.active {
+    background: rgba(255, 107, 53, 0.2) !important;
+    color: #ff6b35 !important;
+    border-left: 4px solid #ff6b35 !important;
+    box-shadow: none !important;
   }
   
   /* Adjust Page Content */
   .page-wrap {
     max-width: 100% !important;
     padding: 20px 10px !important;
+    box-sizing: border-box !important;
+  }
+  
+  /* Page sections */
+  .page-section {
+    width: 100% !important;
+    max-width: 100vw !important;
+    padding: 10px !important;
+    box-sizing: border-box !important;
   }
   
   /* Responsive Grids */
   .pets-grid,
+  .mypets-grid,
   .shop-grid,
   .badges-grid,
   .leaderboard-list {
     grid-template-columns: 1fr !important;
     gap: 16px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  
+  /* Pet cards */
+  .pet-card,
+  .shop-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
   
   /* Battle Screen Mobile */
   .battle-container {
     flex-direction: column !important;
     gap: 20px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
   
   .battle-side {
     width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
   
   .battle-vs {
@@ -9796,14 +9863,17 @@ body.night-mode .btn-outline:hover {
   /* Modal Mobile */
   .modal-content {
     width: 95% !important;
-    max-width: 95% !important;
+    max-width: 95vw !important;
     margin: 10px !important;
+    box-sizing: border-box !important;
   }
   
   /* Activity Feed - Show on mobile but condensed */
   .activity-feed-box {
     display: block !important;
     font-size: 0.8rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
   
   /* Sidebar stats - horizontal layout */
@@ -9811,12 +9881,33 @@ body.night-mode .btn-outline:hover {
     display: flex !important;
     justify-content: space-around !important;
     gap: 10px !important;
+    flex-wrap: wrap !important;
   }
   
   .stat-row {
     flex-direction: column !important;
     align-items: center !important;
     text-align: center !important;
+  }
+  
+  /* Buttons - touch-friendly */
+  button, .btn, a.btn {
+    min-height: 44px !important;
+    padding: 12px 16px !important;
+    font-size: 16px !important; /* Prevent iOS zoom */
+  }
+  
+  /* Inputs - touch-friendly */
+  input, textarea, select {
+    font-size: 16px !important; /* Prevent iOS zoom */
+    min-height: 44px !important;
+  }
+  
+  /* Tables */
+  table {
+    width: 100% !important;
+    display: block !important;
+    overflow-x: auto !important;
   }
 }
 
