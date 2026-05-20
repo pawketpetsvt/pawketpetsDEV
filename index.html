@@ -191,6 +191,24 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
       
       <span id="nav-user"></span>
       <span id="nav-points"></span>
+      
+      <!-- PawketPass Button -->
+      <button class="pass-button" id="pass-button" onclick="showPassModal()" style="display:none;" title="PawketPass Season 1">
+        <div class="pass-icon">🎫</div>
+        <div class="pass-info">
+          <span class="pass-label">Pass</span>
+          <span class="pass-level">Lv. <span id="pass-level-display">1</span></span>
+        </div>
+        <div class="pass-xp-bar">
+          <div class="pass-xp-fill" id="pass-xp-fill" style="width: 0%"></div>
+        </div>
+      </button>
+      
+      <!-- Bingo Button -->
+      <button class="bingo-button" id="bingo-button" onclick="showBingoModal()" style="display:none;" title="Daily Bingo">
+        🎯 <span id="bingo-completion">0/9</span>
+      </button>
+      
       <button class="btn-nav-action" id="nav-profile" style="display:none" onclick="showTab('myprofile')">👤 Profile</button>
       <button class="btn-nav-action" id="nav-logout" style="display:none" onclick="handleLogout()">Logout</button>
     </div>

@@ -647,6 +647,12 @@ async function showApp(user) {
   el('nav-logout').style.display = 'inline-block';
   el('nav-profile').style.display = 'inline-block';
   
+  // Show Pass and Bingo buttons
+  var passBtn = el('pass-button');
+  var bingoBtn = el('bingo-button');
+  if (passBtn) passBtn.style.display = 'flex';
+  if (bingoBtn) bingoBtn.style.display = 'inline-block';
+  
   // Clean up any leftover spooky effects
   cleanupSpookyEffects();
 
@@ -777,6 +783,11 @@ async function showApp(user) {
   
   // Load sidebar news widget
   loadSidebarNews();
+  
+  // PAWKETPASS & BINGO: Initialize systems
+  await loadPassProgress();
+  loadDailyBingo();
+  updateBingoUI();
 }
 
 function showAuth() {
@@ -2636,6 +2647,10 @@ async function feedFree(petId) {
   // MARK FREE OPTION AS USED FOR TODAY (after successful feed)
   localStorage.setItem(freeFeedKey, 'done');
   
+  // PAWKETPASS: Update bingo progress for feeding
+  updateBingoProgress('feed_pet', 1);
+  await addPassXP(2, 'feed');
+  
   // Update local state
   petState[petId].hunger = feedResult.hunger;
   petState[petId].happiness = feedResult.happiness;
@@ -2692,6 +2707,15 @@ async function feedWithItem(petId, itemId, itemName) {
   
   // JSONB response - direct object (not array)
   var feedResult = result;
+  
+  // PAWKETPASS: Update bingo and Pass XP
+  updateBingoProgress('feed_pet', 1);
+  await addPassXP(2, 'feed');
+  
+  // Check if using treat for bingo
+  if (itemId === 'treat' || itemId === 'premium_treat') {
+    updateBingoProgress('use_treat', 1);
+  }
   
   // Update local state
   petState[petId].hunger = feedResult.hunger;
@@ -3130,6 +3154,10 @@ async function playFree(petId) {
   // MARK FREE OPTION AS USED FOR TODAY (after successful play)
   localStorage.setItem(freePlayKey, 'done');
   
+  // PAWKETPASS: Update bingo and Pass XP
+  updateBingoProgress('play_pet', 1);
+  await addPassXP(2, 'play');
+  
   // Update local state (JSONB returns direct object)
   petState[petId].energy = result.energy;
   petState[petId].happiness = result.happiness;
@@ -3183,6 +3211,11 @@ async function playWithToy(petId, toyId, toyName) {
   petState[petId].energy = result.energy;
   petState[petId].happiness = result.happiness;
   petState[petId].xp = result.xp;
+  
+  // PAWKETPASS: Update bingo and Pass XP
+  updateBingoProgress('play_pet', 1);
+  updateBingoProgress('use_toy', 1);
+  await addPassXP(2, 'play');
   
   updateBar(petId, 'energy', result.energy, pet.max_energy);
   updateBar(petId, 'happiness', result.happiness, pet.max_happiness);
@@ -3304,6 +3337,9 @@ function getCurrentRotationWeek() {
 
 async function loadShop() {
   var grid = el('shop-grid');
+  
+  // PAWKETPASS: Mark shop visit for bingo
+  updateBingoProgress('visit_shop', 1);
   
   // Exclude boss drops from shop! Boss items can only be obtained by defeating bosses
   var res = await supabaseClient
@@ -11475,6 +11511,10 @@ async function checkDailyLogin() {
     // Apply daily buffs
     applyDailyBuffs(streak);
     
+    // PAWKETPASS: Update bingo and Pass XP for daily login
+    updateBingoProgress('login', 1);
+    await addPassXP(10, 'login');
+    
     console.log('✅ Daily login checked - Streak:', streak, 'Reward:', ppReward);
     
   } catch (err) {
@@ -16915,3 +16955,699 @@ function applySettings() {
     }
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// PAWKETPASS SYSTEM
+// ══════════════════════════════════════════════════════════════════════════
+
+var passProgress = {
+  season: 1,
+  level: 1,
+  xp: 0,
+  xpToNextLevel: 100,
+  claimedRewards: []
+};
+
+var dailyXPCaps = {
+  login: { earned: 0, max: 10 },
+  feed: { earned: 0, max: 20 },
+  play: { earned: 0, max: 20 },
+  battle: { earned: 0, max: 50 },
+  bingo_square: { earned: 0, max: 135 },
+  bingo_line: { earned: 0, max: 400 },
+  bingo_blackout: { earned: 0, max: 200 }
+};
+
+// Pass rewards structure (50 levels)
+var PASS_REWARDS = {
+  1: { type: 'points', amount: 100 },
+  2: { type: 'item', itemId: 'basic_food', quantity: 2 },
+  3: { type: 'item', itemId: 'treat', quantity: 3 },
+  4: { type: 'points', amount: 150 },
+  5: { type: 'item', itemId: 'rare_toy', quantity: 1 },
+  6: { type: 'title', titleKey: 'pass_rider' },
+  7: { type: 'points', amount: 200 },
+  8: { type: 'item', itemId: 'treat', quantity: 2, itemId2: 'basic_food', quantity2: 1 },
+  9: { type: 'points', amount: 250 },
+  10: { type: 'item', itemId: 'premium_treat', quantity: 1 },
+  11: { type: 'points', amount: 300 },
+  12: { type: 'item', itemId: 'rare_toy', quantity: 2 },
+  13: { type: 'title', titleKey: 'dedicated_trainer' },
+  14: { type: 'points', amount: 350 },
+  15: { type: 'item', itemId: 'revive_potion', quantity: 1 },
+  16: { type: 'points', amount: 400 },
+  17: { type: 'item', itemId: 'treat', quantity: 3, itemId2: 'basic_food', quantity2: 2 },
+  18: { type: 'points', amount: 450 },
+  19: { type: 'item', itemId: 'skin_key', quantity: 1 },
+  20: { type: 'title', titleKey: 'faithful_companion' },
+  21: { type: 'points', amount: 500 },
+  22: { type: 'item', itemId: 'premium_treat', quantity: 2 },
+  23: { type: 'points', amount: 550 },
+  24: { type: 'item', itemId: 'skin_key', quantity: 1 },
+  25: { type: 'points', amount: 600 },
+  26: { type: 'item', itemId: 'rare_toy', quantity: 3 },
+  27: { type: 'title', titleKey: 'pawket_champion' },
+  28: { type: 'points', amount: 700 },
+  29: { type: 'item', itemId: 'skin_key', quantity: 1 },
+  30: { type: 'title', titleKey: 'style_master' },
+  31: { type: 'points', amount: 800 },
+  32: { type: 'item', itemId: 'treat', quantity: 5, itemId2: 'basic_food', quantity2: 3 },
+  33: { type: 'points', amount: 900 },
+  34: { type: 'title', titleKey: 'legendary_tamer' },
+  35: { type: 'points', amount: 1000 },
+  36: { type: 'item', itemId: 'skin_key', quantity: 2 },
+  37: { type: 'points', amount: 1100 },
+  38: { type: 'item', itemId: 'premium_treat', quantity: 3, itemId2: 'revive_potion', quantity2: 2 },
+  39: { type: 'points', amount: 1200 },
+  40: { type: 'title', titleKey: 'mythic_breaker' },
+  41: { type: 'points', amount: 1300 },
+  42: { type: 'item', itemId: 'skin_key', quantity: 2 },
+  43: { type: 'points', amount: 1400 },
+  44: { type: 'item', itemId: 'mystery_box', quantity: 3 },
+  45: { type: 'points', amount: 1500 },
+  46: { type: 'item', itemId: 'skin_key', quantity: 3 },
+  47: { type: 'title', titleKey: 'pawket_master' },
+  48: { type: 'points', amount: 2000 },
+  49: { type: 'item', itemId: 'skin_key', quantity: 3 },
+  50: { type: 'title', titleKey: 'ultimate_collector' }
+};
+
+// Load Pass progress from database
+async function loadPassProgress() {
+  if (!currentUser) return;
+  
+  try {
+    var res = await supabaseClient
+      .from('user_pass_progress')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .eq('season', 1)
+      .maybeSingle();
+    
+    if (res.data) {
+      passProgress.level = res.data.level || 1;
+      passProgress.xp = res.data.xp || 0;
+      passProgress.claimedRewards = res.data.claimed_rewards || [];
+      passProgress.xpToNextLevel = calculateXPForLevel(passProgress.level + 1);
+    } else {
+      // Create new progress entry
+      await supabaseClient
+        .from('user_pass_progress')
+        .insert({
+          user_id: currentUser.id,
+          season: 1,
+          level: 1,
+          xp: 0,
+          claimed_rewards: []
+        });
+    }
+    
+    // Load daily XP caps from localStorage
+    var today = new Date().toISOString().split('T')[0];
+    var savedCaps = localStorage.getItem('daily_xp_caps_' + today);
+    if (savedCaps) {
+      dailyXPCaps = JSON.parse(savedCaps);
+    } else {
+      resetDailyXPCaps();
+    }
+    
+    updatePassUI();
+    
+  } catch (err) {
+    console.error('[Pass] Error loading progress:', err);
+  }
+}
+
+// Calculate XP required for a level
+function calculateXPForLevel(level) {
+  return Math.floor(100 * Math.pow(1.1, level - 1));
+}
+
+// Add Pass XP with daily cap
+async function addPassXP(amount, source) {
+  if (!currentUser || amount <= 0) return;
+  
+  // Check daily cap
+  if (dailyXPCaps[source]) {
+    var remaining = dailyXPCaps[source].max - dailyXPCaps[source].earned;
+    if (remaining <= 0) {
+      console.log('[Pass] Daily XP cap reached for ' + source);
+      return;
+    }
+    amount = Math.min(amount, remaining);
+    dailyXPCaps[source].earned += amount;
+    saveDailyXPCaps();
+  }
+  
+  passProgress.xp += amount;
+  
+  // Check for level up
+  var levelsGained = 0;
+  while (passProgress.xp >= passProgress.xpToNextLevel && passProgress.level < 50) {
+    passProgress.xp -= passProgress.xpToNextLevel;
+    passProgress.level++;
+    passProgress.xpToNextLevel = calculateXPForLevel(passProgress.level + 1);
+    levelsGained++;
+  }
+  
+  // Save to database
+  await supabaseClient
+    .from('user_pass_progress')
+    .update({
+      level: passProgress.level,
+      xp: passProgress.xp,
+      updated_at: new Date().toISOString()
+    })
+    .eq('user_id', currentUser.id)
+    .eq('season', 1);
+  
+  updatePassUI();
+  
+  if (levelsGained > 0) {
+    showToast('🎫 Pass Level Up! Now Level ' + passProgress.level + '!', 'success');
+    playSound('levelup');
+  }
+}
+
+// Save daily XP caps to localStorage
+function saveDailyXPCaps() {
+  var today = new Date().toISOString().split('T')[0];
+  localStorage.setItem('daily_xp_caps_' + today, JSON.stringify(dailyXPCaps));
+}
+
+// Reset daily XP caps (called at midnight)
+function resetDailyXPCaps() {
+  dailyXPCaps = {
+    login: { earned: 0, max: 10 },
+    feed: { earned: 0, max: 20 },
+    play: { earned: 0, max: 20 },
+    battle: { earned: 0, max: 50 },
+    bingo_square: { earned: 0, max: 135 },
+    bingo_line: { earned: 0, max: 400 },
+    bingo_blackout: { earned: 0, max: 200 }
+  };
+  saveDailyXPCaps();
+}
+
+// Claim Pass reward
+async function claimPassReward(level) {
+  if (!currentUser) return;
+  
+  // Check if already claimed
+  if (passProgress.claimedRewards.includes(level)) {
+    showToast('You already claimed this reward!', 'warning');
+    return;
+  }
+  
+  // Check if level reached
+  if (passProgress.level < level) {
+    showToast('Reach Level ' + level + ' to claim this reward!', 'warning');
+    return;
+  }
+  
+  var reward = PASS_REWARDS[level];
+  if (!reward) return;
+  
+  // Grant reward
+  await grantPassReward(level, reward);
+  
+  // Mark as claimed
+  passProgress.claimedRewards.push(level);
+  
+  await supabaseClient
+    .from('user_pass_progress')
+    .update({
+      claimed_rewards: passProgress.claimedRewards
+    })
+    .eq('user_id', currentUser.id)
+    .eq('season', 1);
+  
+  updatePassUI();
+}
+
+// Grant Pass reward to player
+async function grantPassReward(level, reward) {
+  switch(reward.type) {
+    case 'points':
+      updateAllPoints(currentPoints + reward.amount);
+      await supabaseClient.rpc('award_pp_secure', {
+        p_user_id: currentUser.id,
+        p_amount: reward.amount,
+        p_reason: 'Pass Level ' + level
+      });
+      showToast('✨ +' + reward.amount + ' PawketPoints!', 'success');
+      break;
+      
+    case 'item':
+      // Add primary item
+      if (reward.itemId) {
+        await addItemToInventory(reward.itemId, reward.quantity || 1);
+        var itemName = reward.itemId === 'skin_key' ? '🔑 Skin Key' : reward.itemId;
+        showToast('📦 +' + (reward.quantity || 1) + 'x ' + itemName, 'success');
+      }
+      // Add secondary item
+      if (reward.itemId2) {
+        await addItemToInventory(reward.itemId2, reward.quantity2 || 1);
+        showToast('📦 +' + (reward.quantity2 || 1) + 'x ' + reward.itemId2, 'success');
+      }
+      break;
+      
+    case 'title':
+      await awardTitle(reward.titleKey);
+      var titleData = await supabaseClient
+        .from('player_titles')
+        .select('title_name')
+        .eq('title_key', reward.titleKey)
+        .single();
+      
+      if (titleData.data) {
+        showToast('🏆 Title unlocked: "' + titleData.data.title_name + '"!', 'success');
+      }
+      break;
+  }
+}
+
+// Add item to inventory (helper)
+async function addItemToInventory(itemId, quantity) {
+  if (!currentUser) return;
+  
+  // Check if item exists in inventory
+  var invCheck = await supabaseClient
+    .from('user_inventory')
+    .select('id, quantity')
+    .eq('user_id', currentUser.id)
+    .eq('item_id', itemId)
+    .maybeSingle();
+  
+  if (invCheck.data) {
+    // Update quantity
+    await supabaseClient
+      .from('user_inventory')
+      .update({ quantity: invCheck.data.quantity + quantity })
+      .eq('id', invCheck.data.id);
+  } else {
+    // Insert new
+    await supabaseClient
+      .from('user_inventory')
+      .insert({
+        user_id: currentUser.id,
+        item_id: itemId,
+        quantity: quantity
+      });
+  }
+}
+
+// Update Pass UI
+function updatePassUI() {
+  var levelDisplay = document.getElementById('pass-level-display');
+  var xpFill = document.getElementById('pass-xp-fill');
+  
+  if (levelDisplay) {
+    levelDisplay.textContent = passProgress.level;
+  }
+  
+  if (xpFill) {
+    var percent = (passProgress.xp / passProgress.xpToNextLevel) * 100;
+    xpFill.style.width = Math.min(percent, 100) + '%';
+  }
+}
+
+// Show Pass modal
+function showPassModal() {
+  var modal = makeModal();
+  modal.classList.add('pass-modal');
+  
+  var content = makeEl('div', {class: 'pass-modal-content'});
+  content.style.cssText = 'padding:20px;max-width:900px;max-height:80vh;overflow-y:auto;';
+  
+  // Header
+  var header = makeEl('div');
+  header.style.cssText = 'text-align:center;margin-bottom:30px;';
+  header.innerHTML = '<h2 style="color:var(--purple);margin-bottom:10px;">🎫 PawketPass Season 1</h2>' +
+    '<div style="font-size:1.2rem;color:var(--text);">Level ' + passProgress.level + ' / 50</div>' +
+    '<div class="pass-xp-bar-large" style="width:100%;height:30px;background:#ddd;border-radius:15px;margin-top:15px;overflow:hidden;">' +
+    '<div style="width:' + ((passProgress.xp / passProgress.xpToNextLevel) * 100) + '%;height:100%;background:linear-gradient(90deg,var(--purple),var(--pink));transition:width 0.3s;"></div>' +
+    '</div>' +
+    '<div style="margin-top:8px;color:var(--text-light);">' + passProgress.xp + ' / ' + passProgress.xpToNextLevel + ' XP</div>';
+  content.appendChild(header);
+  
+  // Rewards track
+  var track = makeEl('div', {class: 'pass-rewards-track'});
+  track.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:15px;';
+  
+  for (var level = 1; level <= 50; level++) {
+    var reward = PASS_REWARDS[level];
+    if (!reward) continue;
+    
+    var card = makeEl('div', {class: 'pass-reward-card'});
+    var unlocked = passProgress.level >= level;
+    var claimed = passProgress.claimedRewards.includes(level);
+    
+    card.style.cssText = 'background:' + (unlocked ? '#fff' : '#f5f5f5') + ';border:2px solid ' + (claimed ? '#4CAF50' : unlocked ? 'var(--purple)' : '#ddd') + ';border-radius:12px;padding:15px;text-align:center;position:relative;' + (unlocked ? '' : 'opacity:0.6;');
+    
+    // Level badge
+    var badge = makeEl('div');
+    badge.textContent = 'Lv.' + level;
+    badge.style.cssText = 'position:absolute;top:5px;right:5px;background:var(--purple);color:white;padding:2px 8px;border-radius:8px;font-size:0.8rem;font-weight:bold;';
+    card.appendChild(badge);
+    
+    // Reward icon
+    var icon = makeEl('div');
+    icon.style.cssText = 'font-size:2rem;margin:10px 0;';
+    if (reward.type === 'points') icon.textContent = '💰';
+    else if (reward.type === 'item') icon.textContent = reward.itemId === 'skin_key' ? '🔑' : '📦';
+    else if (reward.type === 'title') icon.textContent = '🏆';
+    card.appendChild(icon);
+    
+    // Reward description
+    var desc = makeEl('div');
+    desc.style.cssText = 'font-size:0.9rem;color:var(--text);margin-bottom:10px;';
+    if (reward.type === 'points') desc.textContent = reward.amount + ' PP';
+    else if (reward.type === 'item') {
+      var itemText = (reward.quantity || 1) + 'x ' + (reward.itemId === 'skin_key' ? 'Skin Key' : reward.itemId);
+      if (reward.itemId2) itemText += ' + ' + (reward.quantity2 || 1) + 'x ' + reward.itemId2;
+      desc.textContent = itemText;
+    }
+    else if (reward.type === 'title') desc.textContent = 'Title';
+    card.appendChild(desc);
+    
+    // Claim button
+    if (unlocked && !claimed) {
+      var claimBtn = makeEl('button', {class: 'btn btn-primary btn-sm'});
+      claimBtn.textContent = 'Claim';
+      claimBtn.onclick = function(lvl) {
+        return function() {
+          claimPassReward(lvl);
+          modal.remove();
+          showPassModal();
+        };
+      }(level);
+      card.appendChild(claimBtn);
+    } else if (claimed) {
+      var claimedText = makeEl('div');
+      claimedText.textContent = '✓ Claimed';
+      claimedText.style.cssText = 'color:#4CAF50;font-weight:bold;';
+      card.appendChild(claimedText);
+    } else {
+      var lockedText = makeEl('div');
+      lockedText.textContent = '🔒 Locked';
+      lockedText.style.cssText = 'color:#999;';
+      card.appendChild(lockedText);
+    }
+    
+    track.appendChild(card);
+  }
+  
+  content.appendChild(track);
+  modal.querySelector('.modal-content').appendChild(content);
+  document.body.appendChild(modal);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// DAILY BINGO SYSTEM
+// ══════════════════════════════════════════════════════════════════════════
+
+var BINGO_TASKS = [
+  { id: 'feed_pet', name: '🍖 Feed Pet', target: 5, taskType: 'feed_pet', rewardPoints: 50 },
+  { id: 'play_pet', name: '🎾 Play with Pet', target: 5, taskType: 'play_pet', rewardPoints: 50 },
+  { id: 'win_battle', name: '⚔️ Win Battle', target: 3, taskType: 'win_battle', rewardPoints: 100 },
+  { id: 'login', name: '📅 Daily Login', target: 1, taskType: 'login', rewardPoints: 20 },
+  { id: 'visit_shop', name: '🛒 Visit Shop', target: 1, taskType: 'visit_shop', rewardPoints: 20 },
+  { id: 'use_treat', name: '🍬 Feed Treat', target: 3, taskType: 'use_treat', rewardPoints: 50 },
+  { id: 'pet_companion', name: '💬 Pet Companion', target: 5, taskType: 'pet_companion', rewardPoints: 50 },
+  { id: 'earn_points', name: '💰 Earn 500 PP', target: 500, taskType: 'earn_points', rewardPoints: 100 },
+  { id: 'level_up_pet', name: '⬆️ Level Up Pet', target: 1, taskType: 'level_up_pet', rewardPoints: 100 },
+  { id: 'adopt_pet', name: '🐣 Adopt a Pet', target: 1, taskType: 'adopt_pet', rewardPoints: 150 },
+  { id: 'use_toy', name: '🎾 Use a Toy', target: 3, taskType: 'use_toy', rewardPoints: 50 },
+  { id: 'complete_minigame', name: '🎮 Play Minigame', target: 1, taskType: 'complete_minigame', rewardPoints: 75 }
+];
+
+var dailyBingo = {
+  date: null,
+  squares: [],
+  completedLines: [],
+  blackoutCompleted: false
+};
+
+// Load daily bingo from localStorage
+function loadDailyBingo() {
+  var today = new Date().toISOString().split('T')[0];
+  var saved = localStorage.getItem('daily_bingo');
+  
+  if (saved) {
+    var parsed = JSON.parse(saved);
+    if (parsed.date === today) {
+      dailyBingo = parsed;
+      return;
+    }
+  }
+  
+  // New day - generate new bingo
+  dailyBingo = {
+    date: today,
+    squares: generateDailyBingo(),
+    completedLines: [],
+    blackoutCompleted: false
+  };
+  saveDailyBingo();
+}
+
+// Generate random 3x3 bingo grid
+function generateDailyBingo() {
+  var shuffled = BINGO_TASKS.slice();
+  for (var i = shuffled.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var temp = shuffled[i];
+    shuffled[i] = shuffled[j];
+    shuffled[j] = temp;
+  }
+  
+  return shuffled.slice(0, 9).map(function(task) {
+    return {
+      id: task.id,
+      name: task.name,
+      target: task.target,
+      taskType: task.taskType,
+      rewardPoints: task.rewardPoints,
+      progress: 0,
+      completed: false
+    };
+  });
+}
+
+// Save bingo to localStorage
+function saveDailyBingo() {
+  localStorage.setItem('daily_bingo', JSON.stringify(dailyBingo));
+}
+
+// Update bingo progress
+async function updateBingoProgress(taskType, amount) {
+  if (!currentUser) return;
+  
+  loadDailyBingo();
+  
+  var square = dailyBingo.squares.find(function(s) { return s.taskType === taskType; });
+  if (!square || square.completed) return;
+  
+  square.progress = Math.min(square.progress + (amount || 1), square.target);
+  
+  if (square.progress >= square.target) {
+    square.completed = true;
+    
+    // Award points
+    updateAllPoints(currentPoints + square.rewardPoints);
+    await supabaseClient.rpc('award_pp_secure', {
+      p_user_id: currentUser.id,
+      p_amount: square.rewardPoints,
+      p_reason: 'Bingo: ' + square.name
+    });
+    
+    // Award Pass XP
+    await addPassXP(15, 'bingo_square');
+    
+    showToast('✓ Bingo: ' + square.name + ' complete! +' + square.rewardPoints + ' PP, +15 XP', 'success');
+    playSound('success');
+    
+    // Check for lines
+    await checkBingoLines();
+  }
+  
+  saveDailyBingo();
+  updateBingoUI();
+}
+
+// Check for bingo lines
+async function checkBingoLines() {
+  var grid = dailyBingo.squares;
+  var lines = [
+    [0,1,2], [3,4,5], [6,7,8], // rows
+    [0,3,6], [1,4,7], [2,5,8], // cols
+    [0,4,8], [2,4,6]           // diagonals
+  ];
+  
+  for (var idx = 0; idx < lines.length; idx++) {
+    var line = lines[idx];
+    var lineKey = 'line_' + idx;
+    
+    if (!dailyBingo.completedLines.includes(lineKey)) {
+      var allCompleted = line.every(function(cell) { return grid[cell].completed; });
+      
+      if (allCompleted) {
+        dailyBingo.completedLines.push(lineKey);
+        
+        // Award line bonus
+        updateAllPoints(currentPoints + 100);
+        await supabaseClient.rpc('award_pp_secure', {
+          p_user_id: currentUser.id,
+          p_amount: 100,
+          p_reason: 'Bingo Line Complete'
+        });
+        
+        await addPassXP(50, 'bingo_line');
+        
+        showToast('🎯 Bingo Line Complete! +100 PP, +50 XP', 'success');
+        playSound('victory');
+      }
+    }
+  }
+  
+  // Check blackout
+  if (!dailyBingo.blackoutCompleted && dailyBingo.squares.every(function(s) { return s.completed; })) {
+    dailyBingo.blackoutCompleted = true;
+    
+    // Award blackout bonus
+    updateAllPoints(currentPoints + 500);
+    await supabaseClient.rpc('award_pp_secure', {
+      p_user_id: currentUser.id,
+      p_amount: 500,
+      p_reason: 'Bingo Blackout!'
+    });
+    
+    await addPassXP(200, 'bingo_blackout');
+    
+    // Bonus: Give a Skin Key
+    await addItemToInventory('skin_key', 1);
+    
+    showToast('🏆 BLACKOUT BINGO! +500 PP, +200 XP, +1 Skin Key!', 'success');
+    playSound('jackpot');
+    createConfettiBurst(window.innerWidth / 2, window.innerHeight / 2);
+  }
+  
+  saveDailyBingo();
+}
+
+// Update bingo UI
+function updateBingoUI() {
+  var completionDisplay = document.getElementById('bingo-completion');
+  if (completionDisplay) {
+    var completed = dailyBingo.squares.filter(function(s) { return s.completed; }).length;
+    completionDisplay.textContent = completed + '/9';
+  }
+}
+
+// Show bingo modal
+function showBingoModal() {
+  loadDailyBingo();
+  
+  var modal = makeModal();
+  modal.classList.add('bingo-modal');
+  
+  var content = makeEl('div', {class: 'bingo-modal-content'});
+  content.style.cssText = 'padding:20px;max-width:700px;';
+  
+  // Header
+  var header = makeEl('div');
+  header.style.cssText = 'text-align:center;margin-bottom:20px;';
+  var completed = dailyBingo.squares.filter(function(s) { return s.completed; }).length;
+  header.innerHTML = '<h2 style="color:var(--purple);margin-bottom:10px;">🎯 Daily Bingo</h2>' +
+    '<div style="font-size:1.1rem;color:var(--text);">Completed: ' + completed + ' / 9</div>' +
+    '<div style="font-size:0.9rem;color:var(--text-light);margin-top:5px;">Lines: ' + dailyBingo.completedLines.length + ' / 8 • Blackout: ' + (dailyBingo.blackoutCompleted ? '✓' : '✗') + '</div>';
+  content.appendChild(header);
+  
+  // Bingo grid (3x3)
+  var grid = makeEl('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;';
+  
+  dailyBingo.squares.forEach(function(square) {
+    var card = makeEl('div', {class: 'bingo-square'});
+    card.style.cssText = 'background:' + (square.completed ? '#4CAF50' : '#fff') + ';border:2px solid ' + (square.completed ? '#4CAF50' : 'var(--purple)') + ';border-radius:12px;padding:15px;text-align:center;min-height:120px;display:flex;flex-direction:column;justify-content:center;transition:all 0.3s;';
+    
+    var icon = makeEl('div');
+    icon.style.cssText = 'font-size:2rem;margin-bottom:8px;';
+    icon.textContent = square.name.split(' ')[0]; // Extract emoji
+    card.appendChild(icon);
+    
+    var name = makeEl('div');
+    name.style.cssText = 'font-size:0.9rem;font-weight:bold;color:' + (square.completed ? 'white' : 'var(--text)') + ';margin-bottom:8px;';
+    name.textContent = square.name.split(' ').slice(1).join(' '); // Remove emoji
+    card.appendChild(name);
+    
+    var progress = makeEl('div');
+    progress.style.cssText = 'font-size:0.85rem;color:' + (square.completed ? 'white' : 'var(--text-light)') + ';';
+    progress.textContent = square.progress + ' / ' + square.target;
+    card.appendChild(progress);
+    
+    if (square.completed) {
+      var check = makeEl('div');
+      check.style.cssText = 'font-size:1.5rem;margin-top:5px;';
+      check.textContent = '✓';
+      card.appendChild(check);
+    }
+    
+    grid.appendChild(card);
+  });
+  
+  content.appendChild(grid);
+  
+  // Rewards info
+  var info = makeEl('div');
+  info.style.cssText = 'background:#f9f9f9;border-radius:8px;padding:15px;font-size:0.9rem;color:var(--text-light);';
+  info.innerHTML = '<strong>Rewards:</strong><br>' +
+    '• Each square: +Points +15 Pass XP<br>' +
+    '• Each line (3 in a row): +100 PP +50 XP<br>' +
+    '• Blackout (all 9): +500 PP +200 XP +1 Skin Key 🔑';
+  content.appendChild(info);
+  
+  modal.querySelector('.modal-content').appendChild(content);
+  document.body.appendChild(modal);
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// ADDITIONAL BINGO HOOKS (called from various places)
+// ══════════════════════════════════════════════════════════════════════════
+
+// Hook for points earned - override updateAllPoints
+var originalUpdateAllPoints = updateAllPoints;
+updateAllPoints = function(pts) {
+  var oldPoints = currentPoints || 0;
+  originalUpdateAllPoints(pts);
+  var earnedAmount = pts - oldPoints;
+  if (earnedAmount > 0) {
+    updateBingoProgress('earn_points', earnedAmount);
+  }
+};
+
+// Hook for pet level up - call this when a pet levels up
+function onPetLevelUp(petId) {
+  updateBingoProgress('level_up_pet', 1);
+  
+  // Award Pass XP bonus for leveling up
+  addPassXP(10, 'feed'); // Counts toward feed cap
+}
+
+// Hook for adoption - call this when adopting a pet
+function onPetAdopted(petId) {
+  updateBingoProgress('adopt_pet', 1);
+}
+
+// Hook for minigame completion
+function onMinigameComplete() {
+  updateBingoProgress('complete_minigame', 1);
+}
+
+// Hook for companion pet message
+function onCompanionMessage() {
+  updateBingoProgress('pet_companion', 1);
+}
+
