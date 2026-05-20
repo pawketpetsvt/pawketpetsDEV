@@ -16998,37 +16998,37 @@ var PASS_REWARDS = {
   16: { type: 'points', amount: 400 },
   17: { type: 'item', itemId: 'treat', quantity: 3, itemId2: 'basic_food', quantity2: 2 },
   18: { type: 'points', amount: 450 },
-  19: { type: 'item', itemId: 'skin_key', quantity: 1 },
+  19: { type: 'item', itemId: '00000000-0000-0000-0000-000000000001', quantity: 1 },
   20: { type: 'title', titleKey: 'faithful_companion' },
   21: { type: 'points', amount: 500 },
   22: { type: 'item', itemId: 'premium_treat', quantity: 2 },
   23: { type: 'points', amount: 550 },
-  24: { type: 'item', itemId: 'skin_key', quantity: 1 },
+  24: { type: 'item', itemId: '00000000-0000-0000-0000-000000000001', quantity: 1 },
   25: { type: 'points', amount: 600 },
   26: { type: 'item', itemId: 'rare_toy', quantity: 3 },
   27: { type: 'title', titleKey: 'pawket_champion' },
   28: { type: 'points', amount: 700 },
-  29: { type: 'item', itemId: 'skin_key', quantity: 1 },
+  29: { type: 'item', itemId: '00000000-0000-0000-0000-000000000001', quantity: 1 },
   30: { type: 'title', titleKey: 'style_master' },
   31: { type: 'points', amount: 800 },
   32: { type: 'item', itemId: 'treat', quantity: 5, itemId2: 'basic_food', quantity2: 3 },
   33: { type: 'points', amount: 900 },
   34: { type: 'title', titleKey: 'legendary_tamer' },
   35: { type: 'points', amount: 1000 },
-  36: { type: 'item', itemId: 'skin_key', quantity: 2 },
+  36: { type: 'item', itemId: '00000000-0000-0000-0000-000000000001', quantity: 2 },
   37: { type: 'points', amount: 1100 },
   38: { type: 'item', itemId: 'premium_treat', quantity: 3, itemId2: 'revive_potion', quantity2: 2 },
   39: { type: 'points', amount: 1200 },
   40: { type: 'title', titleKey: 'mythic_breaker' },
   41: { type: 'points', amount: 1300 },
-  42: { type: 'item', itemId: 'skin_key', quantity: 2 },
+  42: { type: 'item', itemId: '00000000-0000-0000-0000-000000000001', quantity: 2 },
   43: { type: 'points', amount: 1400 },
   44: { type: 'item', itemId: 'mystery_box', quantity: 3 },
   45: { type: 'points', amount: 1500 },
-  46: { type: 'item', itemId: 'skin_key', quantity: 3 },
+  46: { type: 'item', itemId: '00000000-0000-0000-0000-000000000001', quantity: 3 },
   47: { type: 'title', titleKey: 'pawket_master' },
   48: { type: 'points', amount: 2000 },
-  49: { type: 'item', itemId: 'skin_key', quantity: 3 },
+  49: { type: 'item', itemId: '00000000-0000-0000-0000-000000000001', quantity: 3 },
   50: { type: 'title', titleKey: 'ultimate_collector' }
 };
 
@@ -17202,7 +17202,7 @@ async function grantPassReward(level, reward) {
       // Add primary item
       if (reward.itemId) {
         await addItemToInventory(reward.itemId, reward.quantity || 1);
-        var itemName = reward.itemId === 'skin_key' ? '🔑 Skin Key' : reward.itemId;
+        var itemName = reward.itemId === '00000000-0000-0000-0000-000000000001' ? '🔑 Skin Key' : reward.itemId;
         showToast('📦 +' + (reward.quantity || 1) + 'x ' + itemName, 'success');
       }
       // Add secondary item
@@ -17215,13 +17215,13 @@ async function grantPassReward(level, reward) {
     case 'title':
       await awardTitle(reward.titleKey);
       var titleData = await supabaseClient
-        .from('player_titles')
-        .select('title_name')
+        .from('titles')
+        .select('display_name')
         .eq('title_key', reward.titleKey)
         .single();
       
       if (titleData.data) {
-        showToast('🏆 Title unlocked: "' + titleData.data.title_name + '"!', 'success');
+        showToast('🏆 Title unlocked: "' + titleData.data.display_name + '"!', 'success');
       }
       break;
   }
@@ -17315,7 +17315,7 @@ function showPassModal() {
     var icon = makeEl('div');
     icon.style.cssText = 'font-size:2rem;margin:10px 0;';
     if (reward.type === 'points') icon.textContent = '💰';
-    else if (reward.type === 'item') icon.textContent = reward.itemId === 'skin_key' ? '🔑' : '📦';
+    else if (reward.type === 'item') icon.textContent = reward.itemId === '00000000-0000-0000-0000-000000000001' ? '🔑' : '📦';
     else if (reward.type === 'title') icon.textContent = '🏆';
     card.appendChild(icon);
     
@@ -17324,7 +17324,7 @@ function showPassModal() {
     desc.style.cssText = 'font-size:0.9rem;color:var(--text);margin-bottom:10px;';
     if (reward.type === 'points') desc.textContent = reward.amount + ' PP';
     else if (reward.type === 'item') {
-      var itemText = (reward.quantity || 1) + 'x ' + (reward.itemId === 'skin_key' ? 'Skin Key' : reward.itemId);
+      var itemText = (reward.quantity || 1) + 'x ' + (reward.itemId === '00000000-0000-0000-0000-000000000001' ? 'Skin Key' : reward.itemId);
       if (reward.itemId2) itemText += ' + ' + (reward.quantity2 || 1) + 'x ' + reward.itemId2;
       desc.textContent = itemText;
     }
@@ -17526,7 +17526,7 @@ async function checkBingoLines() {
     await addPassXP(200, 'bingo_blackout');
     
     // Bonus: Give a Skin Key
-    await addItemToInventory('skin_key', 1);
+    await addItemToInventory('00000000-0000-0000-0000-000000000001', 1);
     
     showToast('🏆 BLACKOUT BINGO! +500 PP, +200 XP, +1 Skin Key!', 'success');
     playSound('jackpot');
