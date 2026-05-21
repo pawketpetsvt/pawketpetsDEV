@@ -175,48 +175,42 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
     
     <!-- Right: All User Controls -->
     <div class="navbar-user">
-      <!-- LEFT SIDE: Notifications, Music, Pass, Bingo -->
-      <div class="navbar-left">
-        <!-- Notification Bell -->
-        <div class="notification-bell" id="notification-bell" style="display:none;" onclick="toggleNotificationDropdown()">
-          <span class="bell-icon">🔔</span>
-          <span class="notification-badge" id="notification-badge" style="display:none;">0</span>
-        </div>
-        
-        <!-- Music Player Controls -->
-        <div class="music-controls-inline">
-          <span class="music-title-inline">🎵</span>
-          <button class="music-btn-inline" id="music-play-btn" onclick="toggleMusic()" title="Play/Pause Music">▶</button>
-          <button class="music-btn-inline" onclick="stopMusic()" title="Stop Music">⏹</button>
-          <input type="range" class="music-volume-inline" id="music-volume" min="0" max="1" step="0.05" value="0.4" oninput="setVolume(this.value)" title="Volume">
-        </div>
-        
-        <span id="nav-user"></span>
-        <span id="nav-points"></span>
-        
-        <!-- PawketPass Button -->
-        <button class="pass-button" id="pass-button" onclick="showPassModal()" style="display:none;" title="PawketPass Season 1">
-          <div class="pass-icon">🎫</div>
-          <div class="pass-info">
-            <span class="pass-label">Pass</span>
-            <span class="pass-level">Lv. <span id="pass-level-display">1</span></span>
-          </div>
-          <div class="pass-xp-bar">
-            <div class="pass-xp-fill" id="pass-xp-fill" style="width: 0%"></div>
-          </div>
-        </button>
-        
-        <!-- Bingo Button -->
-        <button class="bingo-button" id="bingo-button" onclick="showBingoModal()" style="display:none;" title="Daily Bingo">
-          🎯 <span id="bingo-completion">0/9</span>
-        </button>
+      <!-- Notification Bell -->
+      <div class="notification-bell" id="notification-bell" style="display:none;" onclick="toggleNotificationDropdown()">
+        <span class="bell-icon">🔔</span>
+        <span class="notification-badge" id="notification-badge" style="display:none;">0</span>
       </div>
       
-      <!-- RIGHT SIDE: Profile and Logout -->
-      <div class="navbar-right">
-        <button class="btn-nav-action" id="nav-profile" style="display:none" onclick="showTab('myprofile')">👤 Profile</button>
-        <button class="btn-nav-action" id="nav-logout" style="display:none" onclick="handleLogout()">Logout</button>
+      <!-- Music Player Controls -->
+      <div class="music-controls-inline">
+        <span class="music-title-inline">🎵</span>
+        <button class="music-btn-inline" id="music-play-btn" onclick="toggleMusic()" title="Play/Pause Music">▶</button>
+        <button class="music-btn-inline" onclick="stopMusic()" title="Stop Music">⏹</button>
+        <input type="range" class="music-volume-inline" id="music-volume" min="0" max="1" step="0.05" value="0.4" oninput="setVolume(this.value)" title="Volume">
       </div>
+      
+      <span id="nav-user"></span>
+      <span id="nav-points"></span>
+      
+      <!-- PawketPass Button -->
+      <button class="pass-button" id="pass-button" onclick="showPassModal()" style="display:none;" title="PawketPass Season 1">
+        <div class="pass-icon">🎫</div>
+        <div class="pass-info">
+          <span class="pass-label">Pass</span>
+          <span class="pass-level">Lv. <span id="pass-level-display">1</span></span>
+        </div>
+        <div class="pass-xp-bar">
+          <div class="pass-xp-fill" id="pass-xp-fill" style="width: 0%"></div>
+        </div>
+      </button>
+      
+      <!-- Bingo Button -->
+      <button class="bingo-button" id="bingo-button" onclick="showBingoModal()" style="display:none;" title="Daily Bingo">
+        🎯 <span id="bingo-completion">0/9</span>
+      </button>
+      
+      <button class="btn-nav-action" id="nav-profile" style="display:none" onclick="showTab('myprofile')">👤 Profile</button>
+      <button class="btn-nav-action" id="nav-logout" style="display:none" onclick="handleLogout()">Logout</button>
     </div>
   </div>
 </nav>

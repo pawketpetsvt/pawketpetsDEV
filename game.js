@@ -17406,6 +17406,15 @@ function loadDailyBingo() {
     var parsed = JSON.parse(saved);
     if (parsed.date === today) {
       dailyBingo = parsed;
+      
+      // Mark all already-completed squares as notified (prevent spam on page load)
+      dailyBingo.squares.forEach(function(square) {
+        if (square.completed) {
+          var notificationKey = dailyBingo.date + '_' + square.taskType;
+          bingoNotificationsShown[notificationKey] = true;
+        }
+      });
+      
       return;
     }
   }
@@ -17417,6 +17426,10 @@ function loadDailyBingo() {
     completedLines: [],
     blackoutCompleted: false
   };
+  
+  // Reset notifications for new day
+  bingoNotificationsShown = {};
+  
   saveDailyBingo();
 }
 
@@ -17448,6 +17461,9 @@ function saveDailyBingo() {
   localStorage.setItem('daily_bingo', JSON.stringify(dailyBingo));
 }
 
+// Track which squares have been notified to prevent spam
+var bingoNotificationsShown = {};
+
 // Update bingo progress
 async function updateBingoProgress(taskType, amount) {
   if (!currentUser) return;
@@ -17457,27 +17473,39 @@ async function updateBingoProgress(taskType, amount) {
   var square = dailyBingo.squares.find(function(s) { return s.taskType === taskType; });
   if (!square || square.completed) return;
   
+  var wasCompleted = square.completed;
   square.progress = Math.min(square.progress + (amount || 1), square.target);
   
-  if (square.progress >= square.target) {
+  // Check if just completed
+  var justCompleted = !wasCompleted && square.progress >= square.target;
+  
+  if (justCompleted) {
     square.completed = true;
     
-    // Award points
-    updateAllPoints(currentPoints + square.rewardPoints);
-    await supabaseClient.rpc('award_pp_secure', {
-      p_user_id: currentUser.id,
-      p_amount: square.rewardPoints,
-      p_reason: 'Bingo: ' + square.name
-    });
+    // Create unique notification key for today + this task
+    var notificationKey = dailyBingo.date + '_' + taskType;
     
-    // Award Pass XP
-    await addPassXP(15, 'bingo_square');
-    
-    showToast('✓ Bingo: ' + square.name + ' complete! +' + square.rewardPoints + ' PP, +15 XP', 'success');
-    playSound('success');
-    
-    // Check for lines
-    await checkBingoLines();
+    // Only notify if we haven't already today
+    if (!bingoNotificationsShown[notificationKey]) {
+      bingoNotificationsShown[notificationKey] = true;
+      
+      // Award points
+      updateAllPoints(currentPoints + square.rewardPoints);
+      await supabaseClient.rpc('award_pp_secure', {
+        p_user_id: currentUser.id,
+        p_amount: square.rewardPoints,
+        p_reason: 'Bingo: ' + square.name
+      });
+      
+      // Award Pass XP
+      await addPassXP(15, 'bingo_square');
+      
+      showToast('✓ Bingo: ' + square.name + ' complete! +' + square.rewardPoints + ' PP, +15 XP', 'success');
+      playSound('success');
+      
+      // Check for lines
+      await checkBingoLines();
+    }
   }
   
   saveDailyBingo();
@@ -17574,30 +17602,54 @@ function showBingoModal() {
   
   // Bingo grid (3x3)
   var grid = makeEl('div');
-  grid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;';
+  grid.id = 'bingo-grid';
+  grid.className = 'bingo-grid';
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;padding:10px;';
   
   dailyBingo.squares.forEach(function(square) {
-    var card = makeEl('div', {class: 'bingo-square'});
-    card.style.cssText = 'background:' + (square.completed ? '#4CAF50' : '#fff') + ';border:2px solid ' + (square.completed ? '#4CAF50' : 'var(--purple)') + ';border-radius:12px;padding:15px;text-align:center;min-height:120px;display:flex;flex-direction:column;justify-content:center;transition:all 0.3s;';
+    var card = makeEl('div');
+    card.className = 'bingo-card' + (square.completed ? ' bingo-completed' : '');
+    card.style.cssText = 'background:' + (square.completed ? 'rgba(76,175,80,0.25)' : 'rgba(255,255,255,0.08)') + ';border:2px solid ' + (square.completed ? '#4CAF50' : 'rgba(255,255,255,0.1)') + ';border-radius:12px;padding:15px;text-align:center;min-height:120px;display:flex;flex-direction:column;justify-content:center;align-items:center;transition:all 0.3s;';
     
-    var icon = makeEl('div');
-    icon.style.cssText = 'font-size:2rem;margin-bottom:8px;';
-    icon.textContent = square.name.split(' ')[0]; // Extract emoji
-    card.appendChild(icon);
+    // Extract icon from task name (e.g., "🍖 Feed Pet" -> "🍖")
+    var iconMatch = square.name.match(/^([^\s]+)/);
+    var icon = iconMatch ? iconMatch[1] : '📌';
+    var displayName = square.name.replace(/^[^\s]+\s*/, ''); // Remove icon from name
+    
+    var iconDiv = makeEl('div');
+    iconDiv.className = 'bingo-icon';
+    iconDiv.style.cssText = 'font-size:28px;margin-bottom:8px;line-height:1;';
+    iconDiv.textContent = icon;
+    card.appendChild(iconDiv);
     
     var name = makeEl('div');
-    name.style.cssText = 'font-size:0.9rem;font-weight:bold;color:' + (square.completed ? 'white' : 'var(--text)') + ';margin-bottom:8px;';
-    name.textContent = square.name.split(' ').slice(1).join(' '); // Remove emoji
+    name.className = 'bingo-name';
+    name.style.cssText = 'font-size:12px;font-weight:bold;color:#ffffff;margin-bottom:8px;';
+    name.textContent = displayName;
     card.appendChild(name);
     
     var progress = makeEl('div');
-    progress.style.cssText = 'font-size:0.85rem;color:' + (square.completed ? 'white' : 'var(--text-light)') + ';';
+    progress.className = 'bingo-progress';
+    progress.style.cssText = 'font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:6px;';
     progress.textContent = square.progress + ' / ' + square.target;
     card.appendChild(progress);
     
+    // Progress bar
+    var progressPercent = (square.progress / square.target) * 100;
+    var barContainer = makeEl('div');
+    barContainer.className = 'bingo-bar';
+    barContainer.style.cssText = 'background:rgba(255,255,255,0.15);border-radius:4px;height:4px;overflow:hidden;width:100%;';
+    
+    var barFill = makeEl('div');
+    barFill.className = 'bingo-fill';
+    barFill.style.cssText = 'width:' + progressPercent + '%;background:linear-gradient(90deg,#ff6b35,#ffaa44);height:100%;transition:width 0.3s ease;';
+    barContainer.appendChild(barFill);
+    card.appendChild(barContainer);
+    
     if (square.completed) {
       var check = makeEl('div');
-      check.style.cssText = 'font-size:1.5rem;margin-top:5px;';
+      check.className = 'bingo-check';
+      check.style.cssText = 'font-size:20px;color:#4CAF50;margin-top:6px;font-weight:bold;';
       check.textContent = '✓';
       card.appendChild(check);
     }

@@ -10706,3 +10706,766 @@ body.night-mode .btn-outline:hover {
   50% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.8); }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   PAWKETPASS & BINGO UI STYLES
+   Add this to the end of style.css
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ========== PASS BUTTON ========== */
+.pass-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #9966ff 0%, #ff66cc 100%);
+  border: 2px solid #9966ff;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-right: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+.pass-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(153, 102, 255, 0.4);
+}
+
+.pass-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.pass-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  color: white;
+  min-width: 60px;
+}
+
+.pass-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pass-level {
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.pass-xp-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.pass-xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #fff, #ffeb3b);
+  transition: width 0.5s ease;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+/* ========== BINGO BUTTON ========== */
+.bingo-button {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #ff6b35 0%, #ffcc00 100%);
+  color: white;
+  border: 2px solid #ff6b35;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-right: 10px;
+}
+
+.bingo-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
+}
+
+#bingo-completion {
+  font-size: 0.85rem;
+  opacity: 0.9;
+  margin-left: 5px;
+}
+
+/* ========== PASS MODAL ========== */
+.pass-modal .modal-content {
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.pass-rewards-track {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 15px;
+  padding: 20px 0;
+}
+
+.pass-reward-card {
+  background: #fff;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 15px;
+  text-align: center;
+  position: relative;
+  transition: all 0.3s ease;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.pass-reward-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.pass-reward-card.unlocked {
+  border-color: var(--purple);
+  background: linear-gradient(135deg, #fff 0%, #f8f5ff 100%);
+}
+
+.pass-reward-card.claimed {
+  border-color: #4CAF50;
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+}
+
+.pass-xp-bar-large {
+  width: 100%;
+  height: 30px;
+  background: #ddd;
+  border-radius: 15px;
+  overflow: hidden;
+  position: relative;
+}
+
+.pass-xp-bar-large > div {
+  height: 100%;
+  background: linear-gradient(90deg, var(--purple), var(--pink));
+  transition: width 0.5s ease;
+  position: relative;
+}
+
+.pass-xp-bar-large > div::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ========== BINGO MODAL ========== */
+.bingo-modal .modal-content {
+  max-width: 700px;
+}
+
+.bingo-square {
+  background: #fff;
+  border: 2px solid var(--purple);
+  border-radius: 12px;
+  padding: 15px;
+  text-align: center;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.3s ease;
+  cursor: default;
+  position: relative;
+  overflow: hidden;
+}
+
+.bingo-square:hover {
+  transform: scale(1.05);
+}
+
+.bingo-square.completed {
+  background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
+  border-color: #4CAF50;
+  color: white;
+  animation: bingoComplete 0.5s ease;
+}
+
+@keyframes bingoComplete {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.bingo-square::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.bingo-square.completed::before {
+  opacity: 1;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.5); opacity: 0; }
+}
+
+/* ========== MOBILE RESPONSIVE ========== */
+@media (max-width: 900px) {
+  .pass-button {
+    padding: 6px 10px;
+    gap: 6px;
+  }
+  
+  .pass-icon {
+    font-size: 1.2rem;
+  }
+  
+  .pass-info {
+    min-width: 50px;
+  }
+  
+  .pass-label {
+    font-size: 0.7rem;
+  }
+  
+  .pass-level {
+    font-size: 0.8rem;
+  }
+  
+  .bingo-button {
+    padding: 6px 12px;
+    font-size: 0.9rem;
+  }
+  
+  .pass-rewards-track {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+  }
+  
+  .pass-reward-card {
+    min-height: 160px;
+    padding: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .pass-button,
+  .bingo-button {
+    font-size: 0.85rem;
+    padding: 6px 10px;
+  }
+  
+  .pass-rewards-track {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .pass-button .pass-label {
+    display: none;
+  }
+  
+  .pass-button {
+    min-width: auto;
+  }
+  
+  .bingo-button {
+    font-size: 1.2rem;
+    padding: 8px;
+  }
+  
+  #bingo-completion {
+    font-size: 0.75rem;
+  }
+}
+
+/* ========== PASS/BINGO INTEGRATION - COMPRESSION MODE ========== */
+/* Force everything to fit horizontally - NO REARRANGING */
+
+/* Main navbar container - force single line */
+.navbar,
+.navbar-consolidated,
+.navbar-inner {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 6px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  white-space: nowrap !important;
+  padding: 6px 10px !important;
+  min-height: 50px !important;
+  max-height: 60px !important;
+}
+
+/* Logo - keep visible but compress */
+.navbar-logo {
+  font-size: 16px !important;
+  flex-shrink: 0 !important;
+  padding: 0 6px !important;
+}
+
+.navbar-logo img {
+  max-height: 30px !important;
+  width: auto !important;
+}
+
+/* Beta warning section - compress heavily */
+.navbar-center {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  flex-shrink: 1 !important;
+  min-width: 0 !important;
+}
+
+.beta-tag-inline {
+  font-size: 9px !important;
+  padding: 2px 4px !important;
+}
+
+.beta-text-inline {
+  font-size: 9px !important;
+  padding: 0 4px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.beta-contact-inline {
+  font-size: 10px !important;
+  padding: 3px 6px !important;
+  white-space: nowrap !important;
+}
+
+/* User controls section - compress */
+.navbar-user {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-shrink: 0 !important;
+  flex-wrap: nowrap !important;
+}
+
+.navbar-left,
+.navbar-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-wrap: nowrap !important;
+}
+
+/* Notification bell - compress */
+.notification-bell {
+  font-size: 18px !important;
+  padding: 2px !important;
+}
+
+/* Music controls - compress */
+.music-controls-inline {
+  display: flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+}
+
+.music-title-inline {
+  font-size: 14px !important;
+}
+
+.music-btn-inline {
+  padding: 2px 4px !important;
+  font-size: 10px !important;
+  min-width: 24px !important;
+}
+
+.music-volume-inline {
+  width: 50px !important;
+  height: 18px !important;
+}
+
+/* Username and points - compress */
+#nav-user,
+#nav-points {
+  font-size: 11px !important;
+  padding: 0 4px !important;
+  white-space: nowrap !important;
+}
+
+/* Pass button - compress but keep functional */
+.pass-button {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 4px 6px !important;
+  border-radius: 8px !important;
+  min-width: auto !important;
+  max-height: 36px !important;
+}
+
+.pass-icon {
+  font-size: 16px !important;
+  line-height: 1 !important;
+}
+
+.pass-info {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 40px !important;
+}
+
+.pass-label {
+  font-size: 8px !important;
+  letter-spacing: 0.3px !important;
+}
+
+.pass-level {
+  font-size: 10px !important;
+}
+
+.pass-xp-bar {
+  height: 3px !important;
+}
+
+/* Bingo button - compress */
+.bingo-button {
+  padding: 4px 8px !important;
+  font-size: 11px !important;
+  border-radius: 8px !important;
+  white-space: nowrap !important;
+  min-width: auto !important;
+  max-height: 36px !important;
+}
+
+#bingo-completion {
+  font-size: 10px !important;
+  margin-left: 3px !important;
+}
+
+/* Profile and Logout buttons - compress */
+.btn-nav-action {
+  padding: 4px 8px !important;
+  font-size: 11px !important;
+  white-space: nowrap !important;
+  min-width: auto !important;
+}
+
+/* Mobile - if needed, hide less critical elements */
+@media (max-width: 1200px) {
+  .beta-text-inline {
+    display: none !important;
+  }
+  
+  .music-volume-inline {
+    width: 40px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .navbar-center {
+    display: none !important;
+  }
+  
+  .music-controls-inline {
+    transform: scale(0.85) !important;
+  }
+}
+
+/* ========== SKIN KEY ITEM ICON ========== */
+.item-icon.skin-key {
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  border-color: #FFD700;
+  animation: keyShine 2s infinite;
+}
+
+@keyframes keyShine {
+  0%, 100% { box-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.8); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   NIGHTMODE & BINGO GRID FIXES
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ========== BINGO 3x3 GRID LAYOUT ========== */
+#bingo-grid,
+.bingo-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 12px !important;
+  padding: 10px !important;
+  width: 100%;
+}
+
+.bingo-card {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  padding: 12px !important;
+  text-align: center !important;
+  transition: all 0.2s ease !important;
+  min-height: 120px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+.bingo-card.bingo-completed {
+  background: rgba(76, 175, 80, 0.25) !important;
+  border-color: #4caf50 !important;
+}
+
+.bingo-icon {
+  font-size: 28px !important;
+  margin-bottom: 8px !important;
+  line-height: 1 !important;
+}
+
+.bingo-name {
+  font-size: 12px !important;
+  font-weight: bold !important;
+  margin-bottom: 8px !important;
+  color: #ffffff !important;
+}
+
+.bingo-progress {
+  font-size: 11px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  margin-bottom: 6px !important;
+}
+
+.bingo-bar {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-radius: 4px !important;
+  height: 4px !important;
+  overflow: hidden !important;
+  width: 100% !important;
+}
+
+.bingo-fill {
+  background: linear-gradient(90deg, #ff6b35, #ffaa44) !important;
+  height: 100% !important;
+  transition: width 0.3s ease !important;
+}
+
+.bingo-check {
+  color: #4caf50 !important;
+  font-size: 20px !important;
+  margin-top: 6px !important;
+  font-weight: bold !important;
+}
+
+/* ========== NIGHTMODE TEXT READABILITY ========== */
+
+/* Bingo cards - force readable text */
+.bingo-card,
+[class*="bingo-card"],
+.bingo-square {
+  color: #ffffff !important;
+}
+
+.bingo-card .task-name,
+.bingo-square .task-name {
+  color: #ffffff !important;
+}
+
+.bingo-card .progress-text,
+.bingo-square .progress-text {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Pass modal - ensure readability */
+.pass-modal,
+.pass-modal *,
+.pass-modal-content,
+.pass-modal-content * {
+  color: #333 !important;
+}
+
+.pass-modal h1,
+.pass-modal h2,
+.pass-modal h3,
+.pass-modal h4 {
+  color: var(--purple) !important;
+}
+
+.pass-modal-content {
+  background: white !important;
+  color: #333 !important;
+}
+
+.pass-level-card,
+.pass-reward-card,
+.pass-reward-item {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  color: #333 !important;
+}
+
+.pass-level-card.locked,
+.pass-reward-card.locked {
+  background: rgba(0, 0, 0, 0.05) !important;
+  opacity: 0.6 !important;
+  color: #999 !important;
+}
+
+.pass-level-card.completed,
+.pass-reward-card.completed {
+  background: rgba(76, 175, 80, 0.15) !important;
+  border-color: #4caf50 !important;
+  color: #2e7d32 !important;
+}
+
+/* Pass button in top bar - high contrast */
+.pass-button {
+  background: linear-gradient(135deg, #9966ff 0%, #ff66cc 100%) !important;
+  color: white !important;
+  border: 2px solid #9966ff !important;
+}
+
+.pass-button:hover {
+  box-shadow: 0 4px 12px rgba(153, 102, 255, 0.4) !important;
+}
+
+/* Bingo button - high contrast */
+.bingo-button {
+  background: linear-gradient(135deg, #ff6b35 0%, #ffcc00 100%) !important;
+  color: white !important;
+  border: 2px solid #ff6b35 !important;
+}
+
+.bingo-button:hover {
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4) !important;
+}
+
+/* Progress bars - high visibility */
+.pass-xp-fill,
+.bingo-fill,
+.com-progress-fill {
+  background: linear-gradient(90deg, #ff6b35, #ffaa44) !important;
+  box-shadow: 0 0 8px rgba(255, 107, 53, 0.5) !important;
+}
+
+/* Text on dark backgrounds */
+.text-on-dark,
+.dark-bg-text {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Nightmode specific overrides */
+.night-mode .bingo-card,
+.dark-mode .bingo-card,
+.theme-dark .bingo-card,
+body[data-theme="dark"] .bingo-card {
+  background: rgba(42, 42, 58, 0.95) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.night-mode .pass-modal-content,
+.dark-mode .pass-modal-content,
+body[data-theme="dark"] .pass-modal-content {
+  background: #2a2a3a !important;
+  color: #ffffff !important;
+}
+
+.night-mode .pass-reward-card,
+.dark-mode .pass-reward-card,
+body[data-theme="dark"] .pass-reward-card {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Buttons on dark backgrounds */
+button.dark-mode-btn,
+[class*="pass"] button,
+[class*="bingo"] button {
+  background: #ff6b35 !important;
+  color: white !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+button.dark-mode-btn:hover,
+[class*="pass"] button:hover,
+[class*="bingo"] button:hover {
+  background: #ff8c5a !important;
+}
+
+/* Modal content readability */
+.modal-content,
+.modal-body,
+.popup-content {
+  background: white !important;
+  color: #333 !important;
+}
+
+.night-mode .modal-content,
+.dark-mode .modal-content,
+body[data-theme="dark"] .modal-content {
+  background: #2a2a3a !important;
+  color: #ffffff !important;
+}
+
+.modal-content h1,
+.modal-content h2,
+.modal-content h3,
+.modal-content h4 {
+  color: inherit !important;
+}
+
+/* Bingo modal specific */
+.bingo-modal .modal-content {
+  background: #1e1e2e !important;
+  color: #ffffff !important;
+}
+
+.bingo-modal h2 {
+  color: var(--purple) !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Ensure all modal text is readable */
+.pass-modal .pass-level-card *,
+.bingo-modal .bingo-card * {
+  text-shadow: none !important;
+}
+
+/* Pass rewards track container */
+.pass-rewards-track {
+  background: transparent !important;
+}
+
+/* Make sure locked items are still visible */
+.pass-reward-card.locked *,
+.bingo-card.locked * {
+  opacity: 1 !important;
+}
+
