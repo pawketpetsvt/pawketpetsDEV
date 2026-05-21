@@ -11469,3 +11469,315 @@ body[data-theme="dark"] .modal-content {
   opacity: 1 !important;
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TOP BAR SPACING & SIZING FIX - USE DEAD SPACE + BIGGER TEXT
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Override previous compression - make things BIGGER and use full width */
+.navbar,
+.navbar-consolidated,
+.navbar-inner {
+  width: 100% !important;
+  padding: 8px 20px !important;  /* More side padding */
+  gap: 16px !important;  /* More breathing room */
+  justify-content: space-between !important;  /* Spread to edges */
+}
+
+/* Logo - keep good size */
+.navbar-logo {
+  font-size: 18px !important;
+  font-weight: bold !important;
+  flex-shrink: 0 !important;
+  padding: 0 8px !important;
+}
+
+.navbar-logo img {
+  max-height: 32px !important;
+}
+
+/* Beta warning section - BIGGER TEXT */
+.navbar-center {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  flex-shrink: 1 !important;
+}
+
+.beta-tag-inline {
+  font-size: 11px !important;  /* Bigger */
+  padding: 3px 6px !important;
+  font-weight: 600 !important;
+}
+
+.beta-text-inline {
+  font-size: 12px !important;  /* Bigger - was 9px */
+  padding: 0 8px !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+}
+
+.beta-contact-inline {
+  font-size: 12px !important;  /* Bigger */
+  padding: 4px 10px !important;
+  white-space: nowrap !important;
+}
+
+/* User controls - spread out with more space */
+.navbar-user {
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;  /* More space between items */
+  flex-shrink: 0 !important;
+}
+
+/* Notification bell - keep good size */
+.notification-bell {
+  font-size: 20px !important;
+  padding: 4px !important;
+}
+
+/* Music controls - normal size */
+.music-controls-inline {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  transform: scale(1) !important;
+}
+
+.music-title-inline {
+  font-size: 16px !important;
+}
+
+.music-btn-inline {
+  padding: 4px 6px !important;
+  font-size: 11px !important;
+  min-width: 28px !important;
+}
+
+.music-volume-inline {
+  width: 60px !important;
+  height: 20px !important;
+}
+
+/* USERNAME - BIGGER with badge style */
+#nav-user {
+  font-size: 14px !important;  /* Bigger - was 11px */
+  font-weight: 600 !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  padding: 4px 12px !important;
+  border-radius: 20px !important;
+  white-space: nowrap !important;
+  min-height: 28px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+/* PP COUNTER - BIGGER with highlighted badge */
+#nav-points {
+  font-size: 14px !important;  /* Bigger - was 11px */
+  font-weight: 700 !important;
+  background: rgba(255, 107, 53, 0.2) !important;
+  padding: 4px 12px !important;
+  border-radius: 20px !important;
+  white-space: nowrap !important;
+  min-height: 28px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  border: 1px solid rgba(255, 107, 53, 0.3) !important;
+}
+
+/* PASS BUTTON - BIGGER and more prominent */
+.pass-button {
+  font-size: 13px !important;  /* Bigger - was 11px */
+  padding: 6px 14px !important;  /* More padding */
+  gap: 6px !important;
+  border-radius: 20px !important;
+  min-height: 36px !important;
+  max-height: 40px !important;
+  font-weight: 600 !important;
+}
+
+.pass-icon {
+  font-size: 18px !important;  /* Bigger icon */
+}
+
+.pass-info {
+  min-width: 50px !important;
+}
+
+.pass-label {
+  font-size: 9px !important;
+  letter-spacing: 0.5px !important;
+  font-weight: 700 !important;
+}
+
+.pass-level {
+  font-size: 12px !important;  /* Bigger - was 10px */
+  font-weight: 700 !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  padding: 2px 6px !important;
+  border-radius: 12px !important;
+  margin-left: 4px !important;
+}
+
+.pass-xp-bar {
+  height: 4px !important;  /* Slightly bigger */
+}
+
+/* BINGO BUTTON - BIGGER and more prominent */
+.bingo-button {
+  font-size: 13px !important;  /* Bigger - was 11px */
+  padding: 6px 14px !important;  /* More padding */
+  border-radius: 20px !important;
+  white-space: nowrap !important;
+  min-height: 36px !important;
+  max-height: 40px !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+#bingo-completion {
+  font-size: 12px !important;  /* Bigger - was 10px */
+  font-weight: 700 !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  padding: 2px 6px !important;
+  border-radius: 12px !important;
+}
+
+/* Profile and Logout buttons - good readable size */
+.btn-nav-action {
+  padding: 6px 12px !important;
+  font-size: 13px !important;
+  white-space: nowrap !important;
+  min-height: 36px !important;
+  font-weight: 600 !important;
+}
+
+/* ========== RESPONSIVE - HIDE NON-ESSENTIAL ITEMS ========== */
+
+/* Tablet size - hide beta text if cramped */
+@media (max-width: 1100px) {
+  .beta-text-inline {
+    max-width: 200px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .beta-text-inline {
+    display: none !important;  /* Hide beta text */
+  }
+  
+  .navbar {
+    padding: 8px 12px !important;
+  }
+  
+  .navbar-user {
+    gap: 12px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .music-volume-inline {
+    width: 40px !important;
+  }
+  
+  .pass-label {
+    display: none !important;  /* Hide "Pass" text, keep icon and level */
+  }
+}
+
+@media (max-width: 700px) {
+  #nav-user {
+    display: none !important;  /* Hide username, keep PP counter */
+  }
+  
+  .music-controls-inline {
+    transform: scale(0.85) !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .navbar-center {
+    display: none !important;  /* Hide entire beta section */
+  }
+  
+  .music-controls-inline {
+    display: none !important;  /* Hide music player */
+  }
+  
+  #nav-points {
+    font-size: 12px !important;
+    padding: 3px 8px !important;
+  }
+}
+
+@media (max-width: 550px) {
+  .beta-contact-inline {
+    display: none !important;
+  }
+  
+  .pass-level {
+    font-size: 10px !important;
+    padding: 1px 4px !important;
+  }
+  
+  #bingo-completion {
+    font-size: 10px !important;
+    padding: 1px 4px !important;
+  }
+}
+
+@media (max-width: 450px) {
+  .notification-bell {
+    font-size: 18px !important;
+  }
+  
+  .pass-button,
+  .bingo-button {
+    font-size: 11px !important;
+    padding: 4px 10px !important;
+    min-height: 32px !important;
+  }
+  
+  .pass-icon {
+    font-size: 16px !important;
+  }
+}
+
+/* ========== ENSURE TOUCH TARGETS ARE ADEQUATE ========== */
+.pass-button,
+.bingo-button,
+.btn-nav-action,
+.notification-bell,
+.music-btn-inline {
+  min-width: 44px !important;  /* Minimum touch target */
+  min-height: 36px !important;
+  cursor: pointer !important;
+}
+
+/* ========== HIGH CONTRAST COLORS FOR READABILITY ========== */
+#nav-user {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+#nav-points {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+.pass-button {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+
+.bingo-button {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+
