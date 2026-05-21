@@ -594,6 +594,7 @@ function loadTab(tab) {
   else if (tab === 'news') loadNews();
   else if (tab === 'twitch') initTwitchTab();
   else if (tab === 'redeem') { loadRedeemHistory(); }
+  else if (tab === 'stats') loadStatistics();
   // Note: leaderboard and myprofile handled in showTab()
 }
 
@@ -17359,8 +17360,15 @@ function showPassModal() {
   }
   
   content.appendChild(track);
-  modal.querySelector('.modal-content').appendChild(content);
-  document.body.appendChild(modal);
+  
+  // Fix: makeModal() returns modal which is already inside overlay
+  // Just append content directly to modal
+  modal.appendChild(content);
+  
+  // Get the overlay parent and append to body
+  var overlay = modal.parentElement;
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -17608,8 +17616,13 @@ function showBingoModal() {
     '• Blackout (all 9): +500 PP +200 XP +1 Skin Key 🔑';
   content.appendChild(info);
   
-  modal.querySelector('.modal-content').appendChild(content);
-  document.body.appendChild(modal);
+  // Fix: makeModal() returns modal which is already inside overlay
+  modal.appendChild(content);
+  
+  // Get the overlay parent and append to body
+  var overlay = modal.parentElement;
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
 }
 
 
@@ -17649,5 +17662,119 @@ function onMinigameComplete() {
 // Hook for companion pet message
 function onCompanionMessage() {
   updateBingoProgress('pet_companion', 1);
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// STATISTICS PAGE LOADER (BUG FIX #3)
+// ══════════════════════════════════════════════════════════════════════════
+
+async function loadStatistics() {
+  console.log('📊 Loading statistics...');
+  var container = el('stats-container');
+  if (!container) return;
+  
+  // Show loading state
+  container.innerHTML = '<div class="spinner"></div>';
+  
+  try {
+    if (!currentUser) {
+      container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-light);"><p>Please log in to view statistics.</p></div>';
+      return;
+    }
+    
+    // Fetch user stats from database
+    var { data: playerData, error: playerError } = await supabaseClient
+      .from('players')
+      .select('*')
+      .eq('id', currentUser.id)
+      .single();
+    
+    if (playerError) throw playerError;
+    
+    // Fetch pet stats
+    var { data: petsData, error: petsError } = await supabaseClient
+      .from('user_pets')
+      .select('*')
+      .eq('user_id', currentUser.id);
+    
+    if (petsError) throw petsError;
+    
+    // Fetch battle stats
+    var { data: battlesData, error: battlesError } = await supabaseClient
+      .from('battle_history')
+      .select('*')
+      .eq('user_id', currentUser.id);
+    
+    // Calculate stats
+    var totalPets = petsData ? petsData.length : 0;
+    var totalBattles = battlesData ? battlesData.length : 0;
+    var battlesWon = battlesData ? battlesData.filter(function(b) { return b.winner_id === currentUser.id; }).length : 0;
+    var winRate = totalBattles > 0 ? Math.round((battlesWon / totalBattles) * 100) : 0;
+    
+    var totalPoints = playerData ? (playerData.pawketpoints || 0) : 0;
+    var loginStreak = playerData ? (playerData.login_streak || 0) : 0;
+    var highestLevel = petsData && petsData.length > 0 ? Math.max.apply(Math, petsData.map(function(p) { return p.level || 1; })) : 0;
+    
+    // Render stats
+    container.innerHTML = `
+      <div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;margin-top:30px;">
+        
+        <div class="stat-card" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:30px;border-radius:16px;text-align:center;">
+          <div style="font-size:3rem;margin-bottom:10px;">🐾</div>
+          <div style="font-size:2.5rem;font-weight:bold;margin-bottom:5px;">${totalPets}</div>
+          <div style="font-size:1rem;opacity:0.9;">Total Pets Adopted</div>
+        </div>
+        
+        <div class="stat-card" style="background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%);color:white;padding:30px;border-radius:16px;text-align:center;">
+          <div style="font-size:3rem;margin-bottom:10px;">⚔️</div>
+          <div style="font-size:2.5rem;font-weight:bold;margin-bottom:5px;">${battlesWon}/${totalBattles}</div>
+          <div style="font-size:1rem;opacity:0.9;">Battles Won (${winRate}%)</div>
+        </div>
+        
+        <div class="stat-card" style="background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);color:white;padding:30px;border-radius:16px;text-align:center;">
+          <div style="font-size:3rem;margin-bottom:10px;">💰</div>
+          <div style="font-size:2.5rem;font-weight:bold;margin-bottom:5px;">${totalPoints.toLocaleString()}</div>
+          <div style="font-size:1rem;opacity:0.9;">PawketPoints Earned</div>
+        </div>
+        
+        <div class="stat-card" style="background:linear-gradient(135deg,#43e97b 0%,#38f9d7 100%);color:white;padding:30px;border-radius:16px;text-align:center;">
+          <div style="font-size:3rem;margin-bottom:10px;">🔥</div>
+          <div style="font-size:2.5rem;font-weight:bold;margin-bottom:5px;">${loginStreak}</div>
+          <div style="font-size:1rem;opacity:0.9;">Day Login Streak</div>
+        </div>
+        
+        <div class="stat-card" style="background:linear-gradient(135deg,#fa709a 0%,#fee140 100%);color:white;padding:30px;border-radius:16px;text-align:center;">
+          <div style="font-size:3rem;margin-bottom:10px;">⬆️</div>
+          <div style="font-size:2.5rem;font-weight:bold;margin-bottom:5px;">${highestLevel}</div>
+          <div style="font-size:1rem;opacity:0.9;">Highest Pet Level</div>
+        </div>
+        
+        <div class="stat-card" style="background:linear-gradient(135deg,#30cfd0 0%,#330867 100%);color:white;padding:30px;border-radius:16px;text-align:center;">
+          <div style="font-size:3rem;margin-bottom:10px;">📅</div>
+          <div style="font-size:2.5rem;font-weight:bold;margin-bottom:5px;">${playerData && playerData.created_at ? new Date(playerData.created_at).toLocaleDateString() : 'N/A'}</div>
+          <div style="font-size:1rem;opacity:0.9;">Member Since</div>
+        </div>
+        
+      </div>
+      
+      <div style="text-align:center;margin-top:40px;padding:30px;background:rgba(255,255,255,0.05);border-radius:16px;">
+        <p style="font-size:1.1rem;margin-bottom:15px;">🎮 Keep playing to improve your stats!</p>
+        <p style="color:var(--text-light);">Adopt more pets, win battles, and log in daily to climb the leaderboards!</p>
+      </div>
+    `;
+    
+    console.log('✅ Statistics loaded successfully');
+    
+  } catch (error) {
+    console.error('❌ Statistics loading error:', error);
+    container.innerHTML = `
+      <div style="text-align:center;padding:40px;">
+        <p style="color:#ff6b6b;font-size:1.2rem;margin-bottom:10px;">⚠️ Failed to load statistics</p>
+        <p style="color:var(--text-light);">Please try again later or contact support if the issue persists.</p>
+        <button class="btn btn-primary" onclick="loadStatistics()" style="margin-top:20px;">🔄 Retry</button>
+      </div>
+    `;
+  }
 }
 
