@@ -789,6 +789,10 @@ async function showApp(user) {
   await loadPassProgress();
   loadDailyBingo();
   updateBingoUI();
+  
+  // SCRAPBOOK & COMMUNITY GOALS: Initialize systems
+  scrapbook_init();
+  community_init();
 }
 
 function showAuth() {
@@ -1370,6 +1374,11 @@ async function confirmAdopt() {
   
   // Update display
   updateAllPoints(currentPoints - (result.price_paid || 0));
+  
+  // SCRAPBOOK: Add adoption memory
+  if (result.pet_id) {
+    scrapbook_addMemory(result.pet_id, 'adopted', {});
+  }
   
   // Store for social sharing
   lastAdoptedPet = {
@@ -2652,6 +2661,9 @@ async function feedFree(petId) {
   updateBingoProgress('feed_pet', 1);
   await addPassXP(2, 'feed');
   
+  // COMMUNITY GOALS: Track feeding
+  community_increment('feed_pets_week1', 1);
+  
   // Update local state
   petState[petId].hunger = feedResult.hunger;
   petState[petId].happiness = feedResult.happiness;
@@ -2713,9 +2725,13 @@ async function feedWithItem(petId, itemId, itemName) {
   updateBingoProgress('feed_pet', 1);
   await addPassXP(2, 'feed');
   
-  // Check if using treat for bingo
+  // COMMUNITY GOALS: Track feeding
+  community_increment('feed_pets_week1', 1);
+  
+  // Check if using treat for bingo and community
   if (itemId === 'treat' || itemId === 'premium_treat') {
     updateBingoProgress('use_treat', 1);
+    community_increment('use_treats_week1', 1);
   }
   
   // Update local state
@@ -2740,6 +2756,8 @@ async function feedWithItem(petId, itemId, itemName) {
   
   if (reactionType === 'loved') {
     reactionMsg = '💖 ' + itemName + '! (1.75x bonus!)';
+    // SCRAPBOOK: Favorite food discovered
+    scrapbook_addMemory(petId, 'favorite_food', { food: itemName });
   } else if (reactionType === 'liked') {
     reactionMsg = '😊 ' + itemName + '! (1.25x bonus)';
   } else if (reactionType === 'disliked') {
@@ -7295,6 +7313,27 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
   // FETCH UPDATED PET DATA for level-up display
   // ═══════════════════════════════════════════════════════════
   if (battleResult.victory) {
+    // COMMUNITY GOALS: Track battle wins
+    community_increment('battle_wins_week1', 1);
+    
+    // COMMUNITY GOALS: Track mushroom defeats
+    if (enemyStats.name && enemyStats.name.toLowerCase().indexOf('mushroom') !== -1) {
+      community_increment('defeat_mushrooms_week1', 1);
+    }
+    
+    // SCRAPBOOK: Add first battle win memory
+    var hasWinMemory = await scrapbook_hasMemory(petId, 'first_battle_win');
+    if (!hasWinMemory) {
+      scrapbook_addMemory(petId, 'first_battle_win', { enemy: enemyStats.name || 'an enemy' });
+    }
+    
+    // SCRAPBOOK: Low HP victory (if HP < 10%)
+    var petStats = window.petState && window.petState[petId];
+    var maxHp = (petStats && petStats.base_hp) || 100;
+    if (battleResult.playerFinalHP < maxHp * 0.1 && battleResult.playerFinalHP > 0) {
+      scrapbook_addMemory(petId, 'low_hp_victory', { hp: battleResult.playerFinalHP });
+    }
+    
     var petData = await supabaseClient
       .from('user_pets')
       .select('xp, level, max_hunger, max_energy, max_happiness, base_hp, base_attack, base_defense, base_speed, total_battles, battles_won, energy')
@@ -7340,6 +7379,11 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
           level: lu.level
         });
         
+        // SCRAPBOOK: Level milestones at 5, 10, 15, 20
+        if (lu.level === 5 || lu.level === 10 || lu.level === 15 || lu.level === 20) {
+          scrapbook_addMemory(petId, 'level_milestone', { level: lu.level });
+        }
+        
         // Check if pet evolved to a new stage
         if (oldStage !== newStage) {
           battleRewards.evolved = true;
@@ -7347,6 +7391,14 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
           battleRewards.evolutionEmoji = getEvolutionEmoji(newStage);
         }
       }
+    }
+  }
+  
+  // SCRAPBOOK: First battle loss
+  if (!battleResult.victory && battleResult.playerFinalHP <= 0) {
+    var hasLossMemory = await scrapbook_hasMemory(petId, 'first_battle_loss');
+    if (!hasLossMemory) {
+      scrapbook_addMemory(petId, 'first_battle_loss', { enemy: enemyStats.name || 'an enemy' });
     }
   }
   
@@ -11515,6 +11567,13 @@ async function checkDailyLogin() {
     // PAWKETPASS: Update bingo and Pass XP for daily login
     updateBingoProgress('login', 1);
     await addPassXP(10, 'login');
+    
+    // SCRAPBOOK: Add random flavor memory to a random pet
+    var allPetIds = Object.keys(petState || {});
+    if (allPetIds.length > 0) {
+      var randomPetId = allPetIds[Math.floor(Math.random() * allPetIds.length)];
+      scrapbook_addRandomMemory(randomPetId);
+    }
     
     console.log('✅ Daily login checked - Streak:', streak, 'Reward:', ppReward);
     
@@ -17433,7 +17492,7 @@ function loadDailyBingo() {
   saveDailyBingo();
 }
 
-// Generate random 3x3 bingo grid
+// Generate random 4x3 bingo grid (12 squares)
 function generateDailyBingo() {
   var shuffled = BINGO_TASKS.slice();
   for (var i = shuffled.length - 1; i > 0; i--) {
@@ -17443,7 +17502,7 @@ function generateDailyBingo() {
     shuffled[j] = temp;
   }
   
-  return shuffled.slice(0, 9).map(function(task) {
+  return shuffled.slice(0, 12).map(function(task) {
     return {
       id: task.id,
       name: task.name,
@@ -17512,13 +17571,15 @@ async function updateBingoProgress(taskType, amount) {
   updateBingoUI();
 }
 
-// Check for bingo lines
+// Check for bingo lines (4x3 grid = 10 lines total)
 async function checkBingoLines() {
   var grid = dailyBingo.squares;
+  
+  // 4x3 grid layout: 3 rows, 4 columns, 2 diagonals = 10 lines
   var lines = [
-    [0,1,2], [3,4,5], [6,7,8], // rows
-    [0,3,6], [1,4,7], [2,5,8], // cols
-    [0,4,8], [2,4,6]           // diagonals
+    [0,1,2,3], [4,5,6,7], [8,9,10,11],  // 3 horizontal rows
+    [0,4,8], [1,5,9], [2,6,10], [3,7,11],  // 4 vertical columns
+    [0,5,10], [3,6,9]  // 2 diagonals
   ];
   
   for (var idx = 0; idx < lines.length; idx++) {
@@ -17526,7 +17587,7 @@ async function checkBingoLines() {
     var lineKey = 'line_' + idx;
     
     if (!dailyBingo.completedLines.includes(lineKey)) {
-      var allCompleted = line.every(function(cell) { return grid[cell].completed; });
+      var allCompleted = line.every(function(cell) { return grid[cell] && grid[cell].completed; });
       
       if (allCompleted) {
         dailyBingo.completedLines.push(lineKey);
@@ -17547,7 +17608,7 @@ async function checkBingoLines() {
     }
   }
   
-  // Check blackout
+  // Check blackout (all 12 squares complete)
   if (!dailyBingo.blackoutCompleted && dailyBingo.squares.every(function(s) { return s.completed; })) {
     dailyBingo.blackoutCompleted = true;
     
@@ -17561,10 +17622,20 @@ async function checkBingoLines() {
     
     await addPassXP(200, 'bingo_blackout');
     
-    // Bonus: Give a Skin Key
-    await addItemToInventory('00000000-0000-0000-0000-000000000001', 1);
+    // Check if this is the FIRST blackout of the week
+    var weekKey = getWeekNumberKey();
+    var hasClaimedWeeklySkinKey = localStorage.getItem(weekKey) === 'true';
     
-    showToast('🏆 BLACKOUT BINGO! +500 PP, +200 XP, +1 Skin Key!', 'success');
+    if (!hasClaimedWeeklySkinKey) {
+      // First blackout of the week - award Skin Key!
+      await addItemToInventory('00000000-0000-0000-0000-000000000001', 1);
+      localStorage.setItem(weekKey, 'true');
+      showToast('🏆 WEEKLY BLACKOUT! +500 PP, +200 XP, +1 Skin Key!', 'success');
+    } else {
+      // Additional blackout this week - no Skin Key
+      showToast('🏆 BLACKOUT BINGO! +500 PP, +200 XP', 'success');
+    }
+    
     playSound('jackpot');
     createConfettiBurst(window.innerWidth / 2, window.innerHeight / 2);
   }
@@ -17572,12 +17643,21 @@ async function checkBingoLines() {
   saveDailyBingo();
 }
 
+// Get week number key for weekly Skin Key tracking
+function getWeekNumberKey() {
+  var now = new Date();
+  var start = new Date(now.getFullYear(), 0, 1);
+  var days = Math.floor((now - start) / (24 * 60 * 60 * 1000));
+  var weekNum = Math.ceil(days / 7);
+  return 'bingo_blackout_week_' + weekNum + '_' + now.getFullYear();
+}
+    
 // Update bingo UI
 function updateBingoUI() {
   var completionDisplay = document.getElementById('bingo-completion');
   if (completionDisplay) {
     var completed = dailyBingo.squares.filter(function(s) { return s.completed; }).length;
-    completionDisplay.textContent = completed + '/9';
+    completionDisplay.textContent = completed + '/12';  // Updated for 4x3 grid
   }
 }
 
@@ -17595,16 +17675,21 @@ function showBingoModal() {
   var header = makeEl('div');
   header.style.cssText = 'text-align:center;margin-bottom:20px;';
   var completed = dailyBingo.squares.filter(function(s) { return s.completed; }).length;
+  var weekKey = getWeekNumberKey();
+  var hasClaimedWeeklySkinKey = localStorage.getItem(weekKey) === 'true';
+  var skinKeyStatus = hasClaimedWeeklySkinKey ? '(claimed this week)' : '(available!)';
+  
   header.innerHTML = '<h2 style="color:var(--purple);margin-bottom:10px;">🎯 Daily Bingo</h2>' +
-    '<div style="font-size:1.1rem;color:var(--text);">Completed: ' + completed + ' / 9</div>' +
-    '<div style="font-size:0.9rem;color:var(--text-light);margin-top:5px;">Lines: ' + dailyBingo.completedLines.length + ' / 8 • Blackout: ' + (dailyBingo.blackoutCompleted ? '✓' : '✗') + '</div>';
+    '<div style="font-size:1.1rem;color:var(--text);">Completed: ' + completed + ' / 12</div>' +
+    '<div style="font-size:0.9rem;color:var(--text-light);margin-top:5px;">Lines: ' + dailyBingo.completedLines.length + ' / 10 • Blackout: ' + (dailyBingo.blackoutCompleted ? '✓' : '✗') + '</div>' +
+    '<div style="font-size:0.85rem;color:#ff6b35;margin-top:5px;">🔑 Weekly Blackout Bonus: ' + skinKeyStatus + '</div>';
   content.appendChild(header);
   
-  // Bingo grid (3x3)
+  // Bingo grid (4x3)
   var grid = makeEl('div');
   grid.id = 'bingo-grid';
   grid.className = 'bingo-grid';
-  grid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;padding:10px;';
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;padding:10px;';
   
   dailyBingo.squares.forEach(function(square) {
     var card = makeEl('div');
@@ -17664,8 +17749,9 @@ function showBingoModal() {
   info.style.cssText = 'background:#f9f9f9;border-radius:8px;padding:15px;font-size:0.9rem;color:var(--text-light);';
   info.innerHTML = '<strong>Rewards:</strong><br>' +
     '• Each square: +Points +15 Pass XP<br>' +
-    '• Each line (3 in a row): +100 PP +50 XP<br>' +
-    '• Blackout (all 9): +500 PP +200 XP +1 Skin Key 🔑';
+    '• Each line (4 in a row): +100 PP +50 XP<br>' +
+    '• Blackout (all 12): +500 PP +200 XP<br>' +
+    '• <strong>Weekly Bonus:</strong> First blackout of the week = +1 Skin Key 🔑';
   content.appendChild(info);
   
   // Fix: makeModal() returns modal which is already inside overlay
@@ -17828,5 +17914,1066 @@ async function loadStatistics() {
       </div>
     `;
   }
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// SCRAPBOOK SYSTEM - COMPLETE IMPLEMENTATION
+// ══════════════════════════════════════════════════════════════════════════
+
+// Memory templates
+var SCRAPBOOK_TEMPLATES = {
+    adopted: [
+        '{pet} found a forever home with {trainer}!',
+        '{pet} was adopted and joined the Pawket family!',
+        'A new journey begins for {pet} with {trainer}!'
+    ],
+    first_battle_win: [
+        '{pet} won their first battle against {enemy}!',
+        '{pet} defeated {enemy} for the very first time!',
+        'Victory! {pet} triumphed over {enemy}!'
+    ],
+    first_battle_loss: [
+        '{pet} lost to {enemy} but learned a valuable lesson.',
+        '{pet} gained experience from defeat against {enemy}.',
+        '{enemy} proved tough, but {pet} will try again!'
+    ],
+    level_milestone: [
+        '{pet} reached level {level}! Growing stronger every day!',
+        'Level {level} achieved for {pet}! More adventures await!',
+        '{pet} hit level {level} - what a journey so far!'
+    ],
+    favorite_food: [
+        '{pet} discovered they absolutely LOVE {food}!',
+        '{pet} went crazy for {food} - new favorite discovered!',
+        '{pet} tried {food} and couldn\'t get enough!'
+    ],
+    low_hp_victory: [
+        '{pet} won a battle with only {hp} HP remaining! Such determination!',
+        '{pet} pulled through a tough fight with {hp} HP left!',
+        'Against all odds, {pet} survived with {hp} HP!'
+    ],
+    random_flavor: [
+        '{pet} enjoyed a peaceful afternoon in the sun.',
+        '{pet} played with other pets at the park.',
+        '{pet} found a hidden treasure while exploring!',
+        '{pet} made a new friend during their adventures.',
+        '{pet} had a relaxing day by the pond.',
+        '{pet} chased butterflies in the meadow.',
+        '{pet} watched the sunset with their trainer.',
+        '{pet} discovered a mysterious hidden cave.'
+    ]
+};
+
+// Cooldown tracker
+var scrapbook_cooldowns = {};
+
+// Load cooldowns from localStorage
+function scrapbook_loadCooldowns() {
+    var saved = localStorage.getItem('scrapbook_cooldowns');
+    if (saved) {
+        try {
+            scrapbook_cooldowns = JSON.parse(saved);
+        } catch(e) {
+            scrapbook_cooldowns = {};
+        }
+    }
+}
+
+// Save cooldowns
+function scrapbook_saveCooldowns() {
+    localStorage.setItem('scrapbook_cooldowns', JSON.stringify(scrapbook_cooldowns));
+}
+
+// Check cooldown
+function scrapbook_onCooldown(petId, memoryType, cooldownHours) {
+    var key = petId + '_' + memoryType;
+    var lastTime = scrapbook_cooldowns[key];
+    if (!lastTime) return false;
+    var now = Date.now();
+    var hoursSince = (now - lastTime) / (1000 * 60 * 60);
+    return hoursSince < cooldownHours;
+}
+
+// Set cooldown
+function scrapbook_setCooldown(petId, memoryType) {
+    var key = petId + '_' + memoryType;
+    scrapbook_cooldowns[key] = Date.now();
+    scrapbook_saveCooldowns();
+}
+
+// Check if pet already has a memory type
+async function scrapbook_hasMemory(userPetId, memoryType) {
+    if (!userPetId || !memoryType) return false;
+    var res = await supabaseClient
+        .from('pet_memories')
+        .select('id')
+        .eq('user_pet_id', userPetId)
+        .eq('memory_type', memoryType)
+        .limit(1);
+    if (res.error) return false;
+    return res.data && res.data.length > 0;
+}
+
+// Add a memory
+async function scrapbook_addMemory(userPetId, memoryType, variables) {
+    if (!userPetId || !memoryType) {
+        console.error('Scrapbook: missing petId or memoryType');
+        return false;
+    }
+    
+    variables = variables || {};
+    
+    // Cooldown settings (hours)
+    var cooldownSettings = {
+        'random_flavor': 24,
+        'low_hp_victory': 24
+    };
+    var cooldownHours = cooldownSettings[memoryType] || 0;
+    
+    if (cooldownHours > 0 && scrapbook_onCooldown(userPetId, memoryType, cooldownHours)) {
+        return false;
+    }
+    
+    // Check once-per-pet memories
+    var oncePerPet = ['adopted', 'first_battle_win', 'first_battle_loss'];
+    if (oncePerPet.indexOf(memoryType) >= 0) {
+        var exists = await scrapbook_hasMemory(userPetId, memoryType);
+        if (exists) return false;
+    }
+    
+    // Get pet name
+    var petName = 'Your pet';
+    if (window.petState && window.petState[userPetId]) {
+        petName = window.petState[userPetId].name || 
+                  window.petState[userPetId].pet_name || 
+                  (window.petState[userPetId].pets && window.petState[userPetId].pets.name) ||
+                  'Your pet';
+    }
+    
+    // Get trainer name
+    var trainerName = 'their trainer';
+    if (window.currentUser) {
+        trainerName = window.currentUser.username || 
+                      (window.currentUser.user_metadata && window.currentUser.user_metadata.username) ||
+                      'their trainer';
+    }
+    
+    // Get templates
+    var templates = SCRAPBOOK_TEMPLATES[memoryType];
+    if (!templates) {
+        console.error('Scrapbook: unknown memory type', memoryType);
+        return false;
+    }
+    
+    // Generate random template
+    var memoryText = templates[Math.floor(Math.random() * templates.length)];
+    
+    // Replace variables
+    memoryText = memoryText.replace(/{pet}/g, petName);
+    memoryText = memoryText.replace(/{trainer}/g, trainerName);
+    memoryText = memoryText.replace(/{enemy}/g, variables.enemy || 'an enemy');
+    memoryText = memoryText.replace(/{level}/g, variables.level || '?');
+    memoryText = memoryText.replace(/{food}/g, variables.food || 'a treat');
+    memoryText = memoryText.replace(/{hp}/g, variables.hp || 'low');
+    
+    // Save to database
+    try {
+        var res = await supabaseClient
+            .from('pet_memories')
+            .insert({
+                user_pet_id: userPetId,
+                memory_text: memoryText,
+                memory_type: memoryType
+            });
+        
+        if (res.error) {
+            console.error('Scrapbook insert error:', res.error);
+            return false;
+        }
+        
+        // Set cooldown
+        if (cooldownHours > 0) {
+            scrapbook_setCooldown(userPetId, memoryType);
+        }
+        
+        // Refresh UI if this pet's modal is open
+        if (window.scrapbook_currentPetId === userPetId) {
+            scrapbook_refreshMemories(userPetId);
+        }
+        
+        console.log('📖 Scrapbook: ' + memoryText);
+        return true;
+        
+    } catch(e) {
+        console.error('Scrapbook error:', e);
+        return false;
+    }
+}
+
+// Add random daily memory
+async function scrapbook_addRandomMemory(petId) {
+    var today = new Date().toISOString().split('T')[0];
+    var key = 'sb_random_' + petId + '_' + today;
+    if (localStorage.getItem(key)) return false;
+    localStorage.setItem(key, 'true');
+    return await scrapbook_addMemory(petId, 'random_flavor', {});
+}
+
+// Load memories
+async function scrapbook_loadMemories(userPetId, limit) {
+    if (!userPetId) return [];
+    limit = limit || 15;
+    var res = await supabaseClient
+        .from('pet_memories')
+        .select('memory_text, memory_type, created_at')
+        .eq('user_pet_id', userPetId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+    if (res.error) {
+        console.error('Load memories error:', res.error);
+        return [];
+    }
+    return res.data || [];
+}
+
+// Format date
+function scrapbook_formatDate(dateString) {
+    var date = new Date(dateString);
+    var now = new Date();
+    var diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return diffDays + ' days ago';
+    if (diffDays < 30) return Math.floor(diffDays / 7) + ' weeks ago';
+    return date.toLocaleDateString();
+}
+
+// Refresh UI
+async function scrapbook_refreshMemories(userPetId) {
+    var container = document.getElementById('sb-memories-container');
+    if (!container) return;
+    var memories = await scrapbook_loadMemories(userPetId);
+    if (memories.length === 0) {
+        container.innerHTML = '<div class="sb-empty">📖 No memories yet. Go make some adventures!</div>';
+        return;
+    }
+    container.innerHTML = memories.map(function(mem) {
+        var escapedText = escapeHtml(mem.memory_text);
+        return '<div class="sb-memory-card">' +
+            '<div class="sb-memory-date">📅 ' + scrapbook_formatDate(mem.created_at) + '</div>' +
+            '<div class="sb-memory-text">💭 ' + escapedText + '</div>' +
+            '</div>';
+    }).join('');
+}
+
+// Initialize
+function scrapbook_init() {
+    scrapbook_loadCooldowns();
+    console.log('📖 Scrapbook system initialized');
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// COMMUNITY GOALS SYSTEM - COMPLETE IMPLEMENTATION
+// ══════════════════════════════════════════════════════════════════════════
+
+// Cache for community goals
+var community_cachedGoals = null;
+var community_lastFetch = 0;
+var community_pendingUpdates = {};
+var community_syncInterval = null;
+var community_claimedGoalIds = [];
+
+// Load goals (cached for 5 minutes)
+async function community_loadGoals() {
+    var now = Date.now();
+    if (community_cachedGoals && (now - community_lastFetch) < 300000) {
+        return community_cachedGoals;
+    }
+    var res = await supabaseClient
+        .from('community_goals')
+        .select('*')
+        .eq('is_active', true)
+        .eq('is_completed', false);
+    if (!res.error && res.data) {
+        community_cachedGoals = res.data;
+        community_lastFetch = now;
+        await community_loadUserClaims();
+        community_refreshUI();
+    }
+    return community_cachedGoals || [];
+}
+
+// Load user's claimed goals
+async function community_loadUserClaims() {
+    if (!currentUser) {
+        community_claimedGoalIds = [];
+        return;
+    }
+    var res = await supabaseClient
+        .from('community_goal_claims')
+        .select('goal_id')
+        .eq('user_id', currentUser.id);
+    if (!res.error && res.data) {
+        community_claimedGoalIds = res.data.map(function(c) { return c.goal_id; });
+    }
+}
+
+// Increment goal progress (local, batched)
+function community_increment(goalKey, amount, metadata) {
+    if (!goalKey) return;
+    amount = amount || 1;
+    metadata = metadata || {};
+    community_pendingUpdates[goalKey] = (community_pendingUpdates[goalKey] || 0) + amount;
+    
+    // Update UI immediately
+    community_updateLocalProgress(goalKey, community_pendingUpdates[goalKey]);
+    
+    // Schedule sync (every 10 seconds or after 10 increments)
+    if (!community_syncInterval) {
+        community_syncInterval = setInterval(community_syncToDatabase, 10000);
+    }
+    var totalPending = Object.keys(community_pendingUpdates).reduce(function(sum, key) {
+        return sum + community_pendingUpdates[key];
+    }, 0);
+    if (totalPending >= 10) {
+        community_syncToDatabase();
+    }
+}
+
+// Sync pending updates to database
+async function community_syncToDatabase() {
+    if (Object.keys(community_pendingUpdates).length === 0) return;
+    var updates = {};
+    for (var key in community_pendingUpdates) {
+        updates[key] = community_pendingUpdates[key];
+    }
+    community_pendingUpdates = {};
+    
+    for (var goalKey in updates) {
+        var increment = updates[goalKey];
+        try {
+            var res = await supabaseClient.rpc('increment_goal_progress', {
+                p_goal_key: goalKey,
+                p_amount: increment
+            });
+            if (res.error) console.error('Sync error:', res.error);
+        } catch(e) {
+            console.error('RPC error:', e);
+            // Put back for retry
+            community_pendingUpdates[goalKey] = (community_pendingUpdates[goalKey] || 0) + increment;
+        }
+    }
+    community_cachedGoals = null;
+    community_loadGoals();
+}
+
+// Update local progress display
+function community_updateLocalProgress(goalKey, increment) {
+    if (!community_cachedGoals) return;
+    var goal = community_cachedGoals.find(function(g) { return g.goal_key === goalKey; });
+    if (!goal) return;
+    var current = goal.current_progress || 0;
+    var percent = Math.min(100, ((current + increment) / goal.goal_target) * 100);
+    var progressBar = document.querySelector('.com-progress-' + goalKey);
+    var progressText = document.querySelector('.com-text-' + goalKey);
+    if (progressBar) progressBar.style.width = percent + '%';
+    if (progressText) progressText.textContent = (current + increment) + '/' + goal.goal_target;
+}
+
+// Refresh entire UI
+async function community_refreshUI() {
+    var goals = await community_loadGoals();
+    var container = document.getElementById('com-goals-container');
+    if (!container || !goals.length) {
+        if (container) container.innerHTML = '<div class="com-loading">Loading community goals...</div>';
+        return;
+    }
+    
+    container.innerHTML = goals.map(function(goal) {
+        var progress = goal.current_progress || 0;
+        var percent = (progress / goal.goal_target) * 100;
+        var isCompleted = progress >= goal.goal_target;
+        var isClaimed = community_claimedGoalIds.indexOf(goal.id) >= 0;
+        var endsAt = goal.ends_at ? new Date(goal.ends_at).toLocaleDateString() : 'soon';
+        
+        var rewardDisplay = '';
+        if (goal.reward_type === 'points') rewardDisplay = '💰 ' + goal.reward_value + ' PawketPoints';
+        else if (goal.reward_type === 'items') rewardDisplay = '📦 ' + goal.reward_value;
+        else if (goal.reward_type === 'title') rewardDisplay = '🏆 Title: "' + goal.reward_value + '"';
+        else rewardDisplay = '🎁 ' + goal.reward_value;
+        
+        var btnHtml = '';
+        if (isCompleted && !isClaimed) {
+            btnHtml = '<button class="com-claim-btn" data-goal-id="' + goal.id + '" data-goal-key="' + goal.goal_key + '">🎁 Claim Reward</button>';
+        } else if (isClaimed) {
+            btnHtml = '<div class="com-claimed">✓ Reward Claimed</div>';
+        } else {
+            btnHtml = '<div class="com-progress-status">📊 ' + Math.round(percent) + '% complete</div>';
+        }
+        
+        return '<div class="com-goal-card">' +
+            '<div class="com-goal-title">' + escapeHtml(goal.title) + '</div>' +
+            '<div class="com-goal-desc">' + escapeHtml(goal.description) + '</div>' +
+            '<div class="com-progress-bar">' +
+            '<div class="com-progress-fill com-progress-' + goal.goal_key + '" style="width:' + percent + '%"></div>' +
+            '</div>' +
+            '<div class="com-progress-text com-text-' + goal.goal_key + '">' +
+            progress.toLocaleString() + '/' + goal.goal_target.toLocaleString() +
+            '</div>' +
+            '<div class="com-reward">🎁 Reward: ' + rewardDisplay + '</div>' +
+            '<div class="com-time-left">⏰ Ends: ' + endsAt + '</div>' +
+            btnHtml +
+            '</div>';
+    }).join('');
+    
+    var claimButtons = document.querySelectorAll('.com-claim-btn');
+    for (var i = 0; i < claimButtons.length; i++) {
+        claimButtons[i].removeEventListener('click', community_handleClaim);
+        claimButtons[i].addEventListener('click', community_handleClaim);
+    }
+}
+
+// Handle reward claim
+async function community_handleClaim(e) {
+    var btn = e.currentTarget;
+    var goalId = parseInt(btn.dataset.goalId);
+    var goalKey = btn.dataset.goalKey;
+    if (!goalId || !currentUser) return;
+    
+    if (community_claimedGoalIds.indexOf(goalId) >= 0) {
+        community_showToast('Reward already claimed!', 'warning');
+        return;
+    }
+    
+    var goal = community_cachedGoals ? community_cachedGoals.find(function(g) { return g.id === goalId; }) : null;
+    if (!goal || goal.current_progress < goal.goal_target) {
+        community_showToast('Goal not completed yet!', 'error');
+        return;
+    }
+    
+    var success = await community_grantReward(goal);
+    if (success) {
+        var res = await supabaseClient
+            .from('community_goal_claims')
+            .insert({ goal_id: goalId, user_id: currentUser.id });
+        if (!res.error) {
+            community_claimedGoalIds.push(goalId);
+            community_showToast('🎉 Reward claimed: ' + community_formatRewardText(goal), 'success');
+            community_refreshUI();
+        }
+    }
+}
+
+// Grant reward based on type
+async function community_grantReward(goal) {
+    var reward = goal.reward_value;
+    var type = goal.reward_type;
+    
+    try {
+        if (type === 'points') {
+            var amount = parseInt(reward);
+            // Add points (use your existing function)
+            if (typeof addPawketPoints === 'function') {
+                addPawketPoints(amount);
+            } else if (typeof updateAllPoints === 'function') {
+                updateAllPoints(currentPoints + amount);
+            }
+            return true;
+        }
+        if (type === 'items') {
+            var items = reward.split(',');
+            for (var i = 0; i < items.length; i++) {
+                var parts = items[i].split(':');
+                var itemId = parts[0];
+                var quantity = parseInt(parts[1]) || 1;
+                if (typeof addItemToInventory === 'function') {
+                    await addItemToInventory(itemId, quantity);
+                }
+            }
+            return true;
+        }
+        if (type === 'title') {
+            if (typeof unlockTitle === 'function') {
+                await unlockTitle(reward);
+            }
+            return true;
+        }
+        return false;
+    } catch(e) {
+        console.error('Reward grant error:', e);
+        return false;
+    }
+}
+
+// Format reward text for toast
+function community_formatRewardText(goal) {
+    if (goal.reward_type === 'points') return goal.reward_value + ' PawketPoints';
+    if (goal.reward_type === 'items') return goal.reward_value;
+    if (goal.reward_type === 'title') return 'Title: "' + goal.reward_value + '"';
+    return goal.reward_value;
+}
+
+// Show toast notification
+function community_showToast(message, type) {
+    type = type || 'info';
+    if (typeof showToast === 'function') {
+        showToast(message, type);
+    } else if (typeof showNotification === 'function') {
+        showNotification(message);
+    } else {
+        console.log('[Community] ' + message);
+        var toast = document.createElement('div');
+        toast.textContent = message;
+        toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#333;color:white;padding:10px 20px;border-radius:8px;z-index:9999;';
+        document.body.appendChild(toast);
+        setTimeout(function() { toast.remove(); }, 3000);
+    }
+}
+
+// Initialize community system
+function community_init() {
+    community_loadGoals();
+    setInterval(function() { community_loadGoals(); }, 300000);
+    window.addEventListener('beforeunload', function() {
+        if (Object.keys(community_pendingUpdates).length > 0) {
+            community_syncToDatabase();
+        }
+    });
+    console.log('🌍 Community Goals system initialized');
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// SCRAPBOOK SYSTEM - COMPLETE IMPLEMENTATION
+// ════════════════════════════════════════════════════════════════════════════
+
+// Memory templates
+var SCRAPBOOK_TEMPLATES = {
+  adopted: [
+    '{pet} found a forever home with {trainer}!',
+    '{pet} was adopted and joined the Pawket family!',
+    'A new journey begins for {pet} with {trainer}!'
+  ],
+  first_battle_win: [
+    '{pet} won their first battle against {enemy}!',
+    '{pet} defeated {enemy} for the very first time!',
+    'Victory! {pet} triumphed over {enemy}!'
+  ],
+  first_battle_loss: [
+    '{pet} lost to {enemy} but learned a valuable lesson.',
+    '{pet} gained experience from defeat against {enemy}.',
+    '{enemy} proved tough, but {pet} will try again!'
+  ],
+  level_milestone: [
+    '{pet} reached level {level}! Growing stronger every day!',
+    'Level {level} achieved for {pet}! More adventures await!',
+    '{pet} hit level {level} - what a journey so far!'
+  ],
+  favorite_food: [
+    '{pet} discovered they absolutely LOVE {food}!',
+    '{pet} went crazy for {food} - new favorite discovered!',
+    '{pet} tried {food} and couldn\'t get enough!'
+  ],
+  low_hp_victory: [
+    '{pet} won a battle with only {hp} HP remaining! Such determination!',
+    '{pet} pulled through a tough fight with {hp} HP left!',
+    'Against all odds, {pet} survived with {hp} HP!'
+  ],
+  random_flavor: [
+    '{pet} enjoyed a peaceful afternoon in the sun.',
+    '{pet} played with other pets at the park.',
+    '{pet} found a hidden treasure while exploring!',
+    '{pet} made a new friend during their adventures.',
+    '{pet} had a relaxing day by the pond.',
+    '{pet} chased butterflies in the meadow.',
+    '{pet} watched the sunset with their trainer.',
+    '{pet} discovered a mysterious hidden cave.'
+  ]
+};
+
+// Cooldown tracker
+var scrapbook_cooldowns = {};
+
+// Load cooldowns from localStorage
+function scrapbook_loadCooldowns() {
+  var saved = localStorage.getItem('scrapbook_cooldowns');
+  if (saved) {
+    try {
+      scrapbook_cooldowns = JSON.parse(saved);
+    } catch(e) {
+      scrapbook_cooldowns = {};
+    }
+  }
+}
+
+// Save cooldowns
+function scrapbook_saveCooldowns() {
+  localStorage.setItem('scrapbook_cooldowns', JSON.stringify(scrapbook_cooldowns));
+}
+
+// Check cooldown
+function scrapbook_onCooldown(petId, memoryType, cooldownHours) {
+  cooldownHours = cooldownHours || 24;
+  var key = petId + '_' + memoryType;
+  var lastTime = scrapbook_cooldowns[key];
+  if (!lastTime) return false;
+  var now = Date.now();
+  var hoursSince = (now - lastTime) / (1000 * 60 * 60);
+  return hoursSince < cooldownHours;
+}
+
+// Set cooldown
+function scrapbook_setCooldown(petId, memoryType) {
+  var key = petId + '_' + memoryType;
+  scrapbook_cooldowns[key] = Date.now();
+  scrapbook_saveCooldowns();
+}
+
+// Check if pet already has a memory type
+async function scrapbook_hasMemory(userPetId, memoryType) {
+  if (!userPetId || !memoryType) return false;
+  var { data, error } = await supabaseClient
+    .from('pet_memories')
+    .select('id')
+    .eq('user_pet_id', userPetId)
+    .eq('memory_type', memoryType)
+    .limit(1);
+  if (error) return false;
+  return data && data.length > 0;
+}
+
+// Add a memory
+async function scrapbook_addMemory(userPetId, memoryType, variables) {
+  if (!userPetId || !memoryType) {
+    console.error('Scrapbook: missing petId or memoryType');
+    return false;
+  }
+  
+  variables = variables || {};
+  
+  // Cooldown settings (hours)
+  var cooldownSettings = {
+    'random_flavor': 24,
+    'low_hp_victory': 24
+  };
+  var cooldownHours = cooldownSettings[memoryType] || 0;
+  
+  if (cooldownHours > 0 && scrapbook_onCooldown(userPetId, memoryType, cooldownHours)) {
+    return false;
+  }
+  
+  // Check once-per-pet memories
+  var oncePerPet = ['adopted', 'first_battle_win', 'first_battle_loss'];
+  if (oncePerPet.indexOf(memoryType) !== -1) {
+    var exists = await scrapbook_hasMemory(userPetId, memoryType);
+    if (exists) return false;
+  }
+  
+  // Get pet name
+  var petName = 'Your pet';
+  if (window.petState && window.petState[userPetId]) {
+    petName = window.petState[userPetId].name || 
+              window.petState[userPetId].pet_name || 
+              (window.petState[userPetId].pets && window.petState[userPetId].pets.name) ||
+              'Your pet';
+  }
+  
+  // Get trainer name
+  var trainerName = 'their trainer';
+  if (window.currentUser) {
+    trainerName = window.currentUser.username || 
+                  (window.currentUser.user_metadata && window.currentUser.user_metadata.username) ||
+                  'their trainer';
+  }
+  
+  // Get templates
+  var templates = SCRAPBOOK_TEMPLATES[memoryType];
+  if (!templates) {
+    console.error('Scrapbook: unknown memory type', memoryType);
+    return false;
+  }
+  
+  // Generate random template
+  var memoryText = templates[Math.floor(Math.random() * templates.length)];
+  
+  // Replace variables
+  memoryText = memoryText.replace(/{pet}/g, petName);
+  memoryText = memoryText.replace(/{trainer}/g, trainerName);
+  memoryText = memoryText.replace(/{enemy}/g, variables.enemy || 'an enemy');
+  memoryText = memoryText.replace(/{level}/g, variables.level || '?');
+  memoryText = memoryText.replace(/{food}/g, variables.food || 'a treat');
+  memoryText = memoryText.replace(/{hp}/g, variables.hp || 'low');
+  
+  // Save to database
+  try {
+    var { error } = await supabaseClient
+      .from('pet_memories')
+      .insert({
+        user_pet_id: userPetId,
+        memory_text: memoryText,
+        memory_type: memoryType
+      });
+    
+    if (error) {
+      console.error('Scrapbook insert error:', error);
+      return false;
+    }
+    
+    // Set cooldown
+    if (cooldownHours > 0) {
+      scrapbook_setCooldown(userPetId, memoryType);
+    }
+    
+    // Refresh UI if this pet's modal is open
+    if (window.scrapbook_currentPetId === userPetId) {
+      scrapbook_refreshMemories(userPetId);
+    }
+    
+    console.log('📖 Scrapbook: ' + memoryText);
+    return true;
+    
+  } catch(e) {
+    console.error('Scrapbook error:', e);
+    return false;
+  }
+}
+
+// Add random daily memory
+async function scrapbook_addRandomMemory(petId) {
+  var today = new Date().toISOString().split('T')[0];
+  var key = 'sb_random_' + petId + '_' + today;
+  if (localStorage.getItem(key)) return false;
+  localStorage.setItem(key, 'true');
+  return await scrapbook_addMemory(petId, 'random_flavor', {});
+}
+
+// Load memories
+async function scrapbook_loadMemories(userPetId, limit) {
+  limit = limit || 15;
+  if (!userPetId) return [];
+  var { data, error } = await supabaseClient
+    .from('pet_memories')
+    .select('memory_text, memory_type, created_at')
+    .eq('user_pet_id', userPetId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.error('Load memories error:', error);
+    return [];
+  }
+  return data || [];
+}
+
+// Format date
+function scrapbook_formatDate(dateString) {
+  var date = new Date(dateString);
+  var now = new Date();
+  var diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return diffDays + ' days ago';
+  if (diffDays < 30) return Math.floor(diffDays / 7) + ' weeks ago';
+  return date.toLocaleDateString();
+}
+
+// Escape HTML
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/[&<>]/g, function(m) {
+    if (m === '&') return '&amp;';
+    if (m === '<') return '&lt;';
+    if (m === '>') return '&gt;';
+    return m;
+  });
+}
+
+// Refresh UI
+async function scrapbook_refreshMemories(userPetId) {
+  var container = document.getElementById('sb-memories-container');
+  if (!container) return;
+  var memories = await scrapbook_loadMemories(userPetId);
+  if (memories.length === 0) {
+    container.innerHTML = '<div class="sb-empty">📖 No memories yet. Go make some adventures!</div>';
+    return;
+  }
+  container.innerHTML = memories.map(function(mem) {
+    return '<div class="sb-memory-card">' +
+           '<div class="sb-memory-date">📅 ' + scrapbook_formatDate(mem.created_at) + '</div>' +
+           '<div class="sb-memory-text">💭 ' + escapeHtml(mem.memory_text) + '</div>' +
+           '</div>';
+  }).join('');
+}
+
+// Initialize
+function scrapbook_init() {
+  scrapbook_loadCooldowns();
+  console.log('📖 Scrapbook system initialized');
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// COMMUNITY GOALS SYSTEM - COMPLETE IMPLEMENTATION
+// ════════════════════════════════════════════════════════════════════════════
+
+// Cache for community goals
+var community_cachedGoals = null;
+var community_lastFetch = 0;
+var community_pendingUpdates = {};
+var community_syncInterval = null;
+var community_claimedGoalIds = [];
+
+// Load goals (cached for 5 minutes)
+async function community_loadGoals() {
+  var now = Date.now();
+  if (community_cachedGoals && (now - community_lastFetch) < 300000) {
+    return community_cachedGoals;
+  }
+  var { data, error } = await supabaseClient
+    .from('community_goals')
+    .select('*')
+    .eq('is_active', true)
+    .eq('is_completed', false);
+  if (!error && data) {
+    community_cachedGoals = data;
+    community_lastFetch = now;
+    await community_loadUserClaims();
+    community_refreshUI();
+  }
+  return community_cachedGoals || [];
+}
+
+// Load user's claimed goals
+async function community_loadUserClaims() {
+  if (!window.currentUser) {
+    community_claimedGoalIds = [];
+    return;
+  }
+  var { data, error } = await supabaseClient
+    .from('community_goal_claims')
+    .select('goal_id')
+    .eq('user_id', window.currentUser.id);
+  if (!error && data) {
+    community_claimedGoalIds = data.map(function(c) { return c.goal_id; });
+  }
+}
+
+// Increment goal progress (local, batched)
+function community_increment(goalKey, amount, metadata) {
+  if (!goalKey) return;
+  amount = amount || 1;
+  metadata = metadata || {};
+  community_pendingUpdates[goalKey] = (community_pendingUpdates[goalKey] || 0) + amount;
+  
+  // Update UI immediately
+  community_updateLocalProgress(goalKey, community_pendingUpdates[goalKey]);
+  
+  // Schedule sync (every 10 seconds or after 10 increments)
+  if (!community_syncInterval) {
+    community_syncInterval = setInterval(community_syncToDatabase, 10000);
+  }
+  var totalPending = Object.values(community_pendingUpdates).reduce(function(a,b) { return a+b; }, 0);
+  if (totalPending >= 10) {
+    community_syncToDatabase();
+  }
+}
+
+// Sync pending updates to database
+async function community_syncToDatabase() {
+  if (Object.keys(community_pendingUpdates).length === 0) return;
+  var updates = Object.assign({}, community_pendingUpdates);
+  community_pendingUpdates = {};
+  
+  for (var goalKey in updates) {
+    var increment = updates[goalKey];
+    try {
+      var { error } = await supabaseClient.rpc('increment_goal_progress', {
+        p_goal_key: goalKey,
+        p_amount: increment
+      });
+      if (error) console.error('Sync error:', error);
+    } catch(e) {
+      console.error('RPC error:', e);
+      // Put back for retry
+      community_pendingUpdates[goalKey] = (community_pendingUpdates[goalKey] || 0) + increment;
+    }
+  }
+  community_cachedGoals = null;
+  community_loadGoals();
+}
+
+// Update local progress display
+function community_updateLocalProgress(goalKey, increment) {
+  if (!community_cachedGoals) return;
+  var goal = community_cachedGoals.find(function(g) { return g.goal_key === goalKey; });
+  if (!goal) return;
+  var current = goal.current_progress || 0;
+  var percent = Math.min(100, ((current + increment) / goal.goal_target) * 100);
+  var progressBar = document.querySelector('.com-progress-' + goalKey);
+  var progressText = document.querySelector('.com-text-' + goalKey);
+  if (progressBar) progressBar.style.width = percent + '%';
+  if (progressText) progressText.textContent = (current + increment) + '/' + goal.goal_target;
+}
+
+// Refresh entire UI
+async function community_refreshUI() {
+  var goals = await community_loadGoals();
+  var container = document.getElementById('com-goals-container');
+  if (!container || !goals.length) {
+    if (container) container.innerHTML = '<div class="com-loading">Loading community goals...</div>';
+    return;
+  }
+  
+  container.innerHTML = goals.map(function(goal) {
+    var progress = goal.current_progress || 0;
+    var percent = (progress / goal.goal_target) * 100;
+    var isCompleted = progress >= goal.goal_target;
+    var isClaimed = community_claimedGoalIds.indexOf(goal.id) !== -1;
+    var endsAt = goal.ends_at ? new Date(goal.ends_at).toLocaleDateString() : 'soon';
+    
+    var rewardDisplay = '';
+    if (goal.reward_type === 'points') rewardDisplay = '💰 ' + goal.reward_value + ' PawketPoints';
+    else if (goal.reward_type === 'items') rewardDisplay = '📦 ' + goal.reward_value;
+    else if (goal.reward_type === 'title') rewardDisplay = '🏆 Title: "' + goal.reward_value + '"';
+    else rewardDisplay = '🎁 ' + goal.reward_value;
+    
+    var html = '<div class="com-goal-card">' +
+               '<div class="com-goal-title">' + escapeHtml(goal.title) + '</div>' +
+               '<div class="com-goal-desc">' + escapeHtml(goal.description) + '</div>' +
+               '<div class="com-progress-bar">' +
+               '<div class="com-progress-fill com-progress-' + goal.goal_key + '" style="width: ' + percent + '%"></div>' +
+               '</div>' +
+               '<div class="com-progress-text com-text-' + goal.goal_key + '">' +
+               progress.toLocaleString() + '/' + goal.goal_target.toLocaleString() +
+               '</div>' +
+               '<div class="com-reward">🎁 Reward: ' + rewardDisplay + '</div>' +
+               '<div class="com-time-left">⏰ Ends: ' + endsAt + '</div>';
+    
+    if (isCompleted && !isClaimed) {
+      html += '<button class="com-claim-btn" data-goal-id="' + goal.id + '" data-goal-key="' + goal.goal_key + '">🎁 Claim Reward</button>';
+    } else if (isClaimed) {
+      html += '<div class="com-claimed">✓ Reward Claimed</div>';
+    } else {
+      html += '<div class="com-progress-status">📊 ' + Math.round(percent) + '% complete</div>';
+    }
+    
+    html += '</div>';
+    return html;
+  }).join('');
+  
+  var buttons = document.querySelectorAll('.com-claim-btn');
+  buttons.forEach(function(btn) {
+    btn.removeEventListener('click', community_handleClaim);
+    btn.addEventListener('click', community_handleClaim);
+  });
+}
+
+// Handle reward claim
+async function community_handleClaim(e) {
+  var btn = e.currentTarget;
+  var goalId = parseInt(btn.dataset.goalId);
+  var goalKey = btn.dataset.goalKey;
+  if (!goalId || !window.currentUser) return;
+  
+  if (community_claimedGoalIds.indexOf(goalId) !== -1) {
+    community_showToast('Reward already claimed!', 'warning');
+    return;
+  }
+  
+  var goal = community_cachedGoals && community_cachedGoals.find(function(g) { return g.id === goalId; });
+  if (!goal || goal.current_progress < goal.goal_target) {
+    community_showToast('Goal not completed yet!', 'error');
+    return;
+  }
+  
+  var success = await community_grantReward(goal);
+  if (success) {
+    var { error } = await supabaseClient
+      .from('community_goal_claims')
+      .insert({ goal_id: goalId, user_id: window.currentUser.id });
+    if (!error) {
+      community_claimedGoalIds.push(goalId);
+      community_showToast('🎉 Reward claimed: ' + community_formatRewardText(goal), 'success');
+      community_refreshUI();
+    }
+  }
+}
+
+// Grant reward based on type
+async function community_grantReward(goal) {
+  var reward = goal.reward_value;
+  var type = goal.reward_type;
+  
+  try {
+    if (type === 'points') {
+      var amount = parseInt(reward);
+      if (typeof window.addPawketPoints === 'function') {
+        window.addPawketPoints(amount);
+      } else if (window.currentUser) {
+        window.currentUser.pawketPoints = (window.currentUser.pawketPoints || 0) + amount;
+        if (typeof window.saveUserData === 'function') await window.saveUserData();
+        if (typeof updateAllPoints === 'function') updateAllPoints((window.currentUser.pawketPoints || 0));
+      }
+      return true;
+    }
+    if (type === 'items') {
+      var items = reward.split(',');
+      for (var i = 0; i < items.length; i++) {
+        var parts = items[i].split(':');
+        var itemId = parts[0];
+        var quantity = parseInt(parts[1]) || 1;
+        if (typeof addItemToInventory === 'function') {
+          await addItemToInventory(itemId, quantity);
+        }
+      }
+      return true;
+    }
+    if (type === 'title') {
+      if (typeof unlockTitle === 'function') {
+        await unlockTitle(reward);
+      }
+      return true;
+    }
+    return false;
+  } catch(e) {
+    console.error('Reward grant error:', e);
+    return false;
+  }
+}
+
+// Format reward text for toast
+function community_formatRewardText(goal) {
+  if (goal.reward_type === 'points') return goal.reward_value + ' PawketPoints';
+  if (goal.reward_type === 'items') return goal.reward_value;
+  if (goal.reward_type === 'title') return 'Title: "' + goal.reward_value + '"';
+  return goal.reward_value;
+}
+
+// Show toast notification
+function community_showToast(message, type) {
+  type = type || 'info';
+  if (typeof showToast === 'function') {
+    showToast(message);
+  } else {
+    console.log('[Community] ' + message);
+    var toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#333;color:white;padding:10px 20px;border-radius:8px;z-index:9999;';
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.remove(); }, 3000);
+  }
+}
+
+// Initialize community system
+function community_init() {
+  community_loadGoals();
+  setInterval(function() { community_loadGoals(); }, 300000);
+  window.addEventListener('beforeunload', function() {
+    if (Object.keys(community_pendingUpdates).length > 0) {
+      community_syncToDatabase();
+    }
+  });
+  console.log('🌍 Community Goals system initialized');
 }
 

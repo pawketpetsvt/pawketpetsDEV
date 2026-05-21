@@ -11781,3 +11781,319 @@ body[data-theme="dark"] .modal-content {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SCRAPBOOK STYLES (sb- prefix)
+   ══════════════════════════════════════════════════════════════════════════ */
+.sb-section {
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+}
+
+.sb-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sb-icon {
+  font-size: 20px;
+}
+
+.sb-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sb-memories-container {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.sb-memory-card {
+  padding: 10px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border-left: 3px solid #ff6b35;
+}
+
+.sb-memory-date {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 4px;
+}
+
+.sb-memory-text {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.sb-empty {
+  text-align: center;
+  padding: 20px;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+}
+
+.sb-loading {
+  text-align: center;
+  padding: 20px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   COMMUNITY GOALS STYLES (com- prefix)
+   ══════════════════════════════════════════════════════════════════════════ */
+.com-goals-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+}
+
+.com-goal-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.com-goal-title {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.com-goal-desc {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 15px;
+}
+
+.com-progress-bar {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  height: 20px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.com-progress-fill {
+  background: linear-gradient(90deg, #ff6b35, #ff8c5a);
+  height: 100%;
+  width: 0%;
+  transition: width 0.3s ease;
+  border-radius: 10px;
+}
+
+.com-progress-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 10px;
+}
+
+.com-reward {
+  font-size: 14px;
+  color: #ffd700;
+  margin-bottom: 8px;
+}
+
+.com-time-left {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 15px;
+}
+
+.com-claim-btn {
+  background: #ff6b35;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: transform 0.1s ease;
+}
+
+.com-claim-btn:hover {
+  transform: scale(1.02);
+  background: #ff8c5a;
+}
+
+.com-claimed {
+  color: #4caf50;
+  font-size: 14px;
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+.com-progress-status {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 10px;
+}
+
+.com-loading {
+  text-align: center;
+  padding: 40px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.com-header {
+  text-align: center;
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.com-header h2 {
+  margin: 0 0 8px 0;
+}
+
+.com-header p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   HEADER VERTICAL ALIGNMENT FIX - SIMPLE CSS ONLY
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Fix the header container - force proper alignment */
+.top-bar,
+.header,
+.navbar,
+.navbar-consolidated,
+[class*="top-bar"],
+[class*="header"],
+[class*="navbar"] {
+  display: flex !important;
+  align-items: center !important;  /* Vertical center - KEY FIX */
+  justify-content: space-between !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  overflow: visible !important;
+  min-height: 56px !important;
+  padding: 0 20px !important;
+}
+
+/* Fix ALL children to be vertically centered */
+.top-bar > *,
+.header > *,
+.navbar > *,
+[class*="top-bar"] > *,
+[class*="header"] > *,
+[class*="navbar"] > * {
+  display: inline-flex !important;
+  align-items: center !important;
+  vertical-align: middle !important;
+  margin: 0 4px !important;
+}
+
+/* Fix buttons and clickable items */
+.top-bar button,
+.header button,
+.navbar button,
+[class*="top-bar"] button,
+[class*="header"] button,
+[class*="navbar"] button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: auto !important;
+  min-height: 32px !important;
+  padding: 6px 12px !important;
+  margin: 0 4px !important;
+}
+
+/* Fix the beta warning - keep it on ONE LINE */
+.beta-warning,
+.beta-text-inline,
+.game-warning,
+[class*="beta"],
+[class*="warning"] {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  white-space: nowrap !important;
+  gap: 5px !important;
+}
+
+/* Make beta tag and text side by side, not stacked */
+.beta-tag,
+.beta-tag-inline,
+.beta-badge {
+  display: inline !important;
+  margin-right: 5px !important;
+}
+
+/* Fix any overflowing text */
+.username,
+.pp-counter,
+#nav-user,
+#nav-points,
+.pass-button,
+.bingo-button {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+/* Use the empty space - spread items wider */
+.navbar-user,
+.top-bar-right,
+.header-right {
+  gap: 15px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.navbar-logo,
+.top-bar-left,
+.header-left {
+  gap: 15px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Force inline for notification bell and music controls */
+.notification-bell,
+.music-controls-inline {
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BINGO 4x3 GRID UPDATE
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Override previous 3x3 grid to 4x3 (4 columns, 3 rows) */
+#bingo-grid,
+.bingo-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;  /* 4 columns */
+  gap: 12px !important;
+  padding: 10px !important;
+  width: 100%;
+}
+
+/* Ensure cards fit nicely in 4x3 layout */
+.bingo-card {
+  min-height: 110px !important;  /* Slightly shorter for 4-column layout */
+}
+
+/* Responsive: On small screens, go to 2x6 */
+@media (max-width: 600px) {
+  #bingo-grid,
+  .bingo-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
