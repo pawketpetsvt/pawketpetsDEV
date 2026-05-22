@@ -793,6 +793,9 @@ async function showApp(user) {
   // SCRAPBOOK & COMMUNITY GOALS: Initialize systems
   scrapbook_init();
   community_init();
+  
+  // PHASE 1: Initialize cosmetics, milestones, daily features
+  phase1_init();
 }
 
 function showAuth() {
@@ -19140,3 +19143,793 @@ function community_init() {
   
 })();
 
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 1: PROFILE COSMETICS, PET OF THE DAY, MILESTONES
+// ALL FUNCTIONS PREFIXED WITH phase1_
+// ADDITIVE ONLY - NO MODIFICATIONS TO EXISTING CODE
+// ════════════════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 1: PROFILE COSMETICS, PET OF THE DAY, MILESTONES (FIXED VERSION)
+// ✅ Proper error handling
+// ✅ Visual feedback for all actions
+// ✅ Console logging for debugging
+// ✅ Graceful fallbacks
+// ════════════════════════════════════════════════════════════════════════════
+
+// Global state for Phase 1
+var phase1_state = {
+  unlockedBackgrounds: [],
+  unlockedFrames: [],
+  unlockedBadges: [],
+  milestones: {},
+  petOfTheDay: null,
+  weeklySpotlight: null,
+  isInitialized: false
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function phase1_init() {
+  if (!currentUser) {
+    console.warn('⚠️ Phase 1: No user logged in - skipping initialization');
+    return;
+  }
+  
+  if (phase1_state.isInitialized) {
+    console.log('ℹ️ Phase 1: Already initialized');
+    return;
+  }
+  
+  console.log('📦 Phase 1: Initializing...');
+  
+  try {
+    await phase1_loadUnlockedCosmetics();
+    await phase1_loadPetOfTheDay();
+    await phase1_loadWeeklySpotlight();
+    await phase1_checkAllUnlocks();
+    
+    phase1_state.isInitialized = true;
+    console.log('✅ Phase 1: Initialized successfully');
+  } catch (error) {
+    console.error('❌ Phase 1: Initialization failed:', error);
+    if (typeof showToast === 'function') {
+      showToast('Failed to load some features. Please refresh.', 'error');
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COSMETICS SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Load player's unlocked cosmetics
+async function phase1_loadUnlockedCosmetics() {
+  if (!currentUser) {
+    console.warn('⚠️ Phase 1: Cannot load cosmetics - no user');
+    return;
+  }
+  
+  try {
+    var { data, error } = await supabaseClient
+      .from('unlocked_cosmetics')
+      .select('cosmetic_type, cosmetic_id')
+      .eq('user_id', currentUser.id);
+    
+    if (error) throw error;
+    
+    if (!data) {
+      console.warn('⚠️ Phase 1: No cosmetics data returned');
+      return;
+    }
+    
+    // Group by type
+    phase1_state.unlockedBackgrounds = data
+      .filter(function(c) { return c.cosmetic_type === 'background'; })
+      .map(function(c) { return c.cosmetic_id; });
+    
+    phase1_state.unlockedFrames = data
+      .filter(function(c) { return c.cosmetic_type === 'frame'; })
+      .map(function(c) { return c.cosmetic_id; });
+    
+    phase1_state.unlockedBadges = data
+      .filter(function(c) { return c.cosmetic_type === 'badge'; })
+      .map(function(c) { return c.cosmetic_id; });
+    
+    console.log('✅ Phase 1: Loaded cosmetics - Backgrounds:', phase1_state.unlockedBackgrounds.length, 
+                'Frames:', phase1_state.unlockedFrames.length, 
+                'Badges:', phase1_state.unlockedBadges.length);
+  } catch (error) {
+    console.error('❌ Phase 1: Error loading cosmetics:', error);
+    // Non-critical error - don't show to user
+  }
+}
+
+// Unlock a cosmetic
+async function phase1_unlockCosmetic(type, cosmeticId) {
+  if (!currentUser) {
+    console.warn('⚠️ Phase 1: Cannot unlock cosmetic - no user');
+    return false;
+  }
+  
+  try {
+    // Check if already unlocked
+    var unlocked = phase1_state['unlocked' + type.charAt(0).toUpperCase() + type.slice(1) + 's'];
+    if (unlocked && unlocked.indexOf(cosmeticId) !== -1) {
+      console.log('ℹ️ Phase 1: Cosmetic already unlocked:', type, cosmeticId);
+      return false; // Already unlocked
+    }
+    
+    var { error } = await supabaseClient
+      .from('unlocked_cosmetics')
+      .insert({
+        user_id: currentUser.id,
+        cosmetic_type: type,
+        cosmetic_id: cosmeticId
+      });
+    
+    if (error) throw error;
+    
+    // Update local state
+    await phase1_loadUnlockedCosmetics();
+    
+    // Show notification
+    if (typeof showToast === 'function') {
+      showToast('🎨 New cosmetic unlocked!', 'success');
+    }
+    
+    console.log('✅ Phase 1: Unlocked cosmetic:', type, cosmeticId);
+    return true;
+  } catch (error) {
+    console.error('❌ Phase 1: Error unlocking cosmetic:', error);
+    if (typeof showToast === 'function') {
+      showToast('Failed to unlock cosmetic. Please try again.', 'error');
+    }
+    return false;
+  }
+}
+
+// Apply cosmetic (save to profile)
+async function phase1_applyCosmetic(type, cosmeticId) {
+  if (!currentUser) {
+    console.warn('⚠️ Phase 1: Cannot apply cosmetic - no user');
+    return;
+  }
+  
+  try {
+    var column = 'profile_' + type;
+    var { error } = await supabaseClient
+      .from('players')
+      .update({ [column]: cosmeticId })
+      .eq('id', currentUser.id);
+    
+    if (error) throw error;
+    
+    // Update current user object
+    currentUser['profile_' + type] = cosmeticId;
+    
+    if (typeof showToast === 'function') {
+      showToast('✅ Cosmetic applied!', 'success');
+    }
+    
+    console.log('✅ Phase 1: Applied cosmetic:', type, cosmeticId);
+  } catch (error) {
+    console.error('❌ Phase 1: Error applying cosmetic:', error);
+    if (typeof showToast === 'function') {
+      showToast('Failed to apply cosmetic. Please try again.', 'error');
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PET OF THE DAY
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function phase1_loadPetOfTheDay() {
+  try {
+    var today = new Date().toISOString().split('T')[0];
+    
+    var { data, error } = await supabaseClient
+      .from('daily_featured_pet')
+      .select('*')
+      .eq('date', today)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') {
+      throw error;
+    }
+    
+    if (!data) {
+      console.log('ℹ️ Phase 1: No pet of the day yet - generating...');
+      await phase1_generatePetOfTheDay();
+    } else {
+      phase1_state.petOfTheDay = data;
+      phase1_displayPetOfTheDay();
+      console.log('✅ Phase 1: Loaded pet of the day:', data.pet_name);
+    }
+  } catch (error) {
+    console.error('❌ Phase 1: Error loading pet of the day:', error);
+    // Non-critical - don't show error to user
+  }
+}
+
+async function phase1_generatePetOfTheDay() {
+  try {
+    var today = new Date().toISOString().split('T')[0];
+    
+    // Get random pet from all user_pets
+    var { data: randomPets, error } = await supabaseClient
+      .from('user_pets')
+      .select('id, name, level, user_id, pets(name)')
+      .limit(100)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    if (!randomPets || randomPets.length === 0) {
+      console.warn('⚠️ Phase 1: No pets found for pet of the day');
+      return;
+    }
+    
+    // Pick random from results
+    var selected = randomPets[Math.floor(Math.random() * randomPets.length)];
+    
+    // Get owner username
+    var { data: owner } = await supabaseClient
+      .from('players')
+      .select('username')
+      .eq('id', selected.user_id)
+      .single();
+    
+    // Get a scrapbook memory if available
+    var { data: memory } = await supabaseClient
+      .from('pet_memories')
+      .select('memory_text')
+      .eq('user_pet_id', selected.id)
+      .limit(1)
+      .single();
+    
+    // Save to database
+    var { error: insertError } = await supabaseClient
+      .from('daily_featured_pet')
+      .insert({
+        date: today,
+        user_pet_id: selected.id,
+        pet_name: selected.name || (selected.pets && selected.pets.name) || 'Mystery Pet',
+        owner_username: owner ? owner.username : 'Anonymous',
+        pet_level: selected.level || 1,
+        featured_quote: memory ? memory.memory_text : 'A wonderful companion!'
+      });
+    
+    if (insertError) throw insertError;
+    
+    console.log('✅ Phase 1: Generated pet of the day:', selected.name);
+    await phase1_loadPetOfTheDay(); // Reload
+  } catch (error) {
+    console.error('❌ Phase 1: Error generating pet of the day:', error);
+  }
+}
+
+function phase1_displayPetOfTheDay() {
+  try {
+    var container = document.getElementById('phase1-pet-of-day-container');
+    if (!container) {
+      console.warn('⚠️ Phase 1: Pet of day container not found in DOM');
+      return;
+    }
+    
+    if (!phase1_state.petOfTheDay) {
+      console.warn('⚠️ Phase 1: No pet of the day data to display');
+      return;
+    }
+    
+    var pet = phase1_state.petOfTheDay;
+    
+    container.innerHTML = '<div class="phase1-pet-of-day">' +
+      '<div class="phase1-pet-of-day-header"><h3>🌟 Pet of the Day</h3></div>' +
+      '<div class="phase1-pet-of-day-content">' +
+      '<div class="phase1-pet-of-day-image">🐾</div>' +
+      '<div class="phase1-pet-of-day-info">' +
+      '<div class="phase1-pet-of-day-name">' + escapeHtml(pet.pet_name) + '</div>' +
+      '<div class="phase1-pet-of-day-owner">Owned by ' + escapeHtml(pet.owner_username) + '</div>' +
+      '<div class="phase1-pet-of-day-stats">' +
+      '<span>Level ' + pet.pet_level + '</span>' +
+      '</div>' +
+      '<div class="phase1-pet-of-day-quote">"' + escapeHtml(pet.featured_quote) + '"</div>' +
+      '</div></div></div>';
+    
+    console.log('✅ Phase 1: Displayed pet of the day');
+  } catch (error) {
+    console.error('❌ Phase 1: Error displaying pet of the day:', error);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WEEKLY SPOTLIGHT
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function phase1_loadWeeklySpotlight() {
+  try {
+    var monday = phase1_getMondayDate();
+    
+    var { data, error } = await supabaseClient
+      .from('weekly_spotlight')
+      .select('*')
+      .eq('week_start', monday)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') {
+      throw error;
+    }
+    
+    if (!data) {
+      console.log('ℹ️ Phase 1: No spotlight yet - generating...');
+      await phase1_generateWeeklySpotlight();
+    } else {
+      phase1_state.weeklySpotlight = data;
+      phase1_displayWeeklySpotlight();
+      console.log('✅ Phase 1: Loaded weekly spotlight');
+    }
+  } catch (error) {
+    console.error('❌ Phase 1: Error loading spotlight:', error);
+  }
+}
+
+async function phase1_generateWeeklySpotlight() {
+  try {
+    var monday = phase1_getMondayDate();
+    
+    // Get random active player
+    var { data: players, error } = await supabaseClient
+      .from('players')
+      .select('id, username')
+      .limit(50);
+    
+    if (error) throw error;
+    
+    if (!players || players.length === 0) {
+      console.warn('⚠️ Phase 1: No players found for spotlight');
+      return;
+    }
+    
+    var selected = players[Math.floor(Math.random() * players.length)];
+    
+    var { error: insertError } = await supabaseClient
+      .from('weekly_spotlight')
+      .insert({
+        week_start: monday,
+        spotlight_type: 'player',
+        spotlight_data: {
+          username: selected.username,
+          user_id: selected.id
+        }
+      });
+    
+    if (insertError) throw insertError;
+    
+    console.log('✅ Phase 1: Generated weekly spotlight');
+    await phase1_loadWeeklySpotlight();
+  } catch (error) {
+    console.error('❌ Phase 1: Error generating spotlight:', error);
+  }
+}
+
+function phase1_displayWeeklySpotlight() {
+  try {
+    var container = document.getElementById('phase1-spotlight-container');
+    if (!container) {
+      console.warn('⚠️ Phase 1: Spotlight container not found in DOM');
+      return;
+    }
+    
+    if (!phase1_state.weeklySpotlight) {
+      console.warn('⚠️ Phase 1: No spotlight data to display');
+      return;
+    }
+    
+    var spotlight = phase1_state.weeklySpotlight;
+    var data = spotlight.spotlight_data;
+    
+    container.innerHTML = '<div class="phase1-spotlight">' +
+      '<div class="phase1-spotlight-header"><h3>⭐ Weekly Spotlight</h3></div>' +
+      '<div class="phase1-spotlight-content">' +
+      '<div class="phase1-spotlight-name">' + escapeHtml(data.username) + '</div>' +
+      '<div class="phase1-spotlight-details">Featured Player of the Week!</div>' +
+      '</div></div>';
+    
+    console.log('✅ Phase 1: Displayed weekly spotlight');
+  } catch (error) {
+    console.error('❌ Phase 1: Error displaying spotlight:', error);
+  }
+}
+
+function phase1_getMondayDate() {
+  var now = new Date();
+  var day = now.getDay();
+  var diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  var monday = new Date(now.setDate(diff));
+  return monday.toISOString().split('T')[0];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MILESTONE SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function phase1_checkMilestone(milestoneType, currentValue) {
+  if (!currentUser) {
+    console.warn('⚠️ Phase 1: Cannot check milestone - no user');
+    return;
+  }
+  
+  try {
+    // Check if already achieved
+    var { data: existing } = await supabaseClient
+      .from('player_milestones')
+      .select('milestone_type, notified')
+      .eq('user_id', currentUser.id)
+      .eq('milestone_type', milestoneType)
+      .single();
+    
+    if (existing) {
+      console.log('ℹ️ Phase 1: Milestone already achieved:', milestoneType);
+      return; // Already achieved
+    }
+    
+    // Save milestone
+    var { error } = await supabaseClient
+      .from('player_milestones')
+      .insert({
+        user_id: currentUser.id,
+        milestone_type: milestoneType,
+        milestone_value: { value: currentValue },
+        notified: true
+      });
+    
+    if (error) throw error;
+    
+    console.log('✅ Phase 1: Milestone achieved:', milestoneType);
+    
+    // Trigger celebration
+    phase1_celebrateMilestone(milestoneType, currentValue);
+    
+    // Auto-unlock related cosmetics
+    await phase1_unlockMilestoneRewards(milestoneType);
+  } catch (error) {
+    console.error('❌ Phase 1: Error checking milestone:', error);
+    // Non-critical - don't show error to user
+  }
+}
+
+function phase1_celebrateMilestone(milestoneType, value) {
+  try {
+    var celebrations = {
+      'battle_10': { icon: '⚔️', title: 'Fighter!', text: 'Won 10 battles!' },
+      'battle_100': { icon: '🏆', title: 'Veteran!', text: 'Won 100 battles!' },
+      'battle_500': { icon: '👑', title: 'Champion!', text: 'Won 500 battles!' },
+      'streak_7': { icon: '📅', title: 'Regular!', text: '7-day login streak!' },
+      'streak_30': { icon: '💎', title: 'Dedicated!', text: '30-day login streak!' },
+      'streak_100': { icon: '⭐', title: 'Devoted!', text: '100-day login streak!' },
+      'level_20': { icon: '🌠', title: 'Rising Star!', text: 'Reached level 20!' },
+      'level_50': { icon: '✨', title: 'Legend!', text: 'Reached level 50!' },
+      'pets_5': { icon: '🐾', title: 'Collector!', text: 'Adopted 5 pets!' },
+      'pets_10': { icon: '🦊', title: 'Breeder!', text: 'Adopted 10 pets!' },
+      'pets_20': { icon: '🐉', title: 'Pet Master!', text: 'Adopted 20 pets!' }
+    };
+    
+    var celebration = celebrations[milestoneType];
+    if (!celebration) {
+      console.warn('⚠️ Phase 1: No celebration defined for:', milestoneType);
+      return;
+    }
+    
+    var overlay = document.createElement('div');
+    overlay.className = 'phase1-celebration-overlay';
+    overlay.innerHTML = '<div class="phase1-celebration-card">' +
+      '<div class="phase1-celebration-icon">' + celebration.icon + '</div>' +
+      '<div class="phase1-celebration-title">' + celebration.title + '</div>' +
+      '<div class="phase1-celebration-text">' + celebration.text + '</div>' +
+      '</div>';
+    
+    document.body.appendChild(overlay);
+    
+    // Confetti effect if available
+    if (typeof createConfettiBurst === 'function') {
+      try {
+        createConfettiBurst(window.innerWidth / 2, window.innerHeight / 2);
+      } catch (e) {
+        console.warn('⚠️ Phase 1: Confetti failed:', e);
+      }
+    }
+    
+    // Remove after animation
+    setTimeout(function() {
+      overlay.remove();
+    }, 4000);
+    
+    // Play sound if available
+    if (typeof playSound === 'function') {
+      try {
+        playSound('success');
+      } catch (e) {
+        console.warn('⚠️ Phase 1: Sound failed:', e);
+      }
+    }
+    
+    // Also show toast notification as fallback
+    if (typeof showToast === 'function') {
+      showToast(celebration.icon + ' ' + celebration.title, 'success');
+    }
+    
+    console.log('✅ Phase 1: Celebrated milestone:', milestoneType);
+  } catch (error) {
+    console.error('❌ Phase 1: Error celebrating milestone:', error);
+    // Fallback: just show toast
+    if (typeof showToast === 'function') {
+      showToast('🎉 Milestone achieved!', 'success');
+    }
+  }
+}
+
+async function phase1_unlockMilestoneRewards(milestoneType) {
+  try {
+    var rewards = {
+      'level_10': [{ type: 'background', id: 'bg_forest' }, { type: 'frame', id: 'frame_silver' }],
+      'level_20': [{ type: 'frame', id: 'frame_gold' }, { type: 'badge', id: 'badge_level_20' }],
+      'level_25': [{ type: 'background', id: 'bg_clouds' }],
+      'level_50': [{ type: 'background', id: 'bg_legendary' }, { type: 'frame', id: 'frame_legendary' }, { type: 'badge', id: 'badge_level_50' }],
+      'battle_50': [{ type: 'background', id: 'bg_castle' }],
+      'battle_100': [{ type: 'background', id: 'bg_desert' }, { type: 'frame', id: 'frame_fire' }, { type: 'badge', id: 'badge_100_battles' }],
+      'battle_500': [{ type: 'badge', id: 'badge_500_battles' }],
+      'streak_30': [{ type: 'background', id: 'bg_stars' }, { type: 'frame', id: 'frame_ice' }, { type: 'badge', id: 'badge_30_days' }],
+      'streak_100': [{ type: 'badge', id: 'badge_100_days' }],
+      'pets_5': [{ type: 'badge', id: 'badge_pet_5' }],
+      'pets_10': [{ type: 'badge', id: 'badge_pet_10' }],
+      'pets_20': [{ type: 'background', id: 'bg_underwater' }, { type: 'badge', id: 'badge_pet_20' }],
+      'treats_50': [{ type: 'badge', id: 'badge_treats_50' }],
+      'treats_100': [{ type: 'background', id: 'bg_garden' }, { type: 'badge', id: 'badge_treats_100' }],
+      'boss_10': [{ type: 'background', id: 'bg_volcano' }, { type: 'badge', id: 'badge_boss_10' }]
+    };
+    
+    var rewardList = rewards[milestoneType];
+    if (!rewardList) {
+      console.log('ℹ️ Phase 1: No rewards for milestone:', milestoneType);
+      return;
+    }
+    
+    for (var i = 0; i < rewardList.length; i++) {
+      var reward = rewardList[i];
+      await phase1_unlockCosmetic(reward.type, reward.id);
+    }
+    
+    console.log('✅ Phase 1: Unlocked', rewardList.length, 'rewards for', milestoneType);
+  } catch (error) {
+    console.error('❌ Phase 1: Error unlocking milestone rewards:', error);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTO-CHECK UNLOCKS (on init)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function phase1_checkAllUnlocks() {
+  if (!currentUser) return;
+  
+  try {
+    console.log('🔍 Phase 1: Checking all milestone unlocks...');
+    
+    // Get player stats from existing data
+    var totalBattles = currentUser.total_battles || 0;
+    var loginStreak = currentUser.login_streak || 0;
+    var playerLevel = currentUser.level || 1;
+    
+    // Count pets
+    var totalPets = 0;
+    if (window.petState) {
+      totalPets = Object.keys(window.petState).length;
+    }
+    
+    // Check battle milestones
+    if (totalBattles >= 10) await phase1_checkMilestone('battle_10', totalBattles);
+    if (totalBattles >= 50) await phase1_checkMilestone('battle_50', totalBattles);
+    if (totalBattles >= 100) await phase1_checkMilestone('battle_100', totalBattles);
+    if (totalBattles >= 500) await phase1_checkMilestone('battle_500', totalBattles);
+    
+    // Check streak milestones
+    if (loginStreak >= 7) await phase1_checkMilestone('streak_7', loginStreak);
+    if (loginStreak >= 30) await phase1_checkMilestone('streak_30', loginStreak);
+    if (loginStreak >= 100) await phase1_checkMilestone('streak_100', loginStreak);
+    
+    // Check level milestones
+    if (playerLevel >= 10) await phase1_checkMilestone('level_10', playerLevel);
+    if (playerLevel >= 20) await phase1_checkMilestone('level_20', playerLevel);
+    if (playerLevel >= 25) await phase1_checkMilestone('level_25', playerLevel);
+    if (playerLevel >= 50) await phase1_checkMilestone('level_50', playerLevel);
+    
+    // Check pet collection milestones
+    if (totalPets >= 5) await phase1_checkMilestone('pets_5', totalPets);
+    if (totalPets >= 10) await phase1_checkMilestone('pets_10', totalPets);
+    if (totalPets >= 20) await phase1_checkMilestone('pets_20', totalPets);
+    
+    console.log('✅ Phase 1: Milestone check complete');
+  } catch (error) {
+    console.error('❌ Phase 1: Error checking unlocks:', error);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HOOK FUNCTIONS (Called from existing code)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Called after battle win
+async function phase1_onBattleWin() {
+  if (!currentUser) return;
+  
+  try {
+    var totalBattles = currentUser.total_battles || 0;
+    if (totalBattles === 10) await phase1_checkMilestone('battle_10', totalBattles);
+    if (totalBattles === 50) await phase1_checkMilestone('battle_50', totalBattles);
+    if (totalBattles === 100) await phase1_checkMilestone('battle_100', totalBattles);
+    if (totalBattles === 500) await phase1_checkMilestone('battle_500', totalBattles);
+  } catch (error) {
+    console.error('❌ Phase 1: Battle hook error:', error);
+  }
+}
+
+// Called after login
+async function phase1_onLogin() {
+  if (!currentUser) return;
+  
+  try {
+    var loginStreak = currentUser.login_streak || 0;
+    if (loginStreak === 7) await phase1_checkMilestone('streak_7', loginStreak);
+    if (loginStreak === 30) await phase1_checkMilestone('streak_30', loginStreak);
+    if (loginStreak === 100) await phase1_checkMilestone('streak_100', loginStreak);
+  } catch (error) {
+    console.error('❌ Phase 1: Login hook error:', error);
+  }
+}
+
+// Called after pet adoption
+async function phase1_onPetAdopt() {
+  if (!currentUser || !window.petState) return;
+  
+  try {
+    var totalPets = Object.keys(window.petState).length;
+    if (totalPets === 5) await phase1_checkMilestone('pets_5', totalPets);
+    if (totalPets === 10) await phase1_checkMilestone('pets_10', totalPets);
+    if (totalPets === 20) await phase1_checkMilestone('pets_20', totalPets);
+  } catch (error) {
+    console.error('❌ Phase 1: Adoption hook error:', error);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VERIFICATION & TEST FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Test function - Run in console to verify Phase 1
+async function test_phase1() {
+  console.log('🧪 Testing Phase 1 features...');
+  
+  var passed = 0;
+  var failed = 0;
+  
+  // Test 1: Check all new functions exist
+  var requiredFunctions = [
+    'phase1_init',
+    'phase1_loadUnlockedCosmetics',
+    'phase1_unlockCosmetic',
+    'phase1_applyCosmetic',
+    'phase1_loadPetOfTheDay',
+    'phase1_displayPetOfTheDay',
+    'phase1_loadWeeklySpotlight',
+    'phase1_displayWeeklySpotlight',
+    'phase1_checkMilestone',
+    'phase1_celebrateMilestone',
+    'phase1_checkAllUnlocks',
+    'phase1_onBattleWin',
+    'phase1_onLogin',
+    'phase1_onPetAdopt'
+  ];
+  
+  for (var i = 0; i < requiredFunctions.length; i++) {
+    var fn = requiredFunctions[i];
+    if (typeof window[fn] === 'function') {
+      console.log('✅', fn, 'exists');
+      passed++;
+    } else {
+      console.error('❌', fn, 'missing');
+      failed++;
+    }
+  }
+  
+  // Test 2: Check new UI elements (if added)
+  var requiredElements = [
+    'phase1-pet-of-day-container',
+    'phase1-spotlight-container'
+  ];
+  
+  for (var i = 0; i < requiredElements.length; i++) {
+    var el = requiredElements[i];
+    if (document.getElementById(el)) {
+      console.log('✅', el, 'exists in DOM');
+      passed++;
+    } else {
+      console.warn('⚠️', el, 'missing from DOM (may not be added yet)');
+    }
+  }
+  
+  // Test 3: Check state
+  if (phase1_state) {
+    console.log('✅ phase1_state exists');
+    console.log('   isInitialized:', phase1_state.isInitialized);
+    console.log('   unlockedBackgrounds:', phase1_state.unlockedBackgrounds.length);
+    console.log('   unlockedFrames:', phase1_state.unlockedFrames.length);
+    console.log('   unlockedBadges:', phase1_state.unlockedBadges.length);
+    passed++;
+  } else {
+    console.error('❌ phase1_state missing');
+    failed++;
+  }
+  
+  // Test 4: Check if initialized
+  if (phase1_state && phase1_state.isInitialized) {
+    console.log('✅ Phase 1 is initialized');
+    passed++;
+  } else {
+    console.warn('⚠️ Phase 1 not initialized yet (run phase1_init())');
+  }
+  
+  console.log('\n📈 Results:', passed, 'passed,', failed, 'failed');
+  
+  if (failed === 0) {
+    console.log('🎉 Phase 1 verification PASSED!');
+  } else {
+    console.log('⚠️ Phase 1 needs fixes - check errors above');
+  }
+  
+  console.log('\n📊 Manual checks needed:');
+  console.log('1. Run this in Supabase SQL Editor: SELECT * FROM daily_featured_pet;');
+  console.log('2. Run this in Supabase SQL Editor: SELECT * FROM unlocked_cosmetics WHERE user_id = \'', currentUser ? currentUser.id : 'YOUR_USER_ID', '\';');
+  console.log('3. Check browser console for "✅ Phase 1: Initialized successfully"');
+  console.log('4. Win 10 battles and watch for celebration popup');
+}
+
+// Quick test for milestone celebrations
+async function test_phase1_milestone() {
+  console.log('🧪 Testing milestone celebration...');
+  
+  if (!currentUser) {
+    console.error('❌ No user logged in');
+    return;
+  }
+  
+  // Force a celebration
+  phase1_celebrateMilestone('battle_10', 10);
+  
+  console.log('✅ Check if celebration popup appeared');
+  console.log('   (It should fade out after 4 seconds)');
+}
+
+// Quick test for cosmetics unlock
+async function test_phase1_cosmetic() {
+  console.log('🧪 Testing cosmetic unlock...');
+  
+  if (!currentUser) {
+    console.error('❌ No user logged in');
+    return;
+  }
+  
+  // Try to unlock forest background
+  var result = await phase1_unlockCosmetic('background', 'bg_forest');
+  
+  if (result) {
+    console.log('✅ Cosmetic unlocked successfully');
+    console.log('   Check if toast notification appeared');
+  } else {
+    console.log('ℹ️ Cosmetic was already unlocked or failed');
+  }
+}

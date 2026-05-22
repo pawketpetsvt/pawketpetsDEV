@@ -12234,3 +12234,396 @@ body[data-theme="dark"] .modal-content {
   }
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PHASE 1: PROFILE COSMETICS, PET OF THE DAY, MILESTONES
+   ALL CLASSES PREFIXED WITH phase1-
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ========== COSMETICS SECTION (Profile/Settings Page) ========== */
+.phase1-cosmetics-section {
+  margin-top: 20px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.phase1-cosmetics-section h3 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  color: var(--purple, #9966ff);
+}
+
+.phase1-cosmetics-group {
+  margin-bottom: 20px;
+}
+
+.phase1-cosmetics-group label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.phase1-background-selector,
+.phase1-frame-selector,
+.phase1-badge-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.phase1-cosmetic-option {
+  cursor: pointer;
+  padding: 10px 15px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  font-size: 13px;
+  min-width: 120px;
+  text-align: center;
+}
+
+.phase1-cosmetic-option:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.phase1-cosmetic-option.selected {
+  background: rgba(255, 107, 53, 0.3);
+  border-color: #ff6b35;
+  font-weight: bold;
+}
+
+.phase1-cosmetic-option.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+  position: relative;
+}
+
+.phase1-cosmetic-option.locked::after {
+  content: '🔒';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  font-size: 12px;
+}
+
+.phase1-cosmetic-icon {
+  font-size: 24px;
+  margin-bottom: 5px;
+}
+
+.phase1-cosmetic-name {
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.phase1-cosmetic-unlock {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ========== PET OF THE DAY CARD (Homepage) ========== */
+.phase1-pet-of-day {
+  background: linear-gradient(135deg, rgba(153, 102, 255, 0.2), rgba(255, 107, 53, 0.2));
+  border: 2px solid rgba(153, 102, 255, 0.3);
+  border-radius: 16px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.phase1-pet-of-day-header {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.phase1-pet-of-day-header h3 {
+  margin: 0;
+  font-size: 20px;
+  color: var(--purple, #9966ff);
+}
+
+.phase1-pet-of-day-content {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.phase1-pet-of-day-image {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 3px solid #ff6b35;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 60px;
+  flex-shrink: 0;
+}
+
+.phase1-pet-of-day-info {
+  flex: 1;
+}
+
+.phase1-pet-of-day-name {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.phase1-pet-of-day-owner {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 10px;
+}
+
+.phase1-pet-of-day-stats {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.phase1-pet-of-day-quote {
+  font-style: italic;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border-left: 3px solid #ff6b35;
+  margin-top: 10px;
+}
+
+/* ========== WEEKLY SPOTLIGHT CARD (Homepage) ========== */
+.phase1-spotlight {
+  background: linear-gradient(135deg, rgba(255, 204, 0, 0.2), rgba(255, 107, 53, 0.2));
+  border: 2px solid rgba(255, 204, 0, 0.3);
+  border-radius: 16px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.phase1-spotlight-header {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.phase1-spotlight-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #ffcc00;
+}
+
+.phase1-spotlight-content {
+  text-align: center;
+}
+
+.phase1-spotlight-name {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.phase1-spotlight-details {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ========== MILESTONE CELEBRATION OVERLAY ========== */
+.phase1-celebration-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 20000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: phase1-fadeOut 4s forwards;
+  pointer-events: none;
+}
+
+.phase1-celebration-card {
+  background: linear-gradient(135deg, #9966ff, #ff6b35);
+  padding: 40px;
+  border-radius: 20px;
+  text-align: center;
+  max-width: 500px;
+  animation: phase1-bounce 0.6s ease-out;
+}
+
+.phase1-celebration-icon {
+  font-size: 80px;
+  margin-bottom: 20px;
+  animation: phase1-spin 1s ease-in-out;
+}
+
+.phase1-celebration-title {
+  font-size: 32px;
+  font-weight: bold;
+  color: white;
+  margin-bottom: 10px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.phase1-celebration-text {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+@keyframes phase1-fadeOut {
+  0% { opacity: 1; visibility: visible; }
+  80% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
+
+@keyframes phase1-bounce {
+  0% { transform: scale(0.3); opacity: 0; }
+  50% { transform: scale(1.05); }
+  70% { transform: scale(0.9); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes phase1-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ========== PROFILE BACKGROUNDS (Applied to profile section) ========== */
+.phase1-bg-default {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.phase1-bg-forest {
+  background: linear-gradient(135deg, #134e5e 0%, #71b280 100%);
+}
+
+.phase1-bg-castle {
+  background: linear-gradient(135deg, #3c3b3f 0%, #605c3c 100%);
+}
+
+.phase1-bg-stars {
+  background: linear-gradient(135deg, #000428 0%, #004e92 100%);
+}
+
+.phase1-bg-volcano {
+  background: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);
+}
+
+.phase1-bg-underwater {
+  background: linear-gradient(135deg, #0052d4 0%, #65c7f7 100%);
+}
+
+.phase1-bg-clouds {
+  background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+}
+
+.phase1-bg-desert {
+  background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
+}
+
+.phase1-bg-garden {
+  background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+}
+
+.phase1-bg-legendary {
+  background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+}
+
+/* ========== PROFILE FRAMES (Border overlays) ========== */
+.phase1-frame-none {
+  border: none !important;
+}
+
+.phase1-frame-basic {
+  border: 3px solid rgba(255, 255, 255, 0.3) !important;
+}
+
+.phase1-frame-silver {
+  border: 4px solid #c0c0c0 !important;
+  box-shadow: 0 0 10px rgba(192, 192, 192, 0.5);
+}
+
+.phase1-frame-gold {
+  border: 4px solid #ffd700 !important;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+}
+
+.phase1-frame-rainbow {
+  border: 4px solid transparent !important;
+  background-image: linear-gradient(white, white), 
+                    linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet, red);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  animation: phase1-rainbow-spin 3s linear infinite;
+}
+
+@keyframes phase1-rainbow-spin {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+
+.phase1-frame-fire {
+  border: 4px solid #ff4500 !important;
+  box-shadow: 0 0 20px rgba(255, 69, 0, 0.8);
+  animation: phase1-fire-glow 2s ease-in-out infinite;
+}
+
+@keyframes phase1-fire-glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(255, 69, 0, 0.5); }
+  50% { box-shadow: 0 0 25px rgba(255, 69, 0, 1); }
+}
+
+.phase1-frame-ice {
+  border: 4px solid #00ffff !important;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+}
+
+.phase1-frame-legendary {
+  border: 5px solid #ffd700 !important;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.8), 
+              inset 0 0 20px rgba(255, 215, 0, 0.3);
+  animation: phase1-legendary-pulse 2s ease-in-out infinite;
+}
+
+@keyframes phase1-legendary-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+/* ========== RESPONSIVE (Mobile) ========== */
+@media (max-width: 768px) {
+  .phase1-pet-of-day-content {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .phase1-pet-of-day-image {
+    margin: 0 auto;
+  }
+  
+  .phase1-cosmetic-option {
+    min-width: 100px;
+    font-size: 12px;
+  }
+  
+  .phase1-celebration-card {
+    padding: 30px 20px;
+    max-width: 90%;
+  }
+  
+  .phase1-celebration-icon {
+    font-size: 60px;
+  }
+  
+  .phase1-celebration-title {
+    font-size: 24px;
+  }
+}
+
