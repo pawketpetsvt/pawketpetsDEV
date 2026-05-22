@@ -12627,3 +12627,111 @@ body[data-theme="dark"] .modal-content {
   }
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════════
+   HEADER LAYOUT FIX - SPREAD ITEMS, NO OVERLAP (DESKTOP ONLY)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Desktop only - min-width 769px to avoid affecting mobile */
+@media (min-width: 769px) {
+  
+  /* Main header container - flexbox with space-between */
+  .top-bar,
+  .header,
+  .navbar-consolidated,
+  [class*="top-bar"],
+  [class*="header-main"] {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+    padding: 0 20px !important;
+    gap: 20px !important;
+  }
+  
+  /* Left section - flex start */
+  .top-bar-left,
+  .header-left,
+  .navbar-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 15px !important;
+    flex-shrink: 0 !important;
+  }
+  
+  /* Center section - can grow/shrink */
+  .top-bar-center,
+  .header-center,
+  .navbar-center {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex-shrink: 1 !important;
+    flex-grow: 0 !important;
+    justify-content: center !important;
+  }
+  
+  /* Right section - flex end, pushed to right */
+  .top-bar-right,
+  .header-right,
+  .navbar-right {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    flex-shrink: 0 !important;
+    margin-left: auto !important; /* Push to right edge */
+  }
+  
+  /* Prevent button overlap */
+  .top-bar button,
+  .header button,
+  .top-bar a,
+  .header a {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    margin: 0 !important;
+  }
+  
+  /* Fix specific elements that might overlap */
+  .report-issues,
+  .notification-icon,
+  .music-player,
+  .pass-button,
+  .bingo-button {
+    flex-shrink: 0 !important;
+    margin: 0 4px !important;
+    padding: 6px 12px !important;
+  }
+  
+  /* Username and points - no wrapping */
+  .username,
+  .pp-counter,
+  .profile-level {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+  }
+  
+  /* Beta tag - keep in left */
+  .beta,
+  [class*="beta"] {
+    flex-shrink: 0 !important;
+  }
+  
+  /* Logo - keep in left */
+  .logo,
+  [class*="logo"] {
+    flex-shrink: 0 !important;
+    margin-right: 10px !important;
+  }
+}
+
+/* Mobile - keep existing layout (DO NOT CHANGE) */
+@media (max-width: 768px) {
+  /* Mobile already has hamburger menu adjustments from previous fix */
+  /* Keep padding-left: 60px for hamburger button space */
+  .top-bar,
+  .header {
+    padding-left: 60px !important;
+  }
+}
+

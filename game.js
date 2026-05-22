@@ -19186,6 +19186,33 @@ async function phase1_init() {
   
   console.log('📦 Phase 1: Initializing...');
   
+  // DEBUG: Check table accessibility
+  console.log('🔍 Phase 1 Debug: Checking database tables...');
+  var tables = ['daily_featured_pet', 'unlocked_cosmetics', 'weekly_spotlight', 'player_milestones'];
+  for (var i = 0; i < tables.length; i++) {
+    var table = tables[i];
+    try {
+      var { error } = await supabaseClient.from(table).select('*').limit(1);
+      if (error) {
+        console.error('❌ Phase 1: Table', table, 'error:', error.message);
+      } else {
+        console.log('✅ Phase 1: Table', table, 'accessible');
+      }
+    } catch (e) {
+      console.error('❌ Phase 1: Table', table, 'check failed:', e);
+    }
+  }
+  
+  // DEBUG: Check user_pets schema
+  try {
+    var { data: samplePet } = await supabaseClient.from('user_pets').select('*').limit(1).single();
+    if (samplePet) {
+      console.log('📊 Phase 1 Debug: user_pets columns:', Object.keys(samplePet));
+    }
+  } catch (e) {
+    console.log('📊 Phase 1 Debug: Could not sample user_pets (may be empty)');
+  }
+  
   try {
     await phase1_loadUnlockedCosmetics();
     await phase1_loadPetOfTheDay();
@@ -19361,9 +19388,10 @@ async function phase1_generatePetOfTheDay() {
     var today = new Date().toISOString().split('T')[0];
     
     // Get random pet from all user_pets
+    // FIXED: user_pets has 'nickname' not 'name'
     var { data: randomPets, error } = await supabaseClient
       .from('user_pets')
-      .select('id, name, level, user_id, pets(name)')
+      .select('id, level, user_id, nickname, pets(name)')
       .limit(100)
       .order('created_at', { ascending: false });
     
@@ -19392,16 +19420,18 @@ async function phase1_generatePetOfTheDay() {
       .limit(1)
       .single();
     
-    // Save to database
+    // Save to database - FIXED: Use UPSERT to handle conflicts
     var { error: insertError } = await supabaseClient
       .from('daily_featured_pet')
-      .insert({
+      .upsert({
         date: today,
         user_pet_id: selected.id,
-        pet_name: selected.name || (selected.pets && selected.pets.name) || 'Mystery Pet',
+        pet_name: selected.nickname || (selected.pets && selected.pets.name) || 'Mystery Pet',
         owner_username: owner ? owner.username : 'Anonymous',
         pet_level: selected.level || 1,
         featured_quote: memory ? memory.memory_text : 'A wonderful companion!'
+      }, {
+        onConflict: 'date'
       });
     
     if (insertError) throw insertError;
@@ -19497,15 +19527,18 @@ async function phase1_generateWeeklySpotlight() {
     
     var selected = players[Math.floor(Math.random() * players.length)];
     
+    // FIXED: Use UPSERT to handle conflicts
     var { error: insertError } = await supabaseClient
       .from('weekly_spotlight')
-      .insert({
+      .upsert({
         week_start: monday,
         spotlight_type: 'player',
         spotlight_data: {
           username: selected.username,
           user_id: selected.id
         }
+      }, {
+        onConflict: 'week_start'
       });
     
     if (insertError) throw insertError;
