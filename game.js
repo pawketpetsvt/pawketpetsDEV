@@ -796,6 +796,9 @@ async function showApp(user) {
   
   // PHASE 1: Initialize cosmetics, milestones, daily features
   phase1_init();
+  
+  // CLEANUP: Remove expired localStorage items
+  cleanupExpiredLocalStorage();
 }
 
 function showAuth() {
@@ -5665,11 +5668,6 @@ async function loadLeaderboard(type) {
   }
 }
 
-function escapeHtml(text) {
-  var div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
 
 // Load points leaderboard when tab is opened
 tabsLoaded.leaderboard = function() {
@@ -14014,11 +14012,6 @@ function getTimeAgo(timestamp) {
 /**
  * Escape HTML to prevent XSS
  */
-function escapeHtml(text) {
-  var div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
 
 
 // ══════════════════════════════════════════════════════════════
@@ -18682,11 +18675,6 @@ function scrapbook_formatDate(dateString) {
 }
 
 // Escape HTML
-function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/[&<>]/g, function(m) {
-    if (m === '&') return '&amp;';
-    if (m === '<') return '&lt;';
     if (m === '>') return '&gt;';
     return m;
   });
@@ -19966,3 +19954,47 @@ async function test_phase1_cosmetic() {
     console.log('ℹ️ Cosmetic was already unlocked or failed');
   }
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// CLEANUP: Remove expired localStorage items
+// ════════════════════════════════════════════════════════════════════════════
+
+function cleanupExpiredLocalStorage() {
+  var today = new Date().toISOString().split('T')[0];
+  var keysToRemove = [];
+  
+  for (var i = 0; i < localStorage.length; i++) {
+    var key = localStorage.key(i);
+    // Remove old daily entries
+    if (key && (key.includes('daily_') || key.includes('bingo_')) && !key.includes(today)) {
+      keysToRemove.push(key);
+    }
+    // Remove old feed/play daily limits (older than today)
+    if (key && (key.includes('feed_') || key.includes('play_')) && !key.includes(today)) {
+      keysToRemove.push(key);
+    }
+  }
+  
+  keysToRemove.forEach(function(key) {
+    localStorage.removeItem(key);
+  });
+  
+  if (keysToRemove.length > 0) {
+    console.log('🧹 Cleaned up', keysToRemove.length, 'expired localStorage items');
+  }
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// MOBILE MENU: Close function
+// ════════════════════════════════════════════════════════════════════════════
+
+function closeMobileMenu() {
+  var menu = document.getElementById('mobile-nav-menu');
+  var overlay = document.querySelector('.mobile-nav-overlay');
+  if (menu) menu.classList.remove('open');
+  if (overlay) overlay.classList.remove('show');
+  document.body.style.overflow = '';
+  console.log('📱 Mobile menu closed');
+}
+
