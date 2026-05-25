@@ -797,6 +797,9 @@ async function showApp(user) {
   // PHASE 1: Initialize cosmetics, milestones, daily features
   phase1_init();
   
+  // SKIN KEYS: Initialize variant system
+  skinkey_init();
+  
   // CLEANUP: Remove expired localStorage items
   cleanupExpiredLocalStorage();
 }
@@ -19785,3 +19788,268 @@ function closeMobileMenu() {
   console.log('📱 Mobile menu closed');
 }
 
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// SKIN KEY SYSTEM - VARIANT UNLOCKING
+// ════════════════════════════════════════════════════════════════════════════
+
+var BASIC_VARIANTS = {
+  golden: { name: 'Golden', description: 'Shimmering gold aura', cssClass: 'pet-variant-golden', icon: '✨', cost: 1 },
+  shiny: { name: 'Shiny', description: 'Rainbow sparkle effect', cssClass: 'pet-variant-shiny', icon: '🌈', cost: 1 },
+  cosmic: { name: 'Cosmic', description: 'Mystical space energy', cssClass: 'pet-variant-cosmic', icon: '🌌', cost: 1 },
+  shadow: { name: 'Shadow', description: 'Dark mysterious aura', cssClass: 'pet-variant-shadow', icon: '🌑', cost: 1 },
+  fire: { name: 'Fire', description: 'Burning flames', cssClass: 'pet-variant-fire', icon: '🔥', cost: 1 },
+  ice: { name: 'Ice', description: 'Frozen crystals', cssClass: 'pet-variant-ice', icon: '❄️', cost: 1 },
+  electric: { name: 'Electric', description: 'Crackling lightning', cssClass: 'pet-variant-electric', icon: '⚡', cost: 1 },
+  nature: { name: 'Nature', description: 'Living plants', cssClass: 'pet-variant-nature', icon: '🌿', cost: 1 },
+  crystal: { name: 'Crystal', description: 'Prismatic gems', cssClass: 'pet-variant-crystal', icon: '💎', cost: 1 },
+  ghost: { name: 'Ghost', description: 'Ethereal spirit', cssClass: 'pet-variant-ghost', icon: '👻', cost: 1 }
+};
+
+var SPECIAL_VARIANTS = ['emi', 'numi', 'tob', 'shondo', 'merry', 'vienna', 'lily', 'sleepy', 'cottontail', 'yuno', 'susu', 'sinder', 'snuffy', 'bat', 'zen', 'bao'];
+
+var skinKeyState = {
+  keys: 0,
+  unlockedVariants: {},
+  currentVariants: {}
+};
+
+async function skinkey_loadUserData() {
+  if (!currentUser) return;
+  try {
+    var { data: player } = await supabaseClient.from('players').select('skin_keys').eq('id', currentUser.id).single();
+    if (player) {
+      skinKeyState.keys = player.skin_keys || 0;
+      console.log('🔑 Skin Keys:', skinKeyState.keys);
+    }
+    var petIds = Object.keys(petState || {});
+    if (petIds.length === 0) {
+      console.log('✨ No pets yet, skipping variant load');
+      return;
+    }
+    var { data: unlocked } = await supabaseClient.from('unlocked_variants').select('user_pet_id, variant_id').in('user_pet_id', petIds);
+    if (unlocked) {
+      skinKeyState.unlockedVariants = {};
+      unlocked.forEach(function(row) {
+        if (!skinKeyState.unlockedVariants[row.user_pet_id]) {
+          skinKeyState.unlockedVariants[row.user_pet_id] = [];
+        }
+        skinKeyState.unlockedVariants[row.user_pet_id].push(row.variant_id);
+      });
+      console.log('✨ Unlocked variants loaded:', Object.keys(skinKeyState.unlockedVariants).length, 'pets');
+    }
+    var { data: pets } = await supabaseClient.from('user_pets').select('id, current_variant').eq('user_id', currentUser.id);
+    if (pets) {
+      pets.forEach(function(pet) {
+        if (pet.current_variant) {
+          skinKeyState.currentVariants[pet.id] = pet.current_variant;
+        }
+      });
+    }
+    skinkey_updateDisplay();
+  } catch (error) {
+    console.error('❌ Error loading skin key data:', error);
+  }
+}
+
+function skinkey_updateDisplay() {
+  var keyCounters = document.querySelectorAll('.skin-key-count');
+  keyCounters.forEach(function(el) {
+    el.textContent = skinKeyState.keys;
+  });
+  skinkey_updateVariantButtons();
+}
+
+async function skinkey_unlockVariant(userPetId, variantId) {
+  if (!currentUser) {
+    showToast('Please log in first', 'error');
+    return false;
+  }
+  if (!BASIC_VARIANTS[variantId]) {
+    showToast('Invalid variant', 'error');
+    return false;
+  }
+  if (skinKeyState.unlockedVariants[userPetId] && skinKeyState.unlockedVariants[userPetId].indexOf(variantId) !== -1) {
+    showToast('Variant already unlocked!', 'info');
+    return false;
+  }
+  var cost = BASIC_VARIANTS[variantId].cost;
+  if (skinKeyState.keys < cost) {
+    showToast('Not enough Skin Keys! Need ' + cost, 'error');
+    return false;
+  }
+  try {
+    var { error: updateError } = await supabaseClient.from('players').update({ skin_keys: skinKeyState.keys - cost }).eq('id', currentUser.id);
+    if (updateError) throw updateError;
+    var { error: unlockError } = await supabaseClient.from('unlocked_variants').insert({ user_pet_id: userPetId, variant_id: variantId });
+    if (unlockError) throw unlockError;
+    skinKeyState.keys -= cost;
+    if (!skinKeyState.unlockedVariants[userPetId]) {
+      skinKeyState.unlockedVariants[userPetId] = [];
+    }
+    skinKeyState.unlockedVariants[userPetId].push(variantId);
+    skinkey_updateDisplay();
+    var variantName = BASIC_VARIANTS[variantId].name;
+    showToast('✨ Unlocked ' + variantName + ' variant!', 'success');
+    console.log('🔑 Unlocked variant:', variantId, 'for pet', userPetId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error unlocking variant:', error);
+    showToast('Failed to unlock variant', 'error');
+    return false;
+  }
+}
+
+async function skinkey_applyVariant(userPetId, variantId) {
+  if (!currentUser) {
+    showToast('Please log in first', 'error');
+    return false;
+  }
+  if (variantId === null || variantId === 'none') {
+    variantId = null;
+  }
+  if (variantId && !SPECIAL_VARIANTS.includes(variantId)) {
+    if (!skinKeyState.unlockedVariants[userPetId] || skinKeyState.unlockedVariants[userPetId].indexOf(variantId) === -1) {
+      showToast('Variant not unlocked yet!', 'error');
+      return false;
+    }
+  }
+  try {
+    var { error } = await supabaseClient.from('user_pets').update({ current_variant: variantId }).eq('id', userPetId);
+    if (error) throw error;
+    if (variantId) {
+      skinKeyState.currentVariants[userPetId] = variantId;
+    } else {
+      delete skinKeyState.currentVariants[userPetId];
+    }
+    skinkey_applyVariantToAllDisplays(userPetId, variantId);
+    if (variantId) {
+      var displayName = BASIC_VARIANTS[variantId] ? BASIC_VARIANTS[variantId].name : variantId;
+      showToast('✨ Applied ' + displayName + ' variant!', 'success');
+    } else {
+      showToast('Removed variant', 'info');
+    }
+    console.log('✨ Applied variant:', variantId, 'to pet', userPetId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error applying variant:', error);
+    showToast('Failed to apply variant', 'error');
+    return false;
+  }
+}
+
+function skinkey_applyVariantToAllDisplays(userPetId, variantId) {
+  var petElements = document.querySelectorAll('[data-pet-id="' + userPetId + '"]');
+  petElements.forEach(function(el) {
+    Object.keys(BASIC_VARIANTS).forEach(function(vid) {
+      el.classList.remove(BASIC_VARIANTS[vid].cssClass);
+    });
+    SPECIAL_VARIANTS.forEach(function(vid) {
+      el.classList.remove('pet-variant-' + vid);
+    });
+    if (variantId) {
+      if (BASIC_VARIANTS[variantId]) {
+        el.classList.add(BASIC_VARIANTS[variantId].cssClass);
+      } else {
+        el.classList.add('pet-variant-' + variantId);
+      }
+    }
+  });
+  if (window.companionPetId && window.companionPetId === userPetId) {
+    skinkey_updateCompanionVariant(variantId);
+  }
+  if (typeof loadMyPets === 'function') {
+    loadMyPets();
+  }
+}
+
+function skinkey_updateCompanionVariant(variantId) {
+  var companion = document.querySelector('.companion-container .pet-sprite');
+  if (!companion) return;
+  Object.keys(BASIC_VARIANTS).forEach(function(vid) {
+    companion.classList.remove(BASIC_VARIANTS[vid].cssClass);
+  });
+  SPECIAL_VARIANTS.forEach(function(vid) {
+    companion.classList.remove('pet-variant-' + vid);
+  });
+  if (variantId) {
+    if (BASIC_VARIANTS[variantId]) {
+      companion.classList.add(BASIC_VARIANTS[variantId].cssClass);
+    } else {
+      companion.classList.add('pet-variant-' + variantId);
+    }
+  }
+}
+
+function skinkey_buildVariantSelector(userPetId) {
+  var unlocked = skinKeyState.unlockedVariants[userPetId] || [];
+  var current = skinKeyState.currentVariants[userPetId] || null;
+  var html = '<div class="variant-selector">';
+  html += '<h3>🎨 Pet Variants</h3>';
+  html += '<p class="skin-key-balance">Skin Keys: <span class="skin-key-count">' + skinKeyState.keys + '</span> 🔑</p>';
+  html += '<div class="variant-option ' + (current === null ? 'active' : '') + '">';
+  html += '  <button onclick="skinkey_applyVariant(\'' + userPetId + '\', null)" ' + (current === null ? 'disabled' : '') + '>None (Default)</button>';
+  html += '</div>';
+  Object.keys(BASIC_VARIANTS).forEach(function(variantId) {
+    var variant = BASIC_VARIANTS[variantId];
+    var isUnlocked = unlocked.indexOf(variantId) !== -1;
+    var isActive = current === variantId;
+    html += '<div class="variant-option ' + (isActive ? 'active' : '') + ' ' + (isUnlocked ? 'unlocked' : 'locked') + '">';
+    html += '  <div class="variant-info">';
+    html += '    <span class="variant-icon">' + variant.icon + '</span>';
+    html += '    <span class="variant-name">' + variant.name + '</span>';
+    html += '    <span class="variant-desc">' + variant.description + '</span>';
+    html += '  </div>';
+    if (isUnlocked) {
+      if (isActive) {
+        html += '  <button disabled>Active ✓</button>';
+      } else {
+        html += '  <button onclick="skinkey_applyVariant(\'' + userPetId + '\', \'' + variantId + '\')">Apply</button>';
+      }
+    } else {
+      html += '  <button onclick="skinkey_unlockVariant(\'' + userPetId + '\', \'' + variantId + '\')">Unlock (1 🔑)</button>';
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function skinkey_updateVariantButtons() {
+  var buttons = document.querySelectorAll('.variant-option button');
+  buttons.forEach(function(btn) {
+  });
+}
+
+async function skinkey_grantKeys(amount, reason) {
+  if (!currentUser) return false;
+  try {
+    var newTotal = skinKeyState.keys + amount;
+    var { error } = await supabaseClient.from('players').update({ skin_keys: newTotal }).eq('id', currentUser.id);
+    if (error) throw error;
+    skinKeyState.keys = newTotal;
+    skinkey_updateDisplay();
+    showToast('🔑 Received ' + amount + ' Skin Key' + (amount > 1 ? 's' : '') + '!', 'success');
+    console.log('🔑 Granted', amount, 'skin keys:', reason);
+    return true;
+  } catch (error) {
+    console.error('❌ Error granting skin keys:', error);
+    return false;
+  }
+}
+
+async function skinkey_init() {
+  if (!currentUser) return;
+  console.log('🔑 Initializing Skin Key system...');
+  await skinkey_loadUserData();
+  console.log('✅ Skin Key system ready');
+}
+
+function skinkey_isVariantUnlocked(userPetId, variantId) {
+  return skinKeyState.unlockedVariants[userPetId] && skinKeyState.unlockedVariants[userPetId].indexOf(variantId) !== -1;
+}
+
+function skinkey_getCurrentVariant(userPetId) {
+  return skinKeyState.currentVariants[userPetId] || null;
+}
