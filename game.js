@@ -18674,34 +18674,6 @@ function scrapbook_formatDate(dateString) {
   return date.toLocaleDateString();
 }
 
-// Escape HTML
-    if (m === '>') return '&gt;';
-    return m;
-  });
-}
-
-// Refresh UI
-async function scrapbook_refreshMemories(userPetId) {
-  var container = document.getElementById('sb-memories-container');
-  if (!container) return;
-  var memories = await scrapbook_loadMemories(userPetId);
-  if (memories.length === 0) {
-    container.innerHTML = '<div class="sb-empty">📖 No memories yet. Go make some adventures!</div>';
-    return;
-  }
-  container.innerHTML = memories.map(function(mem) {
-    return '<div class="sb-memory-card">' +
-           '<div class="sb-memory-date">📅 ' + scrapbook_formatDate(mem.created_at) + '</div>' +
-           '<div class="sb-memory-text">💭 ' + escapeHtml(mem.memory_text) + '</div>' +
-           '</div>';
-  }).join('');
-}
-
-// Initialize
-function scrapbook_init() {
-  scrapbook_loadCooldowns();
-  console.log('📖 Scrapbook system initialized');
-}
 
 
 // ════════════════════════════════════════════════════════════════════════════
