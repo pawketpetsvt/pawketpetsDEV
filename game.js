@@ -285,8 +285,12 @@ var dailyTips = [
 var petBackstories = {
   'Ember': 'Co-founder of PawketPets! 🦊',
   'Pyxie': 'Co-founder of PawketPets! 🐰',
-  // Add more as team members join!
-  // 'NewPet': 'Their backstory here...',
+  'Blushimia': 'A silly dog princess who escaped her video game after gaining sentience! 👑🐕',
+  'Jess': 'A local fossil and potion-prepping paleoart Parasaur specializing in the cute and creepy! 🦕⚗️',
+  'Steve': 'A chill menace who clucks, bawks, bucks, and says the occasional bad word! 🐔⚡',
+  'Kleat': 'A grand mage studying void and galaxy magic! Can open portals to anywhere! ✨🌌',
+  'Gnarly': 'A radical gal running the PaleoPlex arcade! Loves Furbies and nachos! 🎮🦖',
+  'Aria': 'A rosy maple moth fae who collects bones! Don\'t worry, she lets you keep yours until you\'re done with them. 🦋💀',
 };
 
 /**
@@ -3746,22 +3750,22 @@ var petFoodPreferences = {
     fun_fact: 'Can sleep for 16 hours straight!'
   },
   
-  'Cowbee': {
+  'Steve': {
     loved_item: 'Fresh Bread',
     liked_item: 'Garden Salad',
     disliked_item: 'Hot Wings',
     hated_item: 'Curry Feast',
-    hobby: 'Organic gardening',
-    fun_fact: 'Grows all their own vegetables!'
+    hobby: 'Being a menace',
+    fun_fact: 'As chill as a fire in hell, controlled like the beasts of Australia!'
   },
   
-  'Kelta': {
+  'Kleat': {
     loved_item: 'Garden Salad',
     liked_item: 'Fresh Bread',
     disliked_item: 'Shrimp Tempura',
     hated_item: 'Grilled Steak',
-    hobby: 'Flower arranging',
-    fun_fact: 'Knows 37 different wildflowers by scent!'
+    hobby: 'Studying void and galaxy magic',
+    fun_fact: 'A grand mage who can open portals to other worlds!'
   },
   
   'Blushimia': {
@@ -3769,8 +3773,8 @@ var petFoodPreferences = {
     liked_item: 'Grilled Salmon',
     disliked_item: 'Banana Bread',
     hated_item: 'Honey Cookies',
-    hobby: 'Treasure hunting',
-    fun_fact: 'Found a legendary golden acorn once!'
+    hobby: 'Breaking out of video games',
+    fun_fact: 'Escaped her video game after gaining sentience!'
   },
   
   'Aria': {
@@ -3778,8 +3782,8 @@ var petFoodPreferences = {
     liked_item: 'Beef Jerky',
     disliked_item: 'Apple Pie',
     hated_item: 'Grape Juice',
-    hobby: 'Moonlight howling',
-    fun_fact: 'Can howl in perfect harmony with music!'
+    hobby: 'Collecting bones and writing stories',
+    fun_fact: 'A fae rosy maple moth who uses bones as currency!'
   },
   
   'Gnarly': {
@@ -3787,8 +3791,8 @@ var petFoodPreferences = {
     liked_item: 'Mango Delight',
     disliked_item: 'Roasted Chicken',
     hated_item: 'Seafood Soup',
-    hobby: 'Forest meditation',
-    fun_fact: 'Can sense weather changes 24 hours early!'
+    hobby: 'Playing arcade games and collecting Furbies',
+    fun_fact: 'Runs the PaleoPlex arcade! Loves nachos!'
   },
   
   'Jess': {
@@ -3796,8 +3800,8 @@ var petFoodPreferences = {
     liked_item: 'Strawberry Parfait',
     disliked_item: 'Cheese Platter',
     hated_item: 'Veggie Noodles',
-    hobby: 'Sky acrobatics',
-    fun_fact: 'Performed in a famous aerial circus!'
+    hobby: 'Potion brewing and fossil collecting',
+    fun_fact: 'A paleoart Parasaur who makes potions!'
   }
 };
 
@@ -4902,8 +4906,8 @@ var TEAM_MEMBERS = [
   { name: 'Pyxshuul',  login: 'pyxshuul',  twitchUrl: 'https://twitch.tv/Pyxshuul',  petName: 'Pyxie' },
   { name: 'Aria',      login: 'ariadoestwitch', twitchUrl: 'https://twitch.tv/ariadoestwitch', petName: 'Aria' },
   { name: 'Blushimia', login: 'realblushimia',  twitchUrl: 'https://twitch.tv/realblushimia',  petName: 'Blushimia' },
-  { name: 'Cowbee',    login: 'cowbeevt',       twitchUrl: 'https://twitch.tv/cowbeevt',       petName: 'Cowbee' },
-  { name: 'Kelta',     login: 'keltathepomeranian', twitchUrl: 'https://twitch.tv/keltathepomeranian', petName: 'Kelta' },
+  { name: 'Steve',    login: 'cowbeevt',       twitchUrl: 'https://twitch.tv/cowbeevt',       petName: 'Steve' },
+  { name: 'Kleat',     login: 'keltathepomeranian', twitchUrl: 'https://twitch.tv/keltathepomeranian', petName: 'Kleat' },
   { name: 'Jess',      login: 'teatimejess',    twitchUrl: 'https://twitch.tv/teatimejess',    petName: 'Jess' },
   { name: 'Gnarly',    login: 'gnarly_neon_smilodon', twitchUrl: 'https://twitch.tv/gnarly_neon_smilodon', petName: 'Gnarly' }
 ];
@@ -4953,8 +4957,8 @@ async function loadTeamShowcase() {
       'Pyxie': 'pyxie.png',
       'Aria': 'aria.png',
       'Blushimia': 'blushimia.png',
-      'Cowbee': 'cowbee.png',
-      'Kelta': 'kelta.png',
+      'Steve': 'cowbee.png',
+      'Kleat': 'kelta.png',
       'Jess': 'jess.png',
       'Gnarly': 'gnarly.png'
     };
@@ -9964,7 +9968,7 @@ var newsTicker = {
     "Alert: Aria insists the lamps are 'just friends.' Community remains skeptical.",
     "EXCLUSIVE: Blushimia the puppy's tail-wagging energy could power entire city. Scientists investigating.",
     "Public notice: Blushimia rated '12/10 good dog' by independent review board.",
-    "Breaking: Cowbee produces both milk AND honey. Economists baffled by implications.",
+    "Breaking: Steve produces both milk AND honey. Economists baffled by implications.",
     "SCANDAL: Cowbee's buzz-moo hybrid sound breaks international classification system.",
     "Market alert: Kelta the Pomeranian's floof levels exceed safety recommendations.",
     "URGENT: Kelta's cuteness has reached critical mass. Protective eyewear advised.",
@@ -10468,6 +10472,28 @@ var CompanionBuddy = {
     gentle: ["Take your time... 💕", "You're doing wonderfully..."],
     chaotic: ["CHAOS TIME! ✨", "Let's break something! 😈"]
   },
+
+  // Pet-specific companion messages
+  petMessages: {
+    blushimia: [
+      "what the glob?????!!!",
+      "I'm free! I'm finally free!",
+      "This is so much better than my game!",
+      "Wanna see my escape route?"
+    ],
+    steve: [
+      "Cluck, bawk, buck, FUCK! Cockadoodledoo!",
+      "I'm a menace, owo",
+      "Don't test me, I'll peck you!",
+      "As chill as a fire in hell!"
+    ],
+    aria: [
+      "Yummy! Bones are my favorite!",
+      "Woah! So shiny and pretty!",
+      "Do you want to see my bones?",
+      "Humans are so strange and silly!"
+    ]
+  },
   
   init: function() {
     // Check if user has set a companion
@@ -10642,7 +10668,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // ══════════════════════════════════════════════════════════════════════════
 
 var currentJournalPage = 0;
-var journalPetTypes = ['Ember', 'Pyxie', 'Cowbee', 'Kelta', 'Blushimia', 'Aria', 'Gnarly', 'Jess'];
+var journalPetTypes = ['Ember', 'Pyxie', 'Steve', 'Kleat', 'Blushimia', 'Aria', 'Gnarly', 'Jess'];
 var journalDiscoveries = {}; // { petType: { loved: true, liked: false, ... } }
 
 async function loadJournalDiscoveries() {
@@ -10724,7 +10750,7 @@ function renderJournalPage() {
   var petImageMap = {
     'Ember': 'ember.png',
     'Pyxie': 'pyxie.png',
-    'Cowbee': 'cowbee.png',
+    'Steve': 'cowbee.png',
     'Bunny': 'bunny.png',
     'Fox': 'fox.png',
     'Wolf': 'wolf.png',
