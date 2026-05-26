@@ -36,7 +36,7 @@ var battleSounds = {
 
 var audioCache = {};
 var lastSoundTime = 0;
-var soundCooldown = 300; // Minimum 300ms between sounds to avoid spam
+var soundCooldown = GAME_CONSTANTS.SOUND_COOLDOWN_MS; // Minimum ms between sounds to avoid spam
 
 // ═══════════════════════════════════════════════════════════════════════
 // AUDIO PRELOADING - Lazy load strategy for better performance
@@ -464,6 +464,21 @@ function makeEl(tag, attrs, text) {
   if (text !== undefined) e.textContent = text;
   return e;
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// GAME CONSTANTS — named values instead of scattered magic numbers
+// ══════════════════════════════════════════════════════════════════════════
+var GAME_CONSTANTS = {
+  XP_PER_LEVEL:        120,   // XP needed per level (currentLevel * this)
+  BATTLE_MAX_TURNS:    50,    // Max turns before battle auto-ends
+  BOSS_ENCOUNTER_RATE: 0.03,  // 3% chance (~1 in 33 battles)
+  SOUND_COOLDOWN_MS:   300,   // Minimum ms between sounds to avoid spam
+  HP_REGEN_PER_HOUR:   3,     // HP regenerated per hour out of battle
+  PASS_XP_PER_FEED:    2,     // Pass XP awarded for feeding a pet
+  REFERRAL_PP_REWARD:  250,   // PP awarded to referrer
+  TUTORIAL_PP_REWARD:  100,   // PP awarded for completing tutorial
+  TUTORIAL_SKIP_PP:    50,    // PP awarded for skipping tutorial
+};
 
 // ══════════════════════════════════════════════════════════════════════════
 // STUB FUNCTIONS - Prevent "not defined" console errors
@@ -1990,7 +2005,7 @@ function getLastSeenText(lastFed, lastPlayed) {
 
 function makeMyPetCard(pet) {
   var info = pet.pets || {};
-  var xpNext = pet.level * 120;
+  var xpNext = pet.level * GAME_CONSTANTS.XP_PER_LEVEL;
   var hPct = Math.round(pet.hunger/pet.max_hunger*100);
   var hapPct = Math.round(pet.happiness/pet.max_happiness*100);
   var ePct = Math.round(pet.energy/pet.max_energy*100);
@@ -2234,23 +2249,18 @@ async function loadEquippedItems(petId) {
   // Wait a bit for the DOM to be ready
   setTimeout(async function() {
     var display = el('equip-display-' + petId);
-    if (!display) {
-      console.error('Equipment display element not found for pet:', petId);
-      return;
-    }
+    if (!display) return;
     
     try {
-      // Get equipped items for this pet
+      // Get equipped items for THIS specific pet (not all pets)
       var equipRes = await supabaseClient
         .from('player_equipment')
         .select('equipment(*), equipped_slot')
         .eq('user_id', currentUser.id)
+        .eq('pet_id', petId)
         .eq('is_equipped', true);
       
-      console.log('Equipment query result:', equipRes);
-      
       if (equipRes.error) {
-        console.error('Equipment query error:', equipRes.error);
         display.innerHTML = '<div style="opacity:0.6;font-size:0.8rem;">Error loading equipment</div>';
         return;
       }
@@ -2467,7 +2477,7 @@ function getPetMood(hunger, energy, happiness, maxHunger, maxEnergy, maxHappines
 // ══════════════════════════════════════════════════════════════════════════
 
 function calculateLevelUp(newXp, currentLevel, currentMaxHunger, currentMaxEnergy, currentMaxHappiness, currentHP, currentAtk, currentDef, currentSpd) {
-  var xpNeeded = currentLevel * 120; // Increased from 100 to 120 for slower leveling
+  var xpNeeded = currentLevel * GAME_CONSTANTS.XP_PER_LEVEL;
   
   if (newXp >= xpNeeded) {
     // Level up! Calculate stat increases
@@ -6594,7 +6604,7 @@ function simulateBattle(playerStats, enemyStats) {
   var playerHP = playerStats.currentHP;
   var enemyHP = enemyStats.hp;
   var turn = 0;
-  var maxTurns = 50; // prevent infinite loops
+  var maxTurns = GAME_CONSTANTS.BATTLE_MAX_TURNS; // prevent infinite loops
   
   // Determine who goes first based on speed
   var playerFirst = playerStats.stats.speed >= enemyStats.speed;
@@ -8215,7 +8225,7 @@ async function getRandomEnemy(zone, playerLevel) {
   // BOSS ENCOUNTER CHECK - 3% chance to encounter Shadow of Piper
   // ═══════════════════════════════════════════════════════════════════════
   var bossRoll = Math.random();
-  if (bossRoll < 0.03 && playerSettings.spooky_enabled) {  // 3% chance (~1 in 33 battles) + spooky enabled
+  if (bossRoll < GAME_CONSTANTS.BOSS_ENCOUNTER_RATE && playerSettings.spooky_enabled) { // 3% chance + spooky enabled
     console.log('🔥 BOSS ENCOUNTER! Shadow of Piper appears!');
     return await getBossEnemy(zone, playerLevel);
   }
@@ -13571,15 +13581,27 @@ async function submitReply() {
  * Delete forum post
  */
 async function deleteForumPost(postId, postType) {
+  if (!currentUser) return;
   if (!confirm('Are you sure you want to delete this ' + postType + '?')) {
     return;
   }
-  
+
   if (postType === 'thread') {
+    // Check ownership before deleting
+    var { data: thread } = await supabaseClient
+      .from('forum_threads')
+      .select('author_id')
+      .eq('id', postId)
+      .single();
+    if (thread && thread.author_id !== currentUser.id) {
+      showToast('You can only delete your own posts.', 'error');
+      return;
+    }
     var { error } = await supabaseClient
       .from('forum_threads')
       .delete()
-      .eq('id', postId);
+      .eq('id', postId)
+      .eq('author_id', currentUser.id);
     
     if (error) {
       showToast('Error deleting thread');
@@ -13589,10 +13611,21 @@ async function deleteForumPost(postId, postType) {
     showPixelToast('Thread deleted', 'success');
     backToCategory();
   } else {
+    // Check ownership before deleting reply
+    var { data: reply } = await supabaseClient
+      .from('forum_replies')
+      .select('author_id')
+      .eq('id', postId)
+      .single();
+    if (reply && reply.author_id !== currentUser.id) {
+      showToast('You can only delete your own posts.', 'error');
+      return;
+    }
     var { error } = await supabaseClient
       .from('forum_replies')
       .delete()
-      .eq('id', postId);
+      .eq('id', postId)
+      .eq('author_id', currentUser.id);
     
     if (error) {
       showToast('Error deleting reply');
@@ -17349,7 +17382,10 @@ function saveDailyBingo() {
 async function updateBingoProgress(taskType, amount) {
   if (!currentUser) return;
   
-  loadDailyBingo();
+  // Only load if not already in memory for today
+  if (!dailyBingo || !dailyBingo.date || dailyBingo.date !== new Date().toISOString().split('T')[0]) {
+    loadDailyBingo();
+  }
   
   var square = dailyBingo.squares.find(function(s) { return s.taskType === taskType; });
   if (!square || square.completed) return;
@@ -19600,9 +19636,8 @@ function skinkey_applyVariantToAllDisplays(userPetId, variantId) {
   if (window.companionPetId && window.companionPetId === userPetId) {
     skinkey_updateCompanionVariant(variantId);
   }
-  if (typeof loadMyPets === 'function') {
-    loadMyPets();
-  }
+  // NOTE: loadMyPets() removed here — DOM classes already updated above,
+  // triggering a full reload was wasteful and could cause update loops.
 }
 
 function skinkey_updateCompanionVariant(variantId) {
