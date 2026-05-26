@@ -17271,6 +17271,9 @@ var dailyBingo = {
   blackoutCompleted: false
 };
 
+// Track which squares have been notified to prevent spam (declared here, before loadDailyBingo uses it)
+var bingoNotificationsShown = {};
+
 // Load daily bingo from localStorage
 function loadDailyBingo() {
   var today = new Date().toISOString().split('T')[0];
@@ -17334,9 +17337,6 @@ function generateDailyBingo() {
 function saveDailyBingo() {
   localStorage.setItem('daily_bingo', JSON.stringify(dailyBingo));
 }
-
-// Track which squares have been notified to prevent spam
-var bingoNotificationsShown = {};
 
 // Update bingo progress
 async function updateBingoProgress(taskType, amount) {
