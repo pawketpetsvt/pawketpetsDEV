@@ -15188,3 +15188,38 @@ button[onclick*="Watch Stream"] {
     z-index: 1 !important;
 }
 
+
+/* ============================================
+   MY PETS PAGE - TEXT WRAPPING FIX
+   ============================================ */
+
+/* Fix pet card text wrapping */
+.my-pet-card {
+    overflow: hidden !important;
+}
+
+.pet-card-body {
+    overflow-x: hidden !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+.pet-card-bio {
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow: hidden !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 3 !important;
+    -webkit-box-orient: vertical !important;
+}
+
+.pet-card-header-info {
+    max-width: 100% !important;
+    overflow: hidden !important;
+}
+
+.pet-card-nickname {
+    font-size: 1.3rem !important;
+    word-break: break-word !important;
+}
+

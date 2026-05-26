@@ -2037,19 +2037,14 @@ function makeMyPetCard(pet) {
   
   var speciesEl = makeEl('div', {class:'pet-card-species'});
   if (info.vtuber_name) speciesEl.textContent = info.vtuber_name;
-  if (info.twitch_url) {
-    var tLink = makeEl('a', {href:info.twitch_url, target:'_blank'});
-    tLink.style.cssText = 'font-size:0.72rem;background:#9146ff;color:white;padding:2px 7px;border-radius:10px;font-family:Fredoka One,cursive;text-decoration:none;margin-left:6px;';
-    tLink.textContent = 'Watch Live';
-    speciesEl.appendChild(tLink);
-  }
+  // NOTE: Watch Live button removed from My Pets page - only shows on Team page
   headerInfo.appendChild(speciesEl);
   
   // Pet backstory/bio
   var backstory = getPetBackstory(info.name);
   var bioEl = makeEl('div', {class:'pet-card-bio'});
   bioEl.textContent = backstory;
-  bioEl.style.cssText = 'font-size:0.85rem;color:var(--text-light);margin:8px 0;font-style:italic;line-height:1.4;';
+  bioEl.style.cssText = 'font-size:0.85rem;color:var(--text-light);margin:8px 0;font-style:italic;line-height:1.4;word-wrap:break-word;overflow-wrap:break-word;white-space:normal;';
   headerInfo.appendChild(bioEl);
   
   headerInfo.appendChild(makeEl('div', {class:'pet-card-level', id:'lvl-'+pet.id}, 'Lv. '+pet.level+' | Max Stats: '+pet.max_hunger));
