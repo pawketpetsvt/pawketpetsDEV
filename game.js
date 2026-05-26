@@ -2634,7 +2634,7 @@ async function feedFree(petId) {
   }
   
   // Call RPC with null item_id for free feed
-  var { data: result, error } = await supabaseClient.rpc('feed_pet_secure', {
+  var { data: result, error } = await supabaseClient.rpc('feed_pet_secure_with_limit', {
     p_pet_id: petId,
     p_item_id: null
   });
@@ -2709,7 +2709,7 @@ async function feedWithItem(petId, itemId, itemName) {
   if (!pet) return;
   
   // Call RPC with the item_id
-  var { data: result, error } = await supabaseClient.rpc('feed_pet_secure', {
+  var { data: result, error } = await supabaseClient.rpc('feed_pet_secure_with_limit', {
     p_pet_id: petId,
     p_item_id: itemId
   });
@@ -2800,7 +2800,7 @@ async function feedFree(petId) {
   var today = new Date().toISOString().split('T')[0];
   
   // Call RPC with null item_id for free feed
-  var { data: result, error } = await supabaseClient.rpc('feed_pet_secure', {
+  var { data: result, error } = await supabaseClient.rpc('feed_pet_secure_with_limit', {
     p_pet_id: petId,
     p_item_id: null
   });
@@ -2841,7 +2841,7 @@ async function feedWithItem(petId, itemId, itemName) {
   if (!pet) return;
   
   // Call secure database function with item_id
-  var { data: result, error } = await supabaseClient.rpc('feed_pet_secure', {
+  var { data: result, error } = await supabaseClient.rpc('feed_pet_secure_with_limit', {
     p_pet_id: petId,
     p_item_id: itemId
   });
@@ -2920,7 +2920,7 @@ async function feedWithItem(petId, itemId, itemName) {
   }
   
   // Call secure database function with item_id
-  var { data: result, error } = await supabaseClient.rpc('feed_pet_secure', {
+  var { data: result, error } = await supabaseClient.rpc('feed_pet_secure_with_limit', {
     p_pet_id: petId,
     p_item_id: itemId
   });
@@ -3163,7 +3163,7 @@ async function playFree(petId) {
   }
   
   // Call RPC for free play
-  var { data: result, error } = await supabaseClient.rpc('play_with_pet_secure', {
+  var { data: result, error } = await supabaseClient.rpc('play_pet_secure_with_limit', {
     p_pet_id: petId
   });
   
@@ -3219,7 +3219,7 @@ async function playWithToy(petId, toyId, toyName) {
   
   // Call RPC to play with toy (if you have a function for it)
   // For now, use the same play function
-  var { data: result, error } = await supabaseClient.rpc('play_with_pet_secure', {
+  var { data: result, error } = await supabaseClient.rpc('play_pet_secure_with_limit', {
     p_pet_id: petId
   });
   
@@ -7982,6 +7982,11 @@ function showBattleRewardsModal() {
   }
   
   modal.classList.add('show');
+  
+  // NEW FEATURES: Check for rare drops after victory
+  if (battleRewards && battleRewards.victory && typeof newFeatures_checkBattleRewards === 'function') {
+    newFeatures_checkBattleRewards('battle_' + Date.now());
+  }
 }
 
 function closeBattleRewardsModal() {
@@ -17559,7 +17564,7 @@ async function updateBingoProgress(taskType, amount) {
       await addPassXP(15, 'bingo_square');
       
       showToast('✓ Bingo: ' + square.name + ' complete! +' + square.rewardPoints + ' PP, +15 XP', 'success');
-      playSound('success');
+      if (typeof playBattleSound === 'function') { playBattleSound('victory', 0.35); }
       
       // Check for lines
       await checkBingoLines();
@@ -18999,6 +19004,10 @@ async function phase1_init() {
     
     phase1_state.isInitialized = true;
     console.log('✅ Phase 1: Initialized successfully');
+    
+    // NEW FEATURES: Initialize wrapper features
+    await newFeatures_init();
+    
   } catch (error) {
     console.error('❌ Phase 1: Initialization failed:', error);
     if (typeof showToast === 'function') {
@@ -19166,12 +19175,12 @@ async function phase1_generatePetOfTheDay() {
     var today = new Date().toISOString().split('T')[0];
     
     // Get random pet from all user_pets
-    // FIXED: user_pets has 'nickname' not 'name'
+    // FIXED: user_pets has 'nickname' not 'name', and 'adopted_at' not 'created_at'
     var { data: randomPets, error } = await supabaseClient
       .from('user_pets')
       .select('id, level, user_id, nickname, pets(name)')
       .limit(100)
-      .order('created_at', { ascending: false });
+      .order('adopted_at', { ascending: false });
     
     if (error) throw error;
     
@@ -20053,3 +20062,1598 @@ function skinkey_isVariantUnlocked(userPetId, variantId) {
 function skinkey_getCurrentVariant(userPetId) {
   return skinKeyState.currentVariants[userPetId] || null;
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// RATE LIMITING - CLIENT-SIDE DISPLAY (optional)
+// ════════════════════════════════════════════════════════════════════════════
+
+async function getDailyRemaining() {
+  if (!currentUser) return { feedsRemaining: 0, playsRemaining: 0, battlesRemaining: 0 };
+  
+  try {
+    var { data } = await supabaseClient
+      .from('user_daily_limits')
+      .select('feed_total, play_total, battle_total')
+      .eq('user_id', currentUser.id)
+      .single();
+    
+    return {
+      feedsRemaining: Math.max(0, 50 - (data?.feed_total || 0)),
+      playsRemaining: Math.max(0, 50 - (data?.play_total || 0)),
+      battlesRemaining: Math.max(0, 50 - (data?.battle_total || 0))
+    };
+  } catch (error) {
+    console.error('Error fetching daily limits:', error);
+    return { feedsRemaining: 50, playsRemaining: 50, battlesRemaining: 50 };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ALL NEW FEATURES - COMPLETE IMPLEMENTATION
+// Founder Badges, Rare Collectibles, Today in PawketPets, Login Calendar, 
+// Screenshot Cards, PawketPass
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 1. FOUNDER BADGES SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+var founderBadges = {
+  tiers: {
+    alpha: {
+      name: 'Alpha Founder',
+      badge: 'founder_alpha',
+      frame: 'founder_alpha_frame',
+      title: 'Alpha Founder',
+      cutoffDate: '2024-06-01'
+    },
+    beta: {
+      name: 'Beta Founder',
+      badge: 'founder_beta',
+      frame: 'founder_beta_frame',
+      title: 'Beta Founder',
+      cutoffDate: '2024-08-01'
+    },
+    early: {
+      name: 'Early Supporter',
+      badge: 'founder_early',
+      frame: 'founder_early_frame',
+      title: 'Early Supporter',
+      cutoffDate: '2024-09-01'
+    }
+  }
+};
+
+async function founder_checkAndGrant() {
+  if (!currentUser) return;
+  
+  try {
+    // Check if already has founder status
+    var { data: player } = await supabaseClient
+      .from('players')
+      .select('founder_status, created_at')
+      .eq('id', currentUser.id)
+      .single();
+    
+    if (!player) return;
+    if (player.founder_status) {
+      console.log('✅ Player already has founder status:', player.founder_status);
+      return;
+    }
+    
+    // Check account age
+    var accountDate = new Date(player.created_at);
+    var tier = null;
+    
+    if (accountDate < new Date(founderBadges.tiers.alpha.cutoffDate)) {
+      tier = 'alpha';
+    } else if (accountDate < new Date(founderBadges.tiers.beta.cutoffDate)) {
+      tier = 'beta';
+    } else if (accountDate < new Date(founderBadges.tiers.early.cutoffDate)) {
+      tier = 'early';
+    }
+    
+    if (!tier) {
+      console.log('Player does not qualify for founder status');
+      return;
+    }
+    
+    // Grant founder status
+    var founderData = founderBadges.tiers[tier];
+    
+    await supabaseClient
+      .from('players')
+      .update({
+        founder_status: tier,
+        founder_granted_at: new Date().toISOString()
+      })
+      .eq('id', currentUser.id);
+    
+    // Grant cosmetics
+    await grantCosmetic(founderData.badge, 'badge');
+    await grantCosmetic(founderData.frame, 'frame');
+    
+    // Show celebration
+    showFounderCelebration(tier, founderData);
+    
+    console.log('🎉 Founder status granted:', tier);
+    
+  } catch (err) {
+    console.error('Error checking founder status:', err);
+  }
+}
+
+function showFounderCelebration(tier, founderData) {
+  var modal = document.createElement('div');
+  modal.className = 'modal-overlay founder-celebration';
+  modal.innerHTML = `
+    <div class="modal-content founder-modal">
+      <div class="founder-header">
+        <div class="founder-icon">👑</div>
+        <h2>FOUNDER STATUS GRANTED!</h2>
+      </div>
+      <div class="founder-body">
+        <div class="founder-tier ${tier}">${founderData.name}</div>
+        <p class="founder-desc">Thank you for being an early supporter!</p>
+        <div class="founder-rewards">
+          <h3>🎁 Exclusive Rewards:</h3>
+          <div class="reward-item">✨ ${founderData.badge} Badge</div>
+          <div class="reward-item">🖼️ ${founderData.frame} Frame</div>
+          <div class="reward-item">🏷️ "${founderData.title}" Title</div>
+        </div>
+        <p class="founder-exclusive">These items can never be obtained again!</p>
+      </div>
+      <button class="btn-primary" onclick="this.closest('.modal-overlay').remove()">
+        Awesome! Thank You! 🎉
+      </button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 2. RARE COLLECTIBLES SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+var rareCollectibles = {
+  rarities: {
+    rare: { color: '#3b82f6', label: 'Rare', dropRate: 0.05 },
+    epic: { color: '#a855f7', label: 'Epic', dropRate: 0.02 },
+    legendary: { color: '#f59e0b', label: 'Legendary', dropRate: 0.01 },
+    mythic: { color: '#ec4899', label: 'Mythic', dropRate: 0.005 }
+  }
+};
+
+async function rare_checkDrop(source, sourceId) {
+  if (!currentUser) return;
+  
+  try {
+    // Get available rare cosmetics for this source
+    var { data: availableRares } = await supabaseClient
+      .from('rare_cosmetics')
+      .select('*')
+      .eq('drop_source', source);
+    
+    if (!availableRares || availableRares.length === 0) return;
+    
+    // Check each rare for drop
+    for (var rare of availableRares) {
+      var roll = Math.random();
+      
+      if (roll < rare.drop_rate) {
+        // Check if player already has it
+        var { data: existing } = await supabaseClient
+          .from('player_rare_cosmetics')
+          .select('id')
+          .eq('player_id', currentUser.id)
+          .eq('cosmetic_id', rare.id)
+          .single();
+        
+        if (existing) continue; // Already owned
+        
+        // Grant rare!
+        await supabaseClient
+          .from('player_rare_cosmetics')
+          .insert({
+            player_id: currentUser.id,
+            cosmetic_id: rare.id,
+            obtained_from: sourceId
+          });
+        
+        // Increment obtained count
+        await supabaseClient
+          .from('rare_cosmetics')
+          .update({ obtained_count: rare.obtained_count + 1 })
+          .eq('id', rare.id);
+        
+        // Grant cosmetic
+        await grantCosmetic(rare.id, rare.type);
+        
+        // Show celebration
+        showRareDropCelebration(rare);
+        
+        console.log('🎉 Rare drop:', rare.name);
+        break; // Only one drop per source
+      }
+    }
+    
+  } catch (err) {
+    console.error('Error checking rare drops:', err);
+  }
+}
+
+function showRareDropCelebration(rare) {
+  var rarityData = rareCollectibles.rarities[rare.rarity] || rareCollectibles.rarities.rare;
+  
+  var modal = document.createElement('div');
+  modal.className = 'modal-overlay rare-drop-celebration';
+  modal.innerHTML = `
+    <div class="modal-content rare-drop-modal" style="border-color: ${rarityData.color};">
+      <div class="rare-drop-header">
+        <div class="rare-drop-icon" style="color: ${rarityData.color};">✨</div>
+        <h2 style="color: ${rarityData.color};">${rarityData.label.toUpperCase()} DROP!</h2>
+      </div>
+      <div class="rare-drop-body">
+        <div class="rare-drop-name">${rare.name}</div>
+        <p class="rare-drop-desc">${rare.description}</p>
+        <div class="rare-drop-stats">
+          <div class="rare-stat">
+            <span class="stat-label">Rarity:</span>
+            <span class="stat-value" style="color: ${rarityData.color};">${rarityData.label}</span>
+          </div>
+          <div class="rare-stat">
+            <span class="stat-label">Drop Rate:</span>
+            <span class="stat-value">${(rare.drop_rate * 100).toFixed(2)}%</span>
+          </div>
+          <div class="rare-stat">
+            <span class="stat-label">Obtained By:</span>
+            <span class="stat-value">${rare.obtained_count + 1} players</span>
+          </div>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="this.closest('.modal-overlay').remove()">
+        Amazing! 🎉
+      </button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  
+  // Play sound effect
+  if (typeof playBattleSound === 'function') {
+    playBattleSound('victory', 0.5);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 3. TODAY IN PAWKETPETS SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+var todayFeatures = {
+  current: null,
+  
+  weatherTypes: [
+    { id: 'sunny', emoji: '☀️', name: 'Sunny', effect: 'Pets are extra happy!' },
+    { id: 'rainy', emoji: '🌧️', name: 'Rainy', effect: 'Water types +25% XP' },
+    { id: 'cloudy', emoji: '☁️', name: 'Cloudy', effect: 'Normal conditions' },
+    { id: 'foggy', emoji: '🌫️', name: 'Foggy', effect: 'Rare encounters +10%' },
+    { id: 'snowy', emoji: '❄️', name: 'Snowy', effect: 'Ice types +25% XP' },
+    { id: 'stormy', emoji: '⛈️', name: 'Stormy', effect: 'Electric types +25% XP' }
+  ],
+  
+  bonusTypes: [
+    { id: 'double_xp', name: '2x Battle XP', multiplier: 2.0 },
+    { id: 'double_pp', name: '2x PawketPoints', multiplier: 2.0 },
+    { id: 'fast_energy', name: '50% Faster Energy Regen', multiplier: 1.5 },
+    { id: 'bonus_drops', name: '+25% Item Drops', multiplier: 1.25 },
+    { id: 'rare_boost', name: 'Rare Encounters +50%', multiplier: 1.5 }
+  ],
+  
+  petTypes: ['fire', 'water', 'grass', 'electric', 'ice', 'normal'],
+  
+  headlines: [
+    '🔬 Scientists discover new pet variant!',
+    '🎭 Local pet wins talent show!',
+    '🌟 Mysterious lights seen in sky...',
+    '📰 PawketPets reaches 1,000 players!',
+    '🎉 Community goal smashed!',
+    '🔮 Fortune teller predicts lucky day!',
+    '🎪 Traveling merchant spotted!',
+    '🏆 New leaderboard champion!',
+    '💫 Strange energy detected...',
+    '🎨 New cosmetics coming soon!'
+  ]
+};
+
+async function today_init() {
+  await today_loadOrGenerate();
+  today_displayBanner();
+  today_applyEffects();
+}
+
+async function today_loadOrGenerate() {
+  var todayDate = new Date().toISOString().split('T')[0];
+  
+  try {
+    var { data: existing } = await supabaseClient
+      .from('daily_features')
+      .select('*')
+      .eq('date', todayDate)
+      .single();
+    
+    if (existing) {
+      todayFeatures.current = existing;
+    } else {
+      // Generate new daily features
+      var features = today_generate();
+      
+      var { data: created } = await supabaseClient
+        .from('daily_features')
+        .insert({
+          date: todayDate,
+          weather: features.weather.id,
+          bonus_type: features.bonus.id,
+          bonus_multiplier: features.bonus.multiplier,
+          featured_type: features.featuredType,
+          event_chance: features.eventChance,
+          news_headline: features.headline
+        })
+        .select()
+        .single();
+      
+      todayFeatures.current = created;
+    }
+  } catch (err) {
+    console.error('Error loading today features:', err);
+    todayFeatures.current = today_generate();
+  }
+}
+
+function today_generate() {
+  var weather = todayFeatures.weatherTypes[Math.floor(Math.random() * todayFeatures.weatherTypes.length)];
+  var bonus = todayFeatures.bonusTypes[Math.floor(Math.random() * todayFeatures.bonusTypes.length)];
+  var featuredType = todayFeatures.petTypes[Math.floor(Math.random() * todayFeatures.petTypes.length)];
+  var eventChance = ['low', 'normal', 'high'][Math.floor(Math.random() * 3)];
+  var headline = todayFeatures.headlines[Math.floor(Math.random() * todayFeatures.headlines.length)];
+  
+  return {
+    weather: weather,
+    bonus: bonus,
+    featuredType: featuredType,
+    eventChance: eventChance,
+    headline: headline
+  };
+}
+
+function today_displayBanner() {
+  var homeContent = document.getElementById('home-content');
+  if (!homeContent) return;
+  
+  var features = todayFeatures.current;
+  if (!features) return;
+  
+  var weather = todayFeatures.weatherTypes.find(function(w) { return w.id === features.weather; });
+  var bonus = todayFeatures.bonusTypes.find(function(b) { return b.id === features.bonus_type; });
+  
+  var banner = document.createElement('div');
+  banner.className = 'today-banner collapsed';
+  banner.innerHTML = `
+    <div class="today-summary" onclick="todayBanner_toggle()">
+      <span class="today-icon">🌟</span>
+      <span class="today-text">
+        Today: ${weather ? weather.emoji + ' ' + weather.name : ''} • 
+        ${bonus ? '⚡ ' + bonus.name : ''} • 
+        ✨ ${features.featured_type} Day
+      </span>
+      <span class="today-arrow">▼</span>
+    </div>
+    <div class="today-details" style="display:none;">
+      <div class="today-detail-item">
+        <strong>Weather:</strong> ${weather ? weather.emoji + ' ' + weather.name : 'Unknown'}
+        <div class="detail-effect">${weather ? weather.effect : ''}</div>
+      </div>
+      <div class="today-detail-item">
+        <strong>Bonus:</strong> ${bonus ? '⚡ ' + bonus.name : 'None'}
+      </div>
+      <div class="today-detail-item">
+        <strong>Featured:</strong> ✨ ${features.featured_type}-type pets earn +50% XP
+      </div>
+      <div class="today-detail-item">
+        <strong>Events:</strong> ${features.event_chance} chance of random events
+      </div>
+      <div class="today-news">
+        📰 ${features.news_headline}
+      </div>
+    </div>
+  `;
+  
+  // Insert at top of home content
+  if (homeContent.firstChild) {
+    homeContent.insertBefore(banner, homeContent.firstChild);
+  } else {
+    homeContent.appendChild(banner);
+  }
+}
+
+function todayBanner_toggle() {
+  var banner = document.querySelector('.today-banner');
+  if (!banner) return;
+  
+  var details = banner.querySelector('.today-details');
+  var arrow = banner.querySelector('.today-arrow');
+  
+  if (details.style.display === 'none') {
+    details.style.display = 'block';
+    arrow.textContent = '▲';
+    banner.classList.remove('collapsed');
+  } else {
+    details.style.display = 'none';
+    arrow.textContent = '▼';
+    banner.classList.add('collapsed');
+  }
+}
+
+function today_applyEffects() {
+  // Effects applied automatically by checking todayFeatures.current
+  console.log('✅ Today features loaded:', todayFeatures.current);
+}
+
+function today_getMultiplier(type) {
+  if (!todayFeatures.current) return 1.0;
+  
+  var features = todayFeatures.current;
+  var multiplier = 1.0;
+  
+  // Featured type bonus
+  if (type === features.featured_type) {
+    multiplier *= 1.5;
+  }
+  
+  // Weather bonus
+  var weather = features.weather;
+  if (weather === 'rainy' && type === 'water') multiplier *= 1.25;
+  if (weather === 'snowy' && type === 'ice') multiplier *= 1.25;
+  if (weather === 'stormy' && type === 'electric') multiplier *= 1.25;
+  
+  return multiplier;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4. LOGIN CALENDAR VISUAL SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+var loginCalendar = {
+  currentStreak: 0,
+  calendarRewards: null
+};
+
+async function calendar_init() {
+  await calendar_loadRewards();
+  calendar_displayWidget();
+}
+
+async function calendar_loadRewards() {
+  try {
+    var { data: rewards } = await supabaseClient
+      .from('login_calendar_rewards')
+      .select('*')
+      .order('day');
+    
+    loginCalendar.calendarRewards = rewards || [];
+  } catch (err) {
+    console.error('Error loading calendar rewards:', err);
+  }
+}
+
+function calendar_displayWidget() {
+  var homeContent = document.getElementById('home-content');
+  if (!homeContent) return;
+  
+  var streak = loginCalendar.currentStreak || 0;
+  var nextDay = Math.min(streak + 1, 30);
+  var nextReward = loginCalendar.calendarRewards ? loginCalendar.calendarRewards.find(function(r) { return r.day === nextDay; }) : null;
+  
+  var widget = document.createElement('div');
+  widget.className = 'calendar-widget';
+  widget.onclick = function() { calendar_showFullModal(); };
+  
+  var html = '<div class="calendar-header">';
+  html += '  <span class="calendar-title">📅 Day ' + streak + ' Streak</span>';
+  if (nextReward) {
+    html += '  <span class="calendar-next">Next: ' + nextReward.pp_reward + ' PP';
+    if (nextReward.skin_keys > 0) html += ' + ' + nextReward.skin_keys + ' 🔑';
+    html += '</span>';
+  }
+  html += '</div>';
+  
+  html += '<div class="calendar-dots">';
+  for (var i = 1; i <= 7; i++) {
+    var dayClass = 'dot';
+    if (i <= streak) dayClass += ' completed';
+    else if (i === streak + 1) dayClass += ' active';
+    
+    var dayReward = loginCalendar.calendarRewards ? loginCalendar.calendarRewards.find(function(r) { return r.day === i; }) : null;
+    if (dayReward && dayReward.is_milestone) dayClass += ' milestone';
+    
+    html += '<span class="' + dayClass + '">' + (i <= streak ? '✓' : i) + '</span>';
+  }
+  html += '</div>';
+  
+  widget.innerHTML = html;
+  
+  // Insert after today banner
+  var todayBanner = homeContent.querySelector('.today-banner');
+  if (todayBanner && todayBanner.nextSibling) {
+    homeContent.insertBefore(widget, todayBanner.nextSibling);
+  } else {
+    homeContent.appendChild(widget);
+  }
+}
+
+function calendar_showFullModal() {
+  var streak = loginCalendar.currentStreak || 0;
+  
+  var modal = document.createElement('div');
+  modal.className = 'modal-overlay calendar-modal-overlay';
+  
+  var html = '<div class="modal-content calendar-modal">';
+  html += '  <div class="modal-header">';
+  html += '    <h2>📅 30-Day Login Calendar</h2>';
+  html += '    <button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">✕</button>';
+  html += '  </div>';
+  html += '  <div class="modal-body">';
+  html += '    <div class="calendar-streak-display">Current Streak: <strong>' + streak + ' days</strong></div>';
+  html += '    <div class="calendar-grid">';
+  
+  for (var i = 1; i <= 30; i++) {
+    var dayReward = loginCalendar.calendarRewards ? loginCalendar.calendarRewards.find(function(r) { return r.day === i; }) : null;
+    
+    var dayClass = 'calendar-day';
+    if (i <= streak) dayClass += ' completed';
+    else if (i === streak + 1) dayClass += ' current';
+    if (dayReward && dayReward.is_milestone) dayClass += ' milestone';
+    
+    html += '<div class="' + dayClass + '">';
+    html += '  <div class="day-number">Day ' + i + '</div>';
+    if (dayReward) {
+      html += '  <div class="day-reward">';
+      html += '    <div class="reward-pp">' + dayReward.pp_reward + ' PP</div>';
+      if (dayReward.skin_keys > 0) {
+        html += '    <div class="reward-keys">' + dayReward.skin_keys + ' 🔑</div>';
+      }
+      if (dayReward.is_milestone) {
+        html += '    <div class="reward-milestone">⭐ ' + dayReward.milestone_title + '</div>';
+      }
+      html += '  </div>';
+    }
+    if (i <= streak) {
+      html += '  <div class="day-status">✓ Claimed</div>';
+    } else if (i === streak + 1) {
+      html += '  <div class="day-status current-day">← Today</div>';
+    }
+    html += '</div>';
+  }
+  
+  html += '    </div>';
+  html += '  </div>';
+  html += '</div>';
+  
+  modal.innerHTML = html;
+  document.body.appendChild(modal);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 5. DAILY WELCOME MODAL (Combines Today + Calendar + Streak Reward)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function dailyWelcome_check() {
+  var lastLogin = localStorage.getItem('lastDailyWelcome');
+  var today = new Date().toDateString();
+  
+  if (lastLogin !== today) {
+    await dailyWelcome_show();
+    localStorage.setItem('lastDailyWelcome', today);
+  }
+}
+
+async function dailyWelcome_show() {
+  if (!currentUser) return;
+  
+  var streak = loginCalendar.currentStreak || 0;
+  var dayReward = loginCalendar.calendarRewards ? loginCalendar.calendarRewards.find(function(r) { return r.day === streak; }) : null;
+  var features = todayFeatures.current;
+  
+  var modal = document.createElement('div');
+  modal.className = 'modal-overlay daily-welcome-modal';
+  
+  var html = '<div class="modal-content welcome-modal">';
+  html += '  <div class="welcome-header">';
+  html += '    <div class="welcome-icon">🎉</div>';
+  html += '    <h2>WELCOME BACK!</h2>';
+  html += '    <div class="welcome-streak">Day ' + streak + ' Streak</div>';
+  html += '  </div>';
+  
+  html += '  <div class="welcome-body">';
+  
+  // Reward claimed
+  if (dayReward) {
+    html += '  <div class="welcome-reward-claimed">';
+    html += '    <div class="claimed-icon">✨</div>';
+    html += '    <div class="claimed-text">Day ' + streak + ' Complete!</div>';
+    html += '    <div class="claimed-amount">+' + dayReward.pp_reward + ' PP';
+    if (dayReward.skin_keys > 0) html += ' + ' + dayReward.skin_keys + ' 🔑';
+    html += '</div>';
+    if (dayReward.is_milestone) {
+      html += '    <div class="claimed-milestone">⭐ ' + dayReward.milestone_title + '</div>';
+    }
+    html += '  </div>';
+  }
+  
+  // Today features
+  if (features) {
+    var weather = todayFeatures.weatherTypes.find(function(w) { return w.id === features.weather; });
+    var bonus = todayFeatures.bonusTypes.find(function(b) { return b.id === features.bonus_type; });
+    
+    html += '  <div class="welcome-today">';
+    html += '    <h3>🌟 TODAY IN PAWKETPETS</h3>';
+    html += '    <div class="today-item">Weather: ' + (weather ? weather.emoji + ' ' + weather.name : '') + '</div>';
+    html += '    <div class="today-item">Bonus: ' + (bonus ? '⚡ ' + bonus.name : '') + '</div>';
+    html += '    <div class="today-item">Featured: ✨ ' + features.featured_type + '-type pets +50% XP</div>';
+    html += '  </div>';
+  }
+  
+  // Calendar progress
+  html += '  <div class="welcome-calendar">';
+  html += '    <h3>📅 YOUR PROGRESS</h3>';
+  html += '    <div class="welcome-calendar-dots">';
+  for (var i = 1; i <= 7; i++) {
+    var dotClass = 'w-dot';
+    if (i <= streak) dotClass += ' completed';
+    else if (i === streak + 1) dotClass += ' active';
+    
+    var dayReward2 = loginCalendar.calendarRewards ? loginCalendar.calendarRewards.find(function(r) { return r.day === i; }) : null;
+    if (dayReward2 && dayReward2.is_milestone) dotClass += ' milestone';
+    
+    html += '<span class="' + dotClass + '">' + (i <= streak ? '✓' : i) + '</span>';
+  }
+  html += '    </div>';
+  
+  var nextDay = Math.min(streak + 1, 30);
+  var nextReward = loginCalendar.calendarRewards ? loginCalendar.calendarRewards.find(function(r) { return r.day === nextDay; }) : null;
+  if (nextReward) {
+    html += '    <div class="welcome-next">🎁 Tomorrow: Day ' + nextDay + ' - ' + nextReward.pp_reward + ' PP';
+    if (nextReward.skin_keys > 0) html += ' + ' + nextReward.skin_keys + ' 🔑';
+    if (nextReward.is_milestone) html += ' + ' + nextReward.milestone_title;
+    html += '</div>';
+  }
+  html += '  </div>';
+  
+  html += '  </div>';
+  
+  html += '  <button class="btn-primary btn-large" onclick="this.closest(\'.modal-overlay\').remove()">';
+  html += '    Let\'s Go! 🚀';
+  html += '  </button>';
+  html += '</div>';
+  
+  modal.innerHTML = html;
+  document.body.appendChild(modal);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 6. SCREENSHOT CARD SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function screenshot_generate(petId) {
+  try {
+    // Get pet data
+    var { data: pet } = await supabaseClient
+      .from('user_pets')
+      .select('*, players(username)')
+      .eq('id', petId)
+      .single();
+    
+    if (!pet) {
+      alert('Pet not found');
+      return;
+    }
+    
+    // Create canvas
+    var canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 800;
+    var ctx = canvas.getContext('2d');
+    
+    // Background gradient
+    var gradient = ctx.createLinearGradient(0, 0, 0, 800);
+    gradient.addColorStop(0, '#667eea');
+    gradient.addColorStop(1, '#764ba2');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 600, 800);
+    
+    // Card background
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.roundRect(40, 40, 520, 720, 20);
+    ctx.fill();
+    
+    // Pet sprite (simplified - would need actual sprite rendering)
+    ctx.fillStyle = '#333';
+    ctx.font = '120px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('🐾', 300, 250);
+    
+    // Pet name
+    ctx.fillStyle = '#333';
+    ctx.font = 'bold 48px Arial';
+    ctx.fillText(pet.nickname || pet.pet_type, 300, 350);
+    
+    // Level and variant
+    ctx.font = '28px Arial';
+    ctx.fillText('Level ' + pet.level, 300, 400);
+    if (pet.current_variant) {
+      ctx.fillText(pet.current_variant + ' Variant', 300, 440);
+    }
+    
+    // Type
+    ctx.fillStyle = '#666';
+    ctx.font = '24px Arial';
+    ctx.fillText('🔥 ' + pet.pet_type + ' Type', 300, 490);
+    
+    // Stats
+    ctx.textAlign = 'left';
+    ctx.font = '22px Arial';
+    ctx.fillText('❤️ HP: ' + pet.max_hp, 100, 560);
+    ctx.fillText('⚔️ ATK: ' + pet.attack, 100, 600);
+    ctx.fillText('🛡️ DEF: ' + pet.defense, 350, 560);
+    ctx.fillText('⚡ SPD: ' + pet.speed, 350, 600);
+    
+    // Owner
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#999';
+    ctx.font = '20px Arial';
+    ctx.fillText('Owned by: ' + (pet.players ? pet.players.username : 'Unknown'), 300, 680);
+    
+    // PawketPets branding
+    ctx.fillStyle = '#667eea';
+    ctx.font = 'bold 24px Arial';
+    ctx.fillText('PawketPets.com', 300, 730);
+    
+    // Convert to image
+    canvas.toBlob(function(blob) {
+      var url = URL.createObjectURL(blob);
+      screenshot_showDownloadModal(url, pet.nickname || pet.pet_type);
+    });
+    
+  } catch (err) {
+    console.error('Error generating screenshot:', err);
+    alert('Failed to generate screenshot');
+  }
+}
+
+function screenshot_showDownloadModal(imageUrl, petName) {
+  var modal = document.createElement('div');
+  modal.className = 'modal-overlay screenshot-modal';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📸 Screenshot Ready!</h2>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <img src="${imageUrl}" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+        <div style="margin-top: 20px;">
+          <a href="${imageUrl}" download="${petName}_card.png" class="btn-primary">
+            Download Image 📥
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 7. PAWKETPASS SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+var pawketPass = {
+  currentSeason: null,
+  playerProgress: null,
+  rewards: []
+};
+
+async function pass_init() {
+  await pass_loadSeason();
+  await pass_loadProgress();
+  await pass_loadRewards();
+}
+
+async function pass_loadSeason() {
+  try {
+    var { data: season } = await supabaseClient
+      .from('pass_seasons')
+      .select('*')
+      .eq('is_active', true)
+      .order('season_number', { ascending: false })
+      .limit(1)
+      .single();
+    
+    pawketPass.currentSeason = season;
+  } catch (err) {
+    console.error('Error loading pass season:', err);
+  }
+}
+
+async function pass_loadProgress() {
+  if (!currentUser || !pawketPass.currentSeason) return;
+  
+  try {
+    var { data: progress } = await supabaseClient
+      .from('player_pass_progress')
+      .select('*')
+      .eq('player_id', currentUser.id)
+      .eq('season_id', pawketPass.currentSeason.id)
+      .single();
+    
+    if (!progress) {
+      // Create progress
+      var { data: created } = await supabaseClient
+        .from('player_pass_progress')
+        .insert({
+          player_id: currentUser.id,
+          season_id: pawketPass.currentSeason.id,
+          pass_xp: 0,
+          pass_level: 1
+        })
+        .select()
+        .single();
+      
+      pawketPass.playerProgress = created;
+    } else {
+      pawketPass.playerProgress = progress;
+    }
+  } catch (err) {
+    console.error('Error loading pass progress:', err);
+  }
+}
+
+async function pass_loadRewards() {
+  if (!pawketPass.currentSeason) return;
+  
+  try {
+    var { data: rewards } = await supabaseClient
+      .from('pass_rewards')
+      .select('*')
+      .eq('season_id', pawketPass.currentSeason.id)
+      .order('level');
+    
+    pawketPass.rewards = rewards || [];
+  } catch (err) {
+    console.error('Error loading pass rewards:', err);
+  }
+}
+
+async function pass_grantXP(amount, source) {
+  if (!currentUser) return;
+  
+  try {
+    var { data: result } = await supabaseClient
+      .rpc('grant_pass_xp', {
+        p_user_id: currentUser.id,
+        p_xp_amount: amount,
+        p_source: source
+      });
+    
+    if (result && result.success) {
+      console.log('✅ Pass XP granted:', result);
+      
+      if (result.leveled_up) {
+        pass_showLevelUpNotification(result.new_level);
+      }
+      
+      // Reload progress
+      await pass_loadProgress();
+      
+      // Update UI
+      pass_updateDisplay();
+    }
+  } catch (err) {
+    console.error('Error granting pass XP:', err);
+  }
+}
+
+function pass_showLevelUpNotification(newLevel) {
+  showMilestone(
+    '🎉 PawketPass Level Up!',
+    'You reached Level ' + newLevel + '!',
+    'pass_levelup',
+    newLevel
+  );
+}
+
+function pass_updateDisplay() {
+  var passBtn = document.getElementById('navbar-pass-btn');
+  if (passBtn && pawketPass.playerProgress) {
+    passBtn.textContent = '🎫 Pass (Lvl ' + pawketPass.playerProgress.pass_level + ')';
+  }
+}
+
+async function pass_showModal() {
+  if (!pawketPass.currentSeason || !pawketPass.playerProgress) {
+    alert('PawketPass not available');
+    return;
+  }
+  
+  var modal = document.createElement('div');
+  modal.className = 'modal-overlay pass-modal-overlay';
+  
+  var progress = pawketPass.playerProgress;
+  var xpPercent = (progress.pass_xp / 100) * 100;
+  
+  var html = '<div class="modal-content pass-modal">';
+  html += '  <div class="modal-header">';
+  html += '    <h2>🎫 ' + pawketPass.currentSeason.name + '</h2>';
+  html += '    <button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">✕</button>';
+  html += '  </div>';
+  
+  html += '  <div class="pass-progress-display">';
+  html += '    <div class="pass-level">Level ' + progress.pass_level + ' / 50</div>';
+  html += '    <div class="pass-xp-bar">';
+  html += '      <div class="pass-xp-fill" style="width: ' + xpPercent + '%"></div>';
+  html += '    </div>';
+  html += '    <div class="pass-xp-text">' + progress.pass_xp + ' / 100 XP</div>';
+  html += '  </div>';
+  
+  html += '  <div class="pass-rewards-grid">';
+  
+  for (var i = 0; i < pawketPass.rewards.length; i++) {
+    var reward = pawketPass.rewards[i];
+    var isUnlocked = reward.level <= progress.pass_level;
+    var isClaimed = false; // TODO: Check claims
+    
+    var rewardClass = 'pass-reward-item';
+    if (isUnlocked) rewardClass += ' unlocked';
+    if (reward.is_premium) rewardClass += ' premium';
+    
+    html += '<div class="' + rewardClass + '">';
+    html += '  <div class="reward-level">Level ' + reward.level + '</div>';
+    html += '  <div class="reward-icon">' + pass_getRewardIcon(reward.reward_type) + '</div>';
+    html += '  <div class="reward-name">';
+    if (reward.reward_type === 'pp') {
+      html += reward.reward_amount + ' PP';
+    } else if (reward.reward_type === 'skin_key') {
+      html += reward.reward_amount + ' Skin Key' + (reward.reward_amount > 1 ? 's' : '');
+    }
+    html += '  </div>';
+    if (isUnlocked && !isClaimed) {
+      html += '  <button class="btn-claim" onclick="pass_claimReward(' + reward.level + ')">Claim</button>';
+    } else if (isClaimed) {
+      html += '  <div class="reward-claimed">✓ Claimed</div>';
+    } else {
+      html += '  <div class="reward-locked">🔒 Locked</div>';
+    }
+    html += '</div>';
+  }
+  
+  html += '  </div>';
+  html += '</div>';
+  
+  modal.innerHTML = html;
+  document.body.appendChild(modal);
+}
+
+function pass_getRewardIcon(type) {
+  switch(type) {
+    case 'pp': return '💰';
+    case 'skin_key': return '🔑';
+    case 'item': return '🎁';
+    case 'cosmetic': return '✨';
+    case 'title': return '🏷️';
+    default: return '❓';
+  }
+}
+
+async function pass_claimReward(level) {
+  if (!currentUser || !pawketPass.currentSeason) return;
+  
+  try {
+    var reward = pawketPass.rewards.find(function(r) { return r.level === level; });
+    if (!reward) return;
+    
+    // Grant reward
+    if (reward.reward_type === 'pp') {
+      await updatePoints(reward.reward_amount);
+    } else if (reward.reward_type === 'skin_key') {
+      await skinkey_grantKeys(reward.reward_amount, 'Pass Level ' + level);
+    }
+    
+    // Mark as claimed
+    await supabaseClient
+      .from('player_pass_claims')
+      .insert({
+        player_id: currentUser.id,
+        season_id: pawketPass.currentSeason.id,
+        level: level
+      });
+    
+    alert('Reward claimed! +' + reward.reward_amount + ' ' + reward.reward_type);
+    
+    // Refresh modal
+    document.querySelector('.pass-modal-overlay').remove();
+    pass_showModal();
+    
+  } catch (err) {
+    console.error('Error claiming reward:', err);
+    alert('Failed to claim reward');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 8. INTEGRATION - Hook into existing systems
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Initialize on load (add to existing phase1_init or similar)
+async function newFeatures_init() {
+  console.log('🚀 Initializing new features...');
+  
+  // Founder badges
+  await founder_checkAndGrant();
+  
+  // Today features
+  await today_init();
+  
+  // Login calendar
+  loginCalendar.currentStreak = playerStats.login_streak || 0;
+  await calendar_init();
+  
+  // Daily welcome modal
+  await dailyWelcome_check();
+  
+  // PawketPass
+  await pass_init();
+  pass_updateDisplay();
+  
+  console.log('✅ New features initialized!');
+}
+
+// Grant Pass XP after battles
+var original_endBattle = endBattle;
+endBattle = function() {
+  original_endBattle.apply(this, arguments);
+  pass_grantXP(10, 'battle');
+};
+
+// Grant Pass XP after feeding
+var original_feedPet = feedPet;
+feedPet = async function() {
+  var result = await original_feedPet.apply(this, arguments);
+  pass_grantXP(5, 'feed');
+  return result;
+};
+
+// Grant Pass XP after playing
+var original_playWithPet = playWithPet;
+playWithPet = async function() {
+  var result = await original_playWithPet.apply(this, arguments);
+  pass_grantXP(5, 'play');
+  return result;
+};
+
+// Check for rare drops after battles
+var original_awardBattleRewards = awardBattleRewards;
+// ═══════════════════════════════════════════════════════════════════════════
+// NEW FEATURES - WRAPPER PATTERN INTEGRATION
+// Extends existing systems without replacing them
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Helper: Get current streak from YOUR existing data
+function getPlayerStreak() {
+  if (window.playerData && playerData.login_streak) {
+    return playerData.login_streak;
+  }
+  if (typeof calculateDayStreak === 'function') {
+    return calculateDayStreak();
+  }
+  return 0;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 1. FOUNDER BADGES SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+var founderBadges = {
+  tiers: {
+    alpha: { name: 'Alpha Founder', cutoffDate: '2024-06-01' },
+    beta: { name: 'Beta Founder', cutoffDate: '2024-08-01' },
+    early: { name: 'Early Supporter', cutoffDate: '2024-09-01' }
+  }
+};
+
+async function founder_checkAndGrant() {
+  if (!currentUser) return;
+  
+  try {
+    var { data: player } = await supabaseClient
+      .from('players')
+      .select('founder_status, created_at')
+      .eq('id', currentUser.id)
+      .single();
+    
+    if (!player || player.founder_status) return;
+    
+    var accountDate = new Date(player.created_at);
+    var tier = null;
+    
+    if (accountDate < new Date(founderBadges.tiers.alpha.cutoffDate)) tier = 'alpha';
+    else if (accountDate < new Date(founderBadges.tiers.beta.cutoffDate)) tier = 'beta';
+    else if (accountDate < new Date(founderBadges.tiers.early.cutoffDate)) tier = 'early';
+    
+    if (!tier) return;
+    
+    await supabaseClient.from('players').update({
+      founder_status: tier,
+      founder_granted_at: new Date().toISOString()
+    }).eq('id', currentUser.id);
+    
+    showModal('👑 Founder Status Granted!',
+      '<div style="text-align:center; padding:20px;">' +
+      '<h2 style="color:#fbbf24; margin-bottom:15px;">' + founderBadges.tiers[tier].name + '</h2>' +
+      '<p style="margin:15px 0;">Thank you for being an early supporter!</p>' +
+      '<p style="color:#f59e0b; font-weight:bold; margin-top:20px;">This status can never be obtained again!</p>' +
+      '</div>'
+    );
+    
+    console.log('🎉 Founder status granted:', tier);
+  } catch (err) {
+    console.error('Founder check error:', err);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 2. RARE COLLECTIBLES SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function rare_checkDrop(source, sourceId) {
+  if (!currentUser) return;
+  
+  try {
+    var { data: availableRares } = await supabaseClient
+      .from('rare_cosmetics')
+      .select('*')
+      .eq('drop_source', source);
+    
+    if (!availableRares || availableRares.length === 0) return;
+    
+    for (var rare of availableRares) {
+      if (Math.random() < rare.drop_rate) {
+        var { data: existing } = await supabaseClient
+          .from('player_rare_cosmetics')
+          .select('id')
+          .eq('player_id', currentUser.id)
+          .eq('cosmetic_id', rare.id)
+          .single();
+        
+        if (existing) continue;
+        
+        await supabaseClient.from('player_rare_cosmetics').insert({
+          player_id: currentUser.id,
+          cosmetic_id: rare.id,
+          obtained_from: sourceId
+        });
+        
+        await supabaseClient.from('rare_cosmetics')
+          .update({ obtained_count: rare.obtained_count + 1 })
+          .eq('id', rare.id);
+        
+        var rarityColors = { rare: '#3b82f6', epic: '#a855f7', legendary: '#f59e0b', mythic: '#ec4899' };
+        var color = rarityColors[rare.rarity] || '#3b82f6';
+        
+        showModal('✨ ' + rare.rarity.toUpperCase() + ' DROP!',
+          '<div style="text-align:center; padding:20px;">' +
+          '<h2 style="color:' + color + '; margin-bottom:15px;">' + rare.name + '</h2>' +
+          '<p style="margin:15px 0;">' + rare.description + '</p>' +
+          '<div style="margin-top:20px; padding:15px; background:rgba(0,0,0,0.2); border-radius:8px;">' +
+          '<div style="margin:8px 0;">Rarity: <span style="color:' + color + '; font-weight:bold;">' + rare.rarity + '</span></div>' +
+          '<div style="margin:8px 0;">Drop Rate: <strong>' + (rare.drop_rate * 100).toFixed(2) + '%</strong></div>' +
+          '<div style="margin:8px 0;">Obtained By: <strong>' + (rare.obtained_count + 1) + ' players</strong></div>' +
+          '</div></div>'
+        );
+        
+        console.log('🎉 Rare drop:', rare.name);
+        break;
+      }
+    }
+  } catch (err) {
+    console.error('Rare drop error:', err);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 3. TODAY IN PAWKETPETS SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+var todayFeatures = {
+  current: null,
+  weatherTypes: [
+    { id: 'sunny', emoji: '☀️', name: 'Sunny' },
+    { id: 'rainy', emoji: '🌧️', name: 'Rainy' },
+    { id: 'foggy', emoji: '🌫️', name: 'Foggy' },
+    { id: 'snowy', emoji: '❄️', name: 'Snowy' },
+    { id: 'stormy', emoji: '⛈️', name: 'Stormy' }
+  ],
+  bonusTypes: [
+    { id: 'double_xp', name: '2x Battle XP' },
+    { id: 'double_pp', name: '2x PawketPoints' },
+    { id: 'bonus_drops', name: '+25% Rare Drops' }
+  ],
+  headlines: [
+    '🔬 Scientists discover new pet variant!',
+    '🎭 Local pet wins talent show!',
+    '🌟 Mysterious lights seen in sky...',
+    '📰 PawketPets reaches 1,000 players!',
+    '🎉 Community goal smashed!',
+    '🔮 Fortune teller predicts lucky day!',
+    '🎪 Traveling merchant spotted!',
+    '🏆 New leaderboard champion!'
+  ]
+};
+
+async function today_init() {
+  var todayDate = new Date().toISOString().split('T')[0];
+  
+  try {
+    var { data: existing } = await supabaseClient
+      .from('daily_features')
+      .select('*')
+      .eq('date', todayDate)
+      .single();
+    
+    if (existing) {
+      todayFeatures.current = existing;
+    } else {
+      var weather = todayFeatures.weatherTypes[Math.floor(Math.random() * todayFeatures.weatherTypes.length)];
+      var bonus = todayFeatures.bonusTypes[Math.floor(Math.random() * todayFeatures.bonusTypes.length)];
+      var headline = todayFeatures.headlines[Math.floor(Math.random() * todayFeatures.headlines.length)];
+      
+      var { data: created } = await supabaseClient.from('daily_features').insert({
+        date: todayDate,
+        weather: weather.id,
+        bonus_type: bonus.id,
+        featured_type: ['fire', 'water', 'grass', 'electric'][Math.floor(Math.random() * 4)],
+        news_headline: headline
+      }).select().single();
+      
+      todayFeatures.current = created;
+    }
+    
+    today_displayBanner();
+  } catch (err) {
+    console.error('Today features error:', err);
+  }
+}
+
+function today_displayBanner() {
+  var homeSection = document.getElementById('section-home');
+  if (!homeSection || !todayFeatures.current) return;
+  
+  var features = todayFeatures.current;
+  var weather = todayFeatures.weatherTypes.find(function(w) { return w.id === features.weather; });
+  var bonus = todayFeatures.bonusTypes.find(function(b) { return b.id === features.bonus_type; });
+  
+  var banner = document.createElement('div');
+  banner.className = 'today-banner';
+  banner.style.cssText = 'background:linear-gradient(135deg,#667eea,#764ba2);border-radius:12px;padding:16px;margin-bottom:16px;cursor:pointer;color:white;box-shadow:0 4px 12px rgba(102,126,234,0.3);';
+  banner.innerHTML = 
+    '<div onclick="var d=this.nextElementSibling;var a=this.querySelector(\'.arrow\');d.style.display=d.style.display===\'none\'?\'block\':\'none\';a.textContent=d.style.display===\'none\'?\'▼\':\'▲\';" style="display:flex;justify-content:space-between;align-items:center;">' +
+    '<span style="font-weight:500;">🌟 Today: ' + (weather ? weather.emoji + ' ' + weather.name : '') + ' • ' +
+    (bonus ? '⚡ ' + bonus.name : '') + ' • ✨ ' + features.featured_type + ' Day</span>' +
+    '<span class="arrow" style="font-size:12px;">▼</span>' +
+    '</div>' +
+    '<div style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.2);">' +
+    '<div style="padding:8px 0;">Weather: ' + (weather ? weather.emoji + ' ' + weather.name : '') + '</div>' +
+    '<div style="padding:8px 0;">Bonus: ' + (bonus ? bonus.name : '') + '</div>' +
+    '<div style="padding:8px 0;">Featured: ' + features.featured_type + '-type pets earn +50% XP</div>' +
+    '<div style="padding:12px;margin-top:12px;background:rgba(0,0,0,0.2);border-radius:8px;border-left:3px solid #fbbf24;color:#fbbf24;font-size:13px;">📰 ' + features.news_headline + '</div>' +
+    '</div>';
+  
+  if (homeSection.firstChild) {
+    homeSection.insertBefore(banner, homeSection.firstChild);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4. LOGIN CALENDAR VISUAL
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function calendar_init() {
+  try {
+    var { data: rewards } = await supabaseClient
+      .from('login_calendar_rewards')
+      .select('*')
+      .order('day');
+    
+    window.calendarRewards = rewards || [];
+    calendar_displayWidget();
+  } catch (err) {
+    console.error('Calendar error:', err);
+  }
+}
+
+function calendar_displayWidget() {
+  var homeSection = document.getElementById('section-home');
+  if (!homeSection) return;
+  
+  var streak = getPlayerStreak();
+  var nextDay = Math.min(streak + 1, 30);
+  var nextReward = window.calendarRewards ? window.calendarRewards.find(function(r) { return r.day === nextDay; }) : null;
+  
+  var widget = document.createElement('div');
+  widget.className = 'calendar-widget';
+  widget.style.cssText = 'background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.2);border-radius:12px;padding:16px;margin-bottom:20px;cursor:pointer;transition:all 0.3s ease;';
+  widget.onmouseover = function() { this.style.background = 'rgba(255,255,255,0.15)'; this.style.borderColor = 'rgba(255,255,255,0.3)'; };
+  widget.onmouseout = function() { this.style.background = 'rgba(255,255,255,0.1)'; this.style.borderColor = 'rgba(255,255,255,0.2)'; };
+  widget.onclick = function() { calendar_showFull(); };
+  
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
+  html += '<span style="font-weight:bold;font-size:16px;color:#fbbf24;">📅 Day ' + streak + ' Streak</span>';
+  if (nextReward) {
+    html += '<span style="color:#cbd5e1;font-size:14px;">Next: ' + nextReward.pp_reward + ' PP';
+    if (nextReward.skin_keys > 0) html += ' + ' + nextReward.skin_keys + ' 🔑';
+    html += '</span>';
+  }
+  html += '</div>';
+  
+  html += '<div style="display:flex;gap:8px;justify-content:center;">';
+  for (var i = 1; i <= 7; i++) {
+    var style = 'width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;transition:all 0.3s ease;';
+    if (i <= streak) {
+      style += 'background:#4ade80;color:white;box-shadow:0 0 10px rgba(74,222,128,0.5);';
+      html += '<span style="' + style + '">✓</span>';
+    } else if (i === streak + 1) {
+      style += 'background:#fbbf24;color:#1e1e2e;box-shadow:0 0 15px rgba(251,191,36,0.6);animation:pulse 2s infinite;';
+      html += '<span style="' + style + '">' + i + '</span>';
+    } else {
+      style += 'background:rgba(255,255,255,0.2);color:#94a3b8;';
+      html += '<span style="' + style + '">' + i + '</span>';
+    }
+  }
+  html += '</div>';
+  
+  widget.innerHTML = html;
+  
+  var todayBanner = homeSection.querySelector('.today-banner');
+  if (todayBanner) {
+    todayBanner.parentNode.insertBefore(widget, todayBanner.nextSibling);
+  } else if (homeSection.firstChild) {
+    homeSection.insertBefore(widget, homeSection.firstChild);
+  }
+}
+
+function calendar_showFull() {
+  var streak = getPlayerStreak();
+  var html = '<h2 style="text-align:center;margin-bottom:20px;">📅 30-Day Login Calendar</h2>';
+  html += '<div style="text-align:center;margin:20px 0;padding:15px;background:rgba(251,191,36,0.1);border-radius:12px;color:#fbbf24;">Current Streak: <strong style="font-size:24px;">' + streak + ' days</strong></div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:15px;max-height:400px;overflow-y:auto;padding:10px;">';
+  
+  for (var i = 1; i <= 30; i++) {
+    var reward = window.calendarRewards ? window.calendarRewards.find(function(r) { return r.day === i; }) : null;
+    var style = 'padding:15px;text-align:center;border-radius:12px;transition:all 0.3s ease;border:2px solid;';
+    if (i <= streak) {
+      style += 'background:rgba(74,222,128,0.1);border-color:#4ade80;';
+    } else if (i === streak + 1) {
+      style += 'background:rgba(251,191,36,0.15);border-color:#fbbf24;box-shadow:0 0 20px rgba(251,191,36,0.3);';
+    } else {
+      style += 'background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);';
+    }
+    
+    if (reward && reward.is_milestone) {
+      style += 'background:linear-gradient(135deg,rgba(245,158,11,0.1),rgba(251,191,36,0.1));border-color:#f59e0b;';
+    }
+    
+    html += '<div style="' + style + '">';
+    html += '<div style="font-weight:bold;font-size:14px;color:#cbd5e1;margin-bottom:10px;">Day ' + i + '</div>';
+    if (reward) {
+      html += '<div style="font-size:16px;font-weight:bold;color:#fbbf24;margin:8px 0;">' + reward.pp_reward + ' PP</div>';
+      if (reward.skin_keys > 0) {
+        html += '<div style="font-size:14px;color:#60a5fa;margin:4px 0;">' + reward.skin_keys + ' 🔑</div>';
+      }
+      if (reward.is_milestone) {
+        html += '<div style="font-size:12px;color:#f59e0b;margin-top:8px;padding:4px 8px;background:rgba(245,158,11,0.2);border-radius:6px;">⭐ ' + reward.milestone_title + '</div>';
+      }
+    }
+    if (i <= streak) {
+      html += '<div style="color:#4ade80;font-size:12px;margin-top:10px;padding:4px 8px;background:rgba(74,222,128,0.2);border-radius:6px;">✓ Claimed</div>';
+    } else if (i === streak + 1) {
+      html += '<div style="color:#fbbf24;font-size:12px;font-weight:bold;margin-top:10px;">← Today</div>';
+    }
+    html += '</div>';
+  }
+  
+  html += '</div>';
+  showModal('Login Calendar', html);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 5. DAILY WELCOME MODAL
+// ═══════════════════════════════════════════════════════════════════════════
+
+function dailyWelcome_check() {
+  var lastWelcome = localStorage.getItem('lastDailyWelcome');
+  var today = new Date().toDateString();
+  
+  if (lastWelcome !== today) {
+    dailyWelcome_show();
+    localStorage.setItem('lastDailyWelcome', today);
+  }
+}
+
+function dailyWelcome_show() {
+  var streak = getPlayerStreak();
+  var features = todayFeatures.current;
+  
+  var html = '<div style="text-align:center;padding:30px;">';
+  html += '<div style="font-size:60px;margin-bottom:10px;animation:bounce 2s infinite;">🎉</div>';
+  html += '<h2 style="font-size:32px;color:#fbbf24;margin:10px 0;">WELCOME BACK!</h2>';
+  html += '<div style="font-size:18px;color:#cbd5e1;margin-bottom:25px;">Day ' + streak + ' Streak</div>';
+  
+  if (features) {
+    var weather = todayFeatures.weatherTypes.find(function(w) { return w.id === features.weather; });
+    var bonus = todayFeatures.bonusTypes.find(function(b) { return b.id === features.bonus_type; });
+    
+    html += '<div style="background:rgba(102,126,234,0.1);padding:20px;border-radius:12px;margin-bottom:20px;border-left:4px solid #667eea;">';
+    html += '<h3 style="color:#667eea;margin-bottom:15px;font-size:18px;">🌟 TODAY IN PAWKETPETS</h3>';
+    html += '<div style="padding:8px 0;color:#e2e8f0;font-size:15px;">Weather: ' + (weather ? weather.emoji + ' ' + weather.name : '') + '</div>';
+    html += '<div style="padding:8px 0;color:#e2e8f0;font-size:15px;">Bonus: ' + (bonus ? bonus.name : '') + '</div>';
+    html += '<div style="padding:8px 0;color:#e2e8f0;font-size:15px;">Featured: ✨ ' + features.featured_type + '-type pets +50% XP</div>';
+    html += '</div>';
+  }
+  
+  html += '<div style="background:rgba(251,191,36,0.1);padding:20px;border-radius:12px;border-left:4px solid #fbbf24;">';
+  html += '<h3 style="color:#fbbf24;margin-bottom:15px;font-size:18px;">📅 YOUR PROGRESS</h3>';
+  html += '<div style="display:flex;gap:10px;justify-content:center;margin:15px 0;">';
+  for (var i = 1; i <= 7; i++) {
+    var style = 'width:45px;height:45px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:bold;';
+    if (i <= streak) {
+      style += 'background:#4ade80;color:white;';
+      html += '<span style="' + style + '">✓</span>';
+    } else if (i === streak + 1) {
+      style += 'background:#fbbf24;color:#1e1e2e;animation:pulse 2s infinite;';
+      html += '<span style="' + style + '">' + i + '</span>';
+    } else {
+      style += 'background:rgba(255,255,255,0.2);color:#94a3b8;';
+      html += '<span style="' + style + '">' + i + '</span>';
+    }
+  }
+  html += '</div>';
+  
+  var nextDay = Math.min(streak + 1, 30);
+  var nextReward = window.calendarRewards ? window.calendarRewards.find(function(r) { return r.day === nextDay; }) : null;
+  if (nextReward) {
+    html += '<div style="text-align:center;margin-top:15px;padding:12px;background:rgba(0,0,0,0.3);border-radius:8px;color:#cbd5e1;font-size:15px;">🎁 Tomorrow: Day ' + nextDay + ' - ' + nextReward.pp_reward + ' PP';
+    if (nextReward.skin_keys > 0) html += ' + ' + nextReward.skin_keys + ' 🔑';
+    if (nextReward.is_milestone) html += ' + ' + nextReward.milestone_title;
+    html += '</div>';
+  }
+  
+  html += '</div></div>';
+  
+  showModal('Welcome Back!', html);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 6. SCREENSHOT CARDS
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function screenshot_generate(petId) {
+  try {
+    var { data: pet } = await supabaseClient
+      .from('user_pets')
+      .select('*, players(username)')
+      .eq('id', petId)
+      .single();
+    
+    if (!pet) { alert('Pet not found'); return; }
+    
+    var canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 800;
+    var ctx = canvas.getContext('2d');
+    
+    var gradient = ctx.createLinearGradient(0, 0, 0, 800);
+    gradient.addColorStop(0, '#667eea');
+    gradient.addColorStop(1, '#764ba2');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 600, 800);
+    
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.fillRect(40, 40, 520, 720);
+    
+    ctx.fillStyle = '#333';
+    ctx.font = '120px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('🐾', 300, 250);
+    
+    ctx.font = 'bold 48px Arial';
+    ctx.fillText(pet.nickname || pet.pet_type, 300, 350);
+    
+    ctx.font = '28px Arial';
+    ctx.fillText('Level ' + pet.level, 300, 400);
+    
+    if (pet.current_variant) {
+      ctx.font = '22px Arial';
+      ctx.fillStyle = '#667eea';
+      ctx.fillText(pet.current_variant + ' Variant', 300, 440);
+    }
+    
+    ctx.fillStyle = '#666';
+    ctx.font = '24px Arial';
+    ctx.fillText('🔥 ' + pet.pet_type + ' Type', 300, 490);
+    
+    ctx.fillStyle = '#333';
+    ctx.textAlign = 'left';
+    ctx.font = '22px Arial';
+    ctx.fillText('❤️ HP: ' + pet.max_hp, 100, 560);
+    ctx.fillText('⚔️ ATK: ' + pet.attack, 100, 600);
+    ctx.fillText('🛡️ DEF: ' + pet.defense, 350, 560);
+    ctx.fillText('⚡ SPD: ' + pet.speed, 350, 600);
+    
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#999';
+    ctx.font = '20px Arial';
+    ctx.fillText('Owned by: ' + (pet.players ? pet.players.username : 'Unknown'), 300, 680);
+    
+    ctx.fillStyle = '#667eea';
+    ctx.font = 'bold 24px Arial';
+    ctx.fillText('PawketPets.com', 300, 730);
+    
+    canvas.toBlob(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = (pet.nickname || pet.pet_type) + '_card.png';
+      a.click();
+      
+      showModal('📸 Screenshot Generated!',
+        '<div style="text-align:center;padding:20px;">' +
+        '<p style="margin-bottom:20px;">Your pet card has been downloaded!</p>' +
+        '<img src="' + url + '" style="max-width:300px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">' +
+        '</div>'
+      );
+    });
+  } catch (err) {
+    console.error('Screenshot error:', err);
+    alert('Failed to generate screenshot');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 7. INTEGRATION HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function newFeatures_checkBattleRewards(battleId) {
+  await rare_checkDrop('battle', battleId);
+}
+
+async function newFeatures_checkDungeonRewards(dungeonId) {
+  await rare_checkDrop('dungeon', dungeonId);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 8. MAIN INITIALIZATION (called from phase1_init)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function newFeatures_init() {
+  console.log('🚀 Initializing new features (wrapper pattern)...');
+  
+  try {
+    await founder_checkAndGrant();
+    await today_init();
+    await calendar_init();
+    dailyWelcome_check();
+    
+    console.log('✅ New features initialized successfully!');
+  } catch (err) {
+    console.error('❌ New features initialization error:', err);
+  }
+}
+
+console.log('✅ New features wrapper code loaded');
+

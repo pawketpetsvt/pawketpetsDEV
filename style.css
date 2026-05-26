@@ -13228,3 +13228,1102 @@ body[data-theme="dark"] .modal-content {
 .bingo-modal .modal-content {
   background: #1a1a2e !important;
 }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   HEADER LAYOUT FIX - FULL WIDTH, PROPER ORDER
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Override previous header fixes with correct layout */
+.navbar,
+.navbar-consolidated {
+  width: 100% !important;
+  max-width: 100vw !important;
+  padding: 8px 20px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.navbar-inner {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  gap: 16px !important;
+}
+
+/* LEFT SECTION - Logo and Beta badge */
+.navbar-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+  flex-shrink: 0 !important;
+}
+
+/* CENTER SECTION - Bell, Pass, Bingo */
+.navbar-center {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  flex-shrink: 0 !important;
+}
+
+/* RIGHT SECTION - Username, PP, Profile, Logout, Music */
+.navbar-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+  flex-shrink: 0 !important;
+  margin-left: auto !important;
+}
+
+/* Logo styling */
+.navbar-logo {
+  font-size: 1.2rem !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+}
+
+.navbar-logo img {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+/* Beta Badge - updated styling */
+.beta-badge-wrapper {
+  display: flex;
+  align-items: center;
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.beta-badge {
+  background: rgba(0, 0, 0, 0.35) !important;
+  color: #ffcc00 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 4px 12px !important;
+  border-radius: 20px !important;
+  letter-spacing: 1px !important;
+  border: 1px solid rgba(255, 204, 0, 0.4) !important;
+  white-space: nowrap !important;
+  cursor: help !important;
+}
+
+.beta-badge:hover {
+  background: rgba(0, 0, 0, 0.6) !important;
+  transform: scale(1.02);
+  border-color: rgba(255, 204, 0, 0.8) !important;
+}
+
+/* Notification Bell */
+.notification-bell {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  padding: 4px 8px !important;
+  position: relative !important;
+}
+
+.bell-icon {
+  font-size: 1.3rem !important;
+}
+
+/* Pass and Bingo buttons */
+.pass-button,
+.bingo-button {
+  padding: 6px 14px !important;
+  font-size: 13px !important;
+  border-radius: 20px !important;
+  white-space: nowrap !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+}
+
+/* Username and Points */
+#nav-user,
+#nav-points {
+  font-size: 13px !important;
+  padding: 6px 12px !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 20px !important;
+  white-space: nowrap !important;
+  font-weight: 600 !important;
+}
+
+#nav-points {
+  background: rgba(255, 107, 53, 0.2) !important;
+  border: 1px solid rgba(255, 107, 53, 0.3) !important;
+}
+
+/* Profile and Logout buttons */
+.btn-nav-action {
+  padding: 6px 14px !important;
+  font-size: 13px !important;
+  border-radius: 20px !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+}
+
+/* Music Player - far right */
+.music-controls-inline {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin-left: 4px !important;
+  padding-left: 8px !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.music-btn-inline {
+  padding: 4px 8px !important;
+  font-size: 11px !important;
+  border-radius: 50% !important;
+  width: 28px !important;
+  height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+}
+
+.music-volume-inline {
+  width: 50px !important;
+}
+
+/* Responsive - hide items on small screens */
+@media (max-width: 1000px) {
+  .music-volume-inline {
+    display: none !important;
+  }
+}
+
+@media (max-width: 850px) {
+  .music-controls-inline {
+    border-left: none !important;
+    padding-left: 0 !important;
+  }
+  .music-title-inline {
+    display: none !important;
+  }
+}
+
+@media (max-width: 750px) {
+  #nav-user {
+    display: none !important;
+  }
+}
+
+@media (max-width: 650px) {
+  .pass-label {
+    display: none !important;
+  }
+  .pass-button {
+    padding: 6px 10px !important;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BINGO MODAL FIXES - PURPLE BORDER, DARK RULES
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Bingo Modal - Dark theme with purple/pink accents */
+.bingo-modal .modal-content,
+.bingo-modal-content {
+  background: #1e1e2e !important;
+  color: #ffffff !important;
+  border: 3px solid #9966ff !important;
+  border-radius: 20px !important;
+  box-shadow: 0 0 20px rgba(153, 102, 255, 0.3) !important;
+}
+
+/* Bingo grid cards */
+.bingo-card,
+#bingo-grid .bingo-card {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(153, 102, 255, 0.3) !important;
+  border-radius: 12px !important;
+  color: #ffffff !important;
+}
+
+/* Completed cards */
+.bingo-card.bingo-completed {
+  background: rgba(76, 175, 80, 0.2) !important;
+  border-color: #4caf50 !important;
+}
+
+/* RULES SECTION - Fix the white background */
+.bingo-modal .rewards-info,
+.bingo-modal .bingo-rewards-info,
+.bingo-modal .bingo-rules,
+.bingo-modal [class*="reward"],
+.bingo-modal .info-box {
+  background: rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid rgba(153, 102, 255, 0.3) !important;
+  border-radius: 12px !important;
+  padding: 15px !important;
+  margin-top: 20px !important;
+  color: #e8d5ff !important;
+}
+
+/* Rules text */
+.bingo-modal .rewards-info p,
+.bingo-modal .bingo-rewards-info p,
+.bingo-modal .info-box p {
+  color: #e8d5ff !important;
+}
+
+/* Rules list items */
+.bingo-modal .rewards-info li,
+.bingo-modal .bingo-rewards-info li {
+  color: #e8d5ff !important;
+}
+
+/* Headers inside bingo modal */
+.bingo-modal h2,
+.bingo-modal h3 {
+  color: #ff6b35 !important;
+}
+
+/* Progress text */
+.bingo-progress,
+.bingo-card .progress-text {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Completed text */
+.bingo-check {
+  color: #4caf50 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ALL NEW FEATURES - CSS STYLING
+   Founder Badges, Rare Collectibles, Today Banner, Login Calendar,
+   Screenshot Cards, PawketPass
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   1. FOUNDER CELEBRATION MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.founder-celebration {
+  z-index: 10000;
+}
+
+.founder-modal {
+  max-width: 500px;
+  background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+  border: 3px solid #fbbf24;
+  animation: founderEntrance 0.5s ease-out;
+}
+
+@keyframes founderEntrance {
+  from { transform: scale(0.8) translateY(-50px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.founder-header {
+  text-align: center;
+  padding: 30px 20px 20px;
+  border-bottom: 2px solid rgba(251, 191, 36, 0.3);
+}
+
+.founder-icon {
+  font-size: 80px;
+  animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+.founder-header h2 {
+  font-size: 28px;
+  color: #fbbf24;
+  margin: 10px 0;
+  text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+}
+
+.founder-body {
+  padding: 30px;
+  text-align: center;
+}
+
+.founder-tier {
+  font-size: 32px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  padding: 15px;
+  border-radius: 12px;
+  background: rgba(251, 191, 36, 0.1);
+  border: 2px solid #fbbf24;
+}
+
+.founder-tier.alpha {
+  color: #fbbf24;
+  text-shadow: 0 0 20px rgba(251, 191, 36, 0.8);
+}
+
+.founder-tier.beta {
+  color: #c084fc;
+  border-color: #c084fc;
+  text-shadow: 0 0 20px rgba(192, 132, 252, 0.8);
+}
+
+.founder-tier.early {
+  color: #60a5fa;
+  border-color: #60a5fa;
+  text-shadow: 0 0 20px rgba(96, 165, 250, 0.8);
+}
+
+.founder-desc {
+  font-size: 16px;
+  color: #e2e8f0;
+  margin-bottom: 25px;
+}
+
+.founder-rewards {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.founder-rewards h3 {
+  color: #fbbf24;
+  margin-bottom: 15px;
+}
+
+.reward-item {
+  font-size: 18px;
+  padding: 10px;
+  margin: 8px 0;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  color: #f1f5f9;
+}
+
+.founder-exclusive {
+  font-size: 14px;
+  color: #f59e0b;
+  font-weight: bold;
+  margin-top: 15px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2. RARE DROP CELEBRATION MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.rare-drop-celebration {
+  z-index: 10000;
+}
+
+.rare-drop-modal {
+  max-width: 500px;
+  background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+  animation: rareDropEntrance 0.6s ease-out;
+}
+
+@keyframes rareDropEntrance {
+  0% { transform: scale(0.5) rotate(-10deg); opacity: 0; }
+  60% { transform: scale(1.1) rotate(5deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+.rare-drop-header {
+  text-align: center;
+  padding: 30px 20px 20px;
+}
+
+.rare-drop-icon {
+  font-size: 80px;
+  animation: sparkle 1.5s infinite;
+}
+
+@keyframes sparkle {
+  0%, 100% { transform: scale(1) rotate(0deg); filter: brightness(1); }
+  50% { transform: scale(1.2) rotate(180deg); filter: brightness(1.5); }
+}
+
+.rare-drop-body {
+  padding: 30px;
+  text-align: center;
+}
+
+.rare-drop-name {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 15px;
+}
+
+.rare-drop-desc {
+  font-size: 16px;
+  color: #cbd5e1;
+  margin-bottom: 25px;
+}
+
+.rare-drop-stats {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 20px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rare-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.stat-label {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-weight: bold;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3. TODAY IN PAWKETPETS BANNER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.today-banner {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.today-banner:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.today-banner.collapsed {
+  padding: 12px 16px;
+}
+
+.today-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.today-icon {
+  font-size: 24px;
+  animation: pulse 2s infinite;
+}
+
+.today-text {
+  flex: 1;
+}
+
+.today-arrow {
+  font-size: 12px;
+  transition: transform 0.3s ease;
+}
+
+.today-details {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.today-detail-item {
+  padding: 8px 0;
+  color: white;
+}
+
+.today-detail-item strong {
+  color: #fbbf24;
+  margin-right: 8px;
+}
+
+.detail-effect {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.today-news {
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  color: #fbbf24;
+  font-size: 13px;
+  border-left: 3px solid #fbbf24;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   4. LOGIN CALENDAR WIDGET
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.calendar-widget {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.calendar-widget:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.calendar-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #fbbf24;
+}
+
+.calendar-next {
+  font-size: 14px;
+  color: #cbd5e1;
+}
+
+.calendar-dots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.dot {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  color: #94a3b8;
+  transition: all 0.3s ease;
+}
+
+.dot.completed {
+  background: #4ade80;
+  color: white;
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+}
+
+.dot.active {
+  background: #fbbf24;
+  color: #1e1e2e;
+  animation: pulse 2s infinite;
+  box-shadow: 0 0 15px rgba(251, 191, 36, 0.6);
+}
+
+.dot.milestone {
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+  border: 2px solid #fbbf24;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.8);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5. CALENDAR FULL MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.calendar-modal {
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.calendar-streak-display {
+  text-align: center;
+  font-size: 20px;
+  margin-bottom: 25px;
+  padding: 15px;
+  background: rgba(251, 191, 36, 0.1);
+  border-radius: 12px;
+  color: #fbbf24;
+}
+
+.calendar-streak-display strong {
+  font-size: 24px;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 15px;
+  padding: 20px 0;
+}
+
+.calendar-day {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 15px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.calendar-day:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.calendar-day.completed {
+  background: rgba(74, 222, 128, 0.1);
+  border-color: #4ade80;
+}
+
+.calendar-day.current {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: #fbbf24;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+}
+
+.calendar-day.milestone {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%);
+  border: 2px solid #f59e0b;
+}
+
+.day-number {
+  font-weight: bold;
+  font-size: 14px;
+  color: #cbd5e1;
+  margin-bottom: 10px;
+}
+
+.day-reward {
+  margin: 10px 0;
+}
+
+.reward-pp {
+  font-size: 16px;
+  font-weight: bold;
+  color: #fbbf24;
+}
+
+.reward-keys {
+  font-size: 14px;
+  color: #60a5fa;
+  margin-top: 4px;
+}
+
+.reward-milestone {
+  font-size: 12px;
+  color: #f59e0b;
+  margin-top: 8px;
+  padding: 4px 8px;
+  background: rgba(245, 158, 11, 0.2);
+  border-radius: 6px;
+}
+
+.day-status {
+  font-size: 12px;
+  margin-top: 10px;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.calendar-day.completed .day-status {
+  background: rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+}
+
+.current-day {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  font-weight: bold;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   6. DAILY WELCOME MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.daily-welcome-modal {
+  z-index: 9999;
+}
+
+.welcome-modal {
+  max-width: 600px;
+  background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+  animation: welcomeEntrance 0.6s ease-out;
+}
+
+@keyframes welcomeEntrance {
+  from { transform: scale(0.9) translateY(-30px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.welcome-header {
+  text-align: center;
+  padding: 30px 20px;
+  border-bottom: 2px solid rgba(251, 191, 36, 0.3);
+}
+
+.welcome-icon {
+  font-size: 60px;
+  animation: bounce 2s infinite;
+}
+
+.welcome-header h2 {
+  font-size: 32px;
+  color: #fbbf24;
+  margin: 10px 0;
+}
+
+.welcome-streak {
+  font-size: 18px;
+  color: #cbd5e1;
+}
+
+.welcome-body {
+  padding: 30px;
+}
+
+.welcome-reward-claimed {
+  text-align: center;
+  padding: 25px;
+  background: linear-gradient(135deg, rgba(74, 222, 128, 0.1) 0%, rgba(34, 197, 94, 0.1) 100%);
+  border: 2px solid #4ade80;
+  border-radius: 12px;
+  margin-bottom: 25px;
+}
+
+.claimed-icon {
+  font-size: 50px;
+  margin-bottom: 10px;
+}
+
+.claimed-text {
+  font-size: 20px;
+  font-weight: bold;
+  color: #4ade80;
+  margin-bottom: 8px;
+}
+
+.claimed-amount {
+  font-size: 24px;
+  font-weight: bold;
+  color: #fbbf24;
+  margin: 8px 0;
+}
+
+.claimed-milestone {
+  font-size: 16px;
+  color: #f59e0b;
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: rgba(245, 158, 11, 0.2);
+  border-radius: 8px;
+  display: inline-block;
+}
+
+.welcome-today {
+  background: rgba(102, 126, 234, 0.1);
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  border-left: 4px solid #667eea;
+}
+
+.welcome-today h3 {
+  color: #667eea;
+  margin-bottom: 15px;
+  font-size: 18px;
+}
+
+.today-item {
+  padding: 8px 0;
+  color: #e2e8f0;
+  font-size: 15px;
+}
+
+.welcome-calendar {
+  background: rgba(251, 191, 36, 0.1);
+  padding: 20px;
+  border-radius: 12px;
+  border-left: 4px solid #fbbf24;
+}
+
+.welcome-calendar h3 {
+  color: #fbbf24;
+  margin-bottom: 15px;
+  font-size: 18px;
+}
+
+.welcome-calendar-dots {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 15px 0;
+}
+
+.w-dot {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  color: #94a3b8;
+}
+
+.w-dot.completed {
+  background: #4ade80;
+  color: white;
+}
+
+.w-dot.active {
+  background: #fbbf24;
+  color: #1e1e2e;
+  animation: pulse 2s infinite;
+}
+
+.w-dot.milestone {
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+  border: 2px solid #fbbf24;
+}
+
+.welcome-next {
+  text-align: center;
+  margin-top: 15px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  color: #cbd5e1;
+  font-size: 15px;
+}
+
+.btn-large {
+  width: 100%;
+  padding: 16px;
+  font-size: 18px;
+  margin-top: 25px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7. PAWKETPASS MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.pass-modal {
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+}
+
+.pass-progress-display {
+  background: rgba(102, 126, 234, 0.1);
+  padding: 25px;
+  border-radius: 12px;
+  margin-bottom: 25px;
+  border: 2px solid rgba(102, 126, 234, 0.3);
+}
+
+.pass-level {
+  text-align: center;
+  font-size: 24px;
+  font-weight: bold;
+  color: #667eea;
+  margin-bottom: 15px;
+}
+
+.pass-xp-bar {
+  width: 100%;
+  height: 30px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 15px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.pass-xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  transition: width 0.5s ease;
+  box-shadow: 0 0 20px rgba(102, 126, 234, 0.6);
+}
+
+.pass-xp-text {
+  text-align: center;
+  font-size: 16px;
+  color: #cbd5e1;
+}
+
+.pass-rewards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 15px;
+  padding: 20px 0;
+}
+
+.pass-reward-item {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.pass-reward-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+}
+
+.pass-reward-item.unlocked {
+  border-color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+}
+
+.pass-reward-item.premium {
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.05);
+}
+
+.reward-level {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.reward-icon {
+  font-size: 40px;
+  margin: 15px 0;
+}
+
+.reward-name {
+  font-size: 14px;
+  color: #e2e8f0;
+  font-weight: 500;
+  margin-bottom: 15px;
+}
+
+.btn-claim {
+  background: #4ade80;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.btn-claim:hover {
+  background: #22c55e;
+  transform: scale(1.05);
+}
+
+.reward-claimed {
+  color: #4ade80;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.reward-locked {
+  color: #64748b;
+  font-size: 14px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   8. MOBILE RESPONSIVE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .founder-modal,
+  .rare-drop-modal,
+  .welcome-modal {
+    max-width: 95%;
+    margin: 20px;
+  }
+  
+  .today-summary {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .today-text {
+    font-size: 13px;
+  }
+  
+  .calendar-dots {
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding-bottom: 8px;
+  }
+  
+  .dot {
+    flex-shrink: 0;
+  }
+  
+  .calendar-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+  }
+  
+  .pass-rewards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  
+  .welcome-calendar-dots {
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+  
+  .w-dot {
+    flex-shrink: 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   9. ANIMATIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   END OF NEW FEATURES CSS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
