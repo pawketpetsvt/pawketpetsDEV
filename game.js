@@ -1699,7 +1699,7 @@ if (!window._pawketFeedPlayDelegationSetup) {
     if (feedBtn) {
       var petId = feedBtn.getAttribute('data-pet-id');
       if (petId && typeof feed === 'function') {
-        feed(parseInt(petId));
+        feed(petId); // UUID string - do NOT parseInt
       }
       return;
     }
@@ -1707,7 +1707,7 @@ if (!window._pawketFeedPlayDelegationSetup) {
     if (playBtn) {
       var petId = playBtn.getAttribute('data-pet-id');
       if (petId && typeof play === 'function') {
-        play(parseInt(petId));
+        play(petId); // UUID string - do NOT parseInt
       }
       return;
     }
