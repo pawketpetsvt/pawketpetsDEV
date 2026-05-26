@@ -15152,3 +15152,11 @@ body.modal-open {
     }
 }
 
+
+/* Hide any old navbar structures */
+.navbar-consolidated,
+.navbar-inner,
+.navbar-user {
+    display: none !important;
+}
+

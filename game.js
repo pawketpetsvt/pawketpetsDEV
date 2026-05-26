@@ -21170,8 +21170,12 @@ playWithPet = async function() {
 };
 */
 
+// NOTE: awardBattleRewards wrapper commented out - function doesn't exist in game
+/*
 // Check for rare drops after battles
 var original_awardBattleRewards = awardBattleRewards;
+*/
+
 // ═══════════════════════════════════════════════════════════════════════════
 // NEW FEATURES - WRAPPER PATTERN INTEGRATION
 // Extends existing systems without replacing them
