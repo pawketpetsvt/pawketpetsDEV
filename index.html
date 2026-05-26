@@ -2405,14 +2405,23 @@ var Tutorial = {
   start: function() {
     this.active = true;
     this.isReplay = false;
-    this.currentStep = 0;
     this.waitingForPet = false;
-    this._clearProgress();
-    this.createOverlay();
-    this.runStep();
     // ESC key support
     this._escHandler = function(e) { if (e.key === 'Escape') Tutorial.promptSkip(); };
     document.addEventListener('keydown', this._escHandler);
+    // Resume from saved progress if available
+    var savedStep = this._loadProgress();
+    if (savedStep && savedStep > 0 && savedStep < this.steps.length) {
+      this.currentStep = savedStep;
+      this.createOverlay();
+      this.runStep();
+      return;
+    }
+    // Otherwise start fresh
+    this.currentStep = 0;
+    this._clearProgress();
+    this.createOverlay();
+    this.runStep();
   },
 
   replay: function() {
