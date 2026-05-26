@@ -8312,7 +8312,6 @@ async function getRandomEnemy(zone, playerLevel) {
     var nameOk = enemy.name.toLowerCase().indexOf('raccoon') === -1;
     return speciesOk && nameOk;
   });
-  });
   
   if (filteredEnemies.length === 0) {
     console.error('No enemies found after filtering raccoons');
@@ -12156,7 +12155,6 @@ async function generateDungeonEnemies(playerStats) {
     var speciesOk = !enemy.species || enemy.species !== 'raccoon';
     var nameOk = enemy.name.toLowerCase().indexOf('raccoon') === -1;
     return speciesOk && nameOk;
-  });
   });
   
   if (filteredEnemies.length === 0) return [];
