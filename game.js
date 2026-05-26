@@ -2764,7 +2764,7 @@ async function feedFree(petId) {
   }
   
   // Call RPC with null item_id for free feed
-  var { data: result, error } = await supabaseClient.rpc('feed_pet_secure_with_limit', {
+  var { data: result, error } = await supabaseClient.rpc('feed_pet_secure', {
     p_pet_id: petId,
     p_item_id: null
   });
@@ -2839,7 +2839,7 @@ async function feedWithItem(petId, itemId, itemName) {
   if (!pet) return;
   
   // Call RPC with the item_id
-  var { data: result, error } = await supabaseClient.rpc('feed_pet_secure_with_limit', {
+  var { data: result, error } = await supabaseClient.rpc('feed_pet_secure', {
     p_pet_id: petId,
     p_item_id: itemId
   });
@@ -3085,51 +3085,61 @@ async function playFree(petId) {
     showFlash(petId, 'Free playtime already used today!', '#ff9f43');
     return;
   }
-  
-  // Call RPC for free play
-  var { data: result, error } = await supabaseClient.rpc('play_pet_secure_with_limit', {
-    p_pet_id: petId
-  });
-  
-  if (error) {
-    showFlash(petId, 'Error: ' + error.message, '#ff6eb4');
-    return;
-  }
-  
-  // Check for error in response
-  if (result && result.error) {
-    console.error('Play error:', result.error);
-    showFlash(petId, result.error, '#ff6eb4');
-    return;
-  }
-  
-  // MARK FREE OPTION AS USED FOR TODAY (after successful play)
-  localStorage.setItem(freePlayKey, 'done');
-  
-  // PAWKETPASS: Update bingo and Pass XP
-  updateBingoProgress('play_pet', 1);
-  await addPassXP(2, 'play');
-  
-  // Update local state (JSONB returns direct object)
-  petState[petId].energy = result.energy;
-  petState[petId].happiness = result.happiness;
-  petState[petId].xp = result.xp;
-  
-  updateBar(petId, 'energy', result.energy, pet.max_energy);
-  updateBar(petId, 'happiness', result.happiness, pet.max_happiness);
-  updateXpBar(petId, result.xp, pet.level);
-  
-  if (result.leveled_up) {
-    petState[petId].level = result.new_level;
-    showFlash(petId, 'Level ' + result.new_level + '! 🎉', '#b06aff');
-    updateLvl(petId, result.new_level, pet.max_hunger);
-    tabsLoaded['mypets'] = false;
-    
-    if (result.new_level === 5) await awardBadge('level_5');
-    if (result.new_level === 10) await awardBadge('level_10');
-    if (result.new_level === 20) await awardBadge('level_20');
-  } else {
-    showFlash(petId, '🎾 -10 Energy +15 Happiness +15 XP', '#5dde7a');
+
+  var btn = document.getElementById('play-' + petId);
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+
+  try {
+    var { data: result, error } = await supabaseClient.rpc('play_pet_secure', {
+      p_pet_id: petId,
+      p_item_id: null
+    });
+
+    if (error) {
+      console.error('Play RPC error:', error);
+      showFlash(petId, 'Error: ' + error.message, '#ff6eb4');
+      return;
+    }
+
+    if (result && result.error) {
+      showFlash(petId, result.error, '#ff6eb4');
+      return;
+    }
+
+    // MARK FREE OPTION AS USED FOR TODAY (after successful play)
+    localStorage.setItem(freePlayKey, 'done');
+
+    // PAWKETPASS: Update bingo and Pass XP
+    updateBingoProgress('play_pet', 1);
+    await addPassXP(2, 'play');
+
+    // Update local state
+    petState[petId].energy = result.energy;
+    petState[petId].happiness = result.happiness;
+    petState[petId].xp = result.xp;
+
+    updateBar(petId, 'energy', result.energy, pet.max_energy);
+    updateBar(petId, 'happiness', result.happiness, pet.max_happiness);
+    updateXpBar(petId, result.xp, pet.level);
+
+    if (result.leveled_up) {
+      petState[petId].level = result.new_level;
+      showFlash(petId, 'Level ' + result.new_level + '! 🎉', '#b06aff');
+      updateLvl(petId, result.new_level, pet.max_hunger);
+      tabsLoaded['mypets'] = false;
+
+      if (result.new_level === 5) await awardBadge('level_5');
+      if (result.new_level === 10) await awardBadge('level_10');
+      if (result.new_level === 20) await awardBadge('level_20');
+    } else {
+      showFlash(petId, '🎾 -10 Energy +15 Happiness +15 XP', '#5dde7a');
+    }
+
+  } catch (err) {
+    console.error('Play error:', err);
+    showFlash(petId, 'Error: ' + err.message, '#ff6eb4');
+  } finally {
+    if (btn) { btn.textContent = 'Play'; btn.disabled = false; }
   }
 }
 
@@ -3141,10 +3151,10 @@ async function playWithToy(petId, toyId, toyName) {
     return;
   }
   
-  // Call RPC to play with toy (if you have a function for it)
-  // For now, use the same play function
-  var { data: result, error } = await supabaseClient.rpc('play_pet_secure_with_limit', {
-    p_pet_id: petId
+  // Call RPC to play with toy
+  var { data: result, error } = await supabaseClient.rpc('play_pet_secure', {
+    p_pet_id: petId,
+    p_item_id: toyId
   });
   
   if (error) {

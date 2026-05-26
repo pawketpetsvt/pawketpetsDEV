@@ -15280,3 +15280,97 @@ body.modal-open {
 }
 
 
+
+/* ============================================
+   NIGHT MODE — Modal & Button Legibility Fix
+   ============================================ */
+
+/* Custom modals (feed/play/variant/etc.) */
+body.night-mode .modal-content-custom {
+  background: #2a2a3a !important;
+  border: 2px solid #9966ff !important;
+  color: #e8d5ff !important;
+}
+
+body.night-mode .modal-content-custom h2,
+body.night-mode .modal-content-custom h3,
+body.night-mode .modal-content-custom p,
+body.night-mode .modal-content-custom label,
+body.night-mode .modal-content-custom div {
+  color: #e8d5ff !important;
+}
+
+/* General buttons in night mode (not navbar/music) */
+body.night-mode .btn:not(.btn-primary):not(.btn-nav-action) {
+  background: #3a3a4e !important;
+  color: #e8d5ff !important;
+  border: 2px solid #9966ff !important;
+}
+
+body.night-mode .btn-primary {
+  background: linear-gradient(135deg, #9966ff, #b589ff) !important;
+  color: #1e1e2e !important;
+  border: none !important;
+  font-weight: bold !important;
+}
+
+body.night-mode .btn-outline {
+  background: transparent !important;
+  border: 2px solid #9966ff !important;
+  color: #e8d5ff !important;
+}
+
+body.night-mode .btn-outline:hover {
+  background: rgba(153, 102, 255, 0.2) !important;
+}
+
+/* Buttons inside custom modals */
+body.night-mode .modal-content-custom button {
+  background: #3a3a4e !important;
+  color: #e8d5ff !important;
+  border: 2px solid #9966ff !important;
+}
+
+body.night-mode .modal-content-custom button:hover {
+  background: #4a4a5e !important;
+}
+
+/* Feed/Play free option and action buttons in modals */
+body.night-mode .modal-overlay-custom button {
+  background: #3a3a4e;
+  color: #e8d5ff;
+  border: 2px solid #9966ff;
+}
+
+/* Fix modal input fields */
+body.night-mode .modal-content-custom input,
+body.night-mode .modal-content-custom textarea,
+body.night-mode .modal-content-custom select {
+  background: #3a3a4e !important;
+  color: #e8d5ff !important;
+  border: 2px solid #9966ff !important;
+}
+
+body.night-mode .modal-content-custom input::placeholder,
+body.night-mode .modal-content-custom textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Centered modal system */
+body.night-mode .centered-modal-container {
+  background: #2a2a3a !important;
+  border: 2px solid #9966ff !important;
+  color: #e8d5ff !important;
+}
+
+body.night-mode .centered-modal-close,
+body.night-mode .modal-close {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #e8d5ff !important;
+}
+
+body.night-mode .centered-modal-close:hover,
+body.night-mode .modal-close:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+
