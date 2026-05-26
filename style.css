@@ -14327,3 +14327,533 @@ body[data-theme="dark"] .modal-content {
    END OF NEW FEATURES CSS
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   PAWKETPASS UI SYSTEM - STYLING
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.02);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PASS BUTTON (Navbar)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#pass-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  font-size: 14px;
+}
+
+#pass-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+#pass-button:active {
+  transform: translateY(0);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PASS MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.pass-modal-content {
+  animation: bounceIn 0.4s ease-out;
+}
+
+/* Custom scrollbar for rewards list */
+#pass-rewards-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+#pass-rewards-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+#pass-rewards-list::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.5);
+  border-radius: 4px;
+}
+
+#pass-rewards-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.7);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   REWARD CARDS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.pass-reward-card:hover {
+  transform: translateX(4px);
+}
+
+.pass-reward-card button {
+  position: relative;
+  overflow: hidden;
+}
+
+.pass-reward-card button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.pass-reward-card button:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .pass-modal-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100vh;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+  }
+  
+  #pass-rewards-list {
+    max-height: calc(100vh - 300px) !important;
+  }
+  
+  .pass-reward-card {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 12px;
+  }
+  
+  .pass-reward-card > div:last-child {
+    width: 100%;
+  }
+  
+  .pass-reward-card button {
+    width: 100%;
+  }
+  
+  #pass-button {
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LEVEL UP MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.pass-levelup-modal {
+  backdrop-filter: blur(10px);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOTIFICATION STYLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 480px) {
+  /* Mobile notifications */
+  body > div[style*="position:fixed"][style*="top:80px"] {
+    right: 10px !important;
+    left: 10px !important;
+    max-width: calc(100% - 20px);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROGRESS BAR
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.pass-progress-bar {
+  position: relative;
+}
+
+.pass-progress-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ACCESSIBILITY
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.pass-reward-card button:focus,
+#pass-button:focus {
+  outline: 3px solid rgba(102, 126, 234, 0.5);
+  outline-offset: 2px;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DARK MODE SUPPORT (if you add it later)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-color-scheme: dark) {
+  /* Already dark by default! */
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRINT STYLES (hide modals when printing)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media print {
+  #pass-modal-overlay,
+  .modal-overlay {
+    display: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CENTERED MODAL NOTIFICATION SYSTEM - STYLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Modal Overlay */
+.centered-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: modalOverlayFadeIn 0.3s ease-out;
+}
+
+@keyframes modalOverlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Modal Container */
+.centered-modal-container {
+  background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  max-width: 450px;
+  width: 90%;
+  padding: 0;
+  position: relative;
+  animation: modalPopIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  border: 2px solid rgba(102, 126, 234, 0.3);
+}
+
+@keyframes modalPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.7) translateY(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Close Button */
+.centered-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #cbd5e1;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  z-index: 1;
+}
+
+.centered-modal-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  transform: rotate(90deg);
+}
+
+/* Modal Header */
+.centered-modal-header {
+  padding: 32px 24px 24px 24px;
+  text-align: center;
+  border-bottom: 2px solid rgba(102, 126, 234, 0.2);
+}
+
+.centered-modal-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  display: inline-block;
+  animation: modalIconBounce 1s ease-in-out infinite;
+}
+
+@keyframes modalIconBounce {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-10px) scale(1.1);
+  }
+}
+
+.centered-modal-title {
+  font-size: 24px;
+  font-weight: bold;
+  color: #667eea;
+  margin: 0;
+  line-height: 1.3;
+}
+
+/* Modal Body */
+.centered-modal-body {
+  padding: 24px;
+  text-align: center;
+}
+
+.centered-modal-message {
+  font-size: 16px;
+  color: #e2e8f0;
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-line;
+}
+
+/* Modal Footer */
+.centered-modal-footer {
+  padding: 20px 24px 24px 24px;
+  text-align: center;
+}
+
+.centered-modal-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 14px 32px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  min-width: 140px;
+  position: relative;
+  overflow: hidden;
+}
+
+.centered-modal-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.6);
+}
+
+.centered-modal-button:active {
+  transform: translateY(0);
+}
+
+.centered-modal-button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.centered-modal-button:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* Fade Out Animations */
+.centered-modal-overlay.closing {
+  animation: modalOverlayFadeOut 0.2s ease-out forwards;
+}
+
+@keyframes modalOverlayFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.centered-modal-container.closing {
+  animation: modalPopOut 0.2s ease-out forwards;
+}
+
+@keyframes modalPopOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+  .centered-modal-container {
+    width: 95%;
+    max-width: 95%;
+  }
+  
+  .centered-modal-icon {
+    font-size: 48px;
+  }
+  
+  .centered-modal-title {
+    font-size: 20px;
+  }
+  
+  .centered-modal-message {
+    font-size: 14px;
+  }
+  
+  .centered-modal-button {
+    width: 100%;
+    padding: 12px 24px;
+  }
+}
+
+/* Accessibility */
+.centered-modal-overlay:focus {
+  outline: none;
+}
+
+.centered-modal-button:focus,
+.centered-modal-close:focus {
+  outline: 3px solid rgba(102, 126, 234, 0.5);
+  outline-offset: 2px;
+}
+
+/* Prevent body scroll when modal is open */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* Reduced motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .centered-modal-overlay,
+  .centered-modal-container,
+  .centered-modal-icon,
+  .centered-modal-button {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+

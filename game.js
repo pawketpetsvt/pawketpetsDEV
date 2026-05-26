@@ -21657,3 +21657,839 @@ async function newFeatures_init() {
 
 console.log('✅ New features wrapper code loaded');
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PAWKETPASS UI SYSTEM - Complete Visual Interface
+// Wraps existing Pass functions to add UI layer
+// Uses YOUR existing: PASS_REWARDS, addPassXP(), claimPassReward()
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Global Pass UI state
+var passUI = {
+  isModalOpen: false,
+  unclaimedLevels: []
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 1. WRAPPER - Enhance existing addPassXP to update UI
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Store original function
+var originalAddPassXP = addPassXP;
+
+// Wrap with UI updates
+addPassXP = async function(amount, source) {
+  var oldLevel = passProgress ? passProgress.level : 1;
+  
+  // Call YOUR original function
+  var result = await originalAddPassXP(amount, source);
+  
+  // Update UI after XP gain
+  pass_updateNavbar();
+  
+  // Check if leveled up
+  if (passProgress && passProgress.level > oldLevel) {
+    pass_showLevelUpNotification(passProgress.level);
+  }
+  
+  // Update modal if open
+  if (passUI.isModalOpen) {
+    pass_renderRewards();
+  }
+  
+  return result;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 2. WRAPPER - Enhance existing claimPassReward to update UI
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Store original function
+var originalClaimPassReward = claimPassReward;
+
+// Wrap with UI updates
+claimPassReward = async function(level) {
+  // Call YOUR original function
+  var result = await originalClaimPassReward(level);
+  
+  // Update UI after claim
+  pass_updateNavbar();
+  
+  // Update modal if open
+  if (passUI.isModalOpen) {
+    pass_renderRewards();
+  }
+  
+  // Show claim success
+  pass_showClaimSuccess(level);
+  
+  return result;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 3. UPDATE NAVBAR BUTTON
+// ═══════════════════════════════════════════════════════════════════════════
+
+function pass_updateNavbar() {
+  var passBtn = document.getElementById('pass-button');
+  if (!passBtn) return;
+  
+  if (passProgress) {
+    passBtn.style.display = 'block';
+    passBtn.textContent = '🎫 Pass (Lvl ' + passProgress.level + ')';
+    
+    // Check for unclaimed rewards
+    passUI.unclaimedLevels = [];
+    for (var i = 1; i <= passProgress.level; i++) {
+      if (!passProgress.claimed_rewards.includes(i)) {
+        passUI.unclaimedLevels.push(i);
+      }
+    }
+    
+    // Add badge if unclaimed
+    if (passUI.unclaimedLevels.length > 0) {
+      passBtn.innerHTML = '🎫 Pass (Lvl ' + passProgress.level + ') <span style="background:#f59e0b;color:white;border-radius:50%;padding:2px 6px;font-size:11px;margin-left:4px;">' + passUI.unclaimedLevels.length + '</span>';
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4. SHOW PASS MODAL
+// ═══════════════════════════════════════════════════════════════════════════
+
+function pass_showModal() {
+  if (!passProgress) {
+    showToast('Pass not loaded yet. Please try again.', 'error');
+    return;
+  }
+  
+  passUI.isModalOpen = true;
+  
+  var modal = document.createElement('div');
+  modal.id = 'pass-modal-overlay';
+  modal.className = 'modal-overlay';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:10000;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s;';
+  
+  var content = document.createElement('div');
+  content.className = 'pass-modal-content';
+  content.style.cssText = 'background:linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);border-radius:16px;max-width:900px;width:95%;max-height:85vh;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.4);';
+  
+  // Header
+  var header = document.createElement('div');
+  header.style.cssText = 'padding:24px;border-bottom:2px solid rgba(102,126,234,0.3);display:flex;justify-content:space-between;align-items:center;';
+  header.innerHTML = 
+    '<div>' +
+    '<h2 style="margin:0;font-size:28px;color:#667eea;">🎫 PawketPass</h2>' +
+    '<p style="margin:4px 0 0 0;color:#94a3b8;font-size:14px;">Season 1: Origins</p>' +
+    '</div>' +
+    '<button onclick="pass_closeModal()" style="background:none;border:none;color:#94a3b8;font-size:32px;cursor:pointer;padding:0;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:all 0.2s;" onmouseover="this.style.background=\'rgba(255,255,255,0.1)\';this.style.color=\'white\';" onmouseout="this.style.background=\'none\';this.style.color=\'#94a3b8\';">×</button>';
+  
+  // Progress section
+  var progressSection = document.createElement('div');
+  progressSection.style.cssText = 'padding:24px;background:rgba(102,126,234,0.1);border-bottom:2px solid rgba(102,126,234,0.2);';
+  
+  var xpPercent = (passProgress.xp / 100) * 100;
+  var nextLevel = passProgress.level + 1;
+  
+  progressSection.innerHTML = 
+    '<div style="text-align:center;margin-bottom:16px;">' +
+    '<div style="font-size:24px;font-weight:bold;color:#667eea;margin-bottom:8px;">Level ' + passProgress.level + ' / 50</div>' +
+    '<div style="font-size:14px;color:#cbd5e1;">Next level: ' + passProgress.xp + ' / 100 XP</div>' +
+    '</div>' +
+    '<div style="width:100%;height:32px;background:rgba(0,0,0,0.4);border-radius:16px;overflow:hidden;position:relative;">' +
+    '<div style="width:' + xpPercent + '%;height:100%;background:linear-gradient(90deg,#667eea,#764ba2);transition:width 0.5s ease;box-shadow:0 0 20px rgba(102,126,234,0.6);"></div>' +
+    '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-weight:bold;font-size:14px;text-shadow:0 2px 4px rgba(0,0,0,0.8);">' + passProgress.xp + ' / 100</div>' +
+    '</div>' +
+    (passUI.unclaimedLevels.length > 0 ? 
+      '<div style="text-align:center;margin-top:16px;padding:12px;background:rgba(245,158,11,0.2);border-radius:8px;border-left:4px solid #f59e0b;">' +
+      '<span style="color:#fbbf24;font-weight:bold;">🎁 ' + passUI.unclaimedLevels.length + ' reward' + (passUI.unclaimedLevels.length > 1 ? 's' : '') + ' ready to claim!</span>' +
+      '</div>' : '');
+  
+  // Rewards list container
+  var rewardsList = document.createElement('div');
+  rewardsList.id = 'pass-rewards-list';
+  rewardsList.style.cssText = 'max-height:400px;overflow-y:auto;padding:20px;';
+  
+  // Build modal
+  content.appendChild(header);
+  content.appendChild(progressSection);
+  content.appendChild(rewardsList);
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+  
+  // Render rewards
+  pass_renderRewards();
+  
+  // Close on backdrop click
+  modal.onclick = function(e) {
+    if (e.target === modal) {
+      pass_closeModal();
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 5. RENDER REWARDS LIST (Uses YOUR PASS_REWARDS)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function pass_renderRewards() {
+  var container = document.getElementById('pass-rewards-list');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  // Loop through all 50 levels using YOUR PASS_REWARDS
+  for (var level = 1; level <= 50; level++) {
+    var reward = PASS_REWARDS[level];
+    if (!reward) continue;
+    
+    var isClaimed = passProgress.claimed_rewards.includes(level);
+    var isUnlocked = level <= passProgress.level && !isClaimed;
+    var isLocked = level > passProgress.level;
+    
+    var card = document.createElement('div');
+    card.className = 'pass-reward-card';
+    card.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:16px 20px;margin-bottom:12px;border-radius:12px;transition:all 0.3s;';
+    
+    // Styling based on state
+    if (isClaimed) {
+      card.style.background = 'rgba(74,222,128,0.1)';
+      card.style.border = '2px solid rgba(74,222,128,0.3)';
+    } else if (isUnlocked) {
+      card.style.background = 'rgba(251,191,36,0.15)';
+      card.style.border = '2px solid #fbbf24';
+      card.style.boxShadow = '0 0 20px rgba(251,191,36,0.3)';
+      card.style.animation = 'pulse 2s infinite';
+    } else {
+      card.style.background = 'rgba(255,255,255,0.05)';
+      card.style.border = '2px solid rgba(255,255,255,0.1)';
+      card.style.opacity = '0.6';
+    }
+    
+    // Left side: Level + reward info
+    var leftSide = document.createElement('div');
+    leftSide.style.cssText = 'flex:1;';
+    
+    var levelNumber = document.createElement('div');
+    levelNumber.style.cssText = 'font-size:12px;color:#94a3b8;margin-bottom:4px;font-weight:600;';
+    levelNumber.textContent = 'Level ' + level;
+    
+    var rewardText = document.createElement('div');
+    rewardText.style.cssText = 'font-size:16px;font-weight:500;';
+    
+    // Format reward text based on YOUR reward types
+    if (reward.type === 'points') {
+      rewardText.innerHTML = '<span style="color:#fbbf24;">💰 ' + reward.amount + ' PP</span>';
+    } else if (reward.type === 'item') {
+      rewardText.innerHTML = '<span style="color:#60a5fa;">🎁 ' + (reward.quantity || 1) + ' Item' + (reward.quantity > 1 ? 's' : '') + '</span>';
+    } else if (reward.type === 'title') {
+      var titleName = reward.titleKey.replace(/_/g, ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); });
+      rewardText.innerHTML = '<span style="color:#c084fc;">🏷️ ' + titleName + '</span>';
+    }
+    
+    leftSide.appendChild(levelNumber);
+    leftSide.appendChild(rewardText);
+    
+    // Right side: Status/button
+    var rightSide = document.createElement('div');
+    rightSide.style.cssText = 'display:flex;align-items:center;';
+    
+    if (isClaimed) {
+      rightSide.innerHTML = '<div style="color:#4ade80;font-weight:bold;display:flex;align-items:center;gap:8px;"><span style="font-size:20px;">✓</span> Claimed</div>';
+    } else if (isUnlocked) {
+      var claimBtn = document.createElement('button');
+      claimBtn.style.cssText = 'background:#fbbf24;color:#1e1e2e;border:none;padding:10px 20px;border-radius:8px;font-weight:bold;cursor:pointer;transition:all 0.2s;font-size:14px;';
+      claimBtn.textContent = 'CLAIM REWARD';
+      claimBtn.onmouseover = function() { this.style.background = '#f59e0b'; this.style.transform = 'scale(1.05)'; };
+      claimBtn.onmouseout = function() { this.style.background = '#fbbf24'; this.style.transform = 'scale(1)'; };
+      claimBtn.onclick = function() { pass_handleClaim(level); };
+      rightSide.appendChild(claimBtn);
+    } else {
+      rightSide.innerHTML = '<div style="color:#64748b;font-weight:500;display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">🔒</span> Locked</div>';
+    }
+    
+    card.appendChild(leftSide);
+    card.appendChild(rightSide);
+    container.appendChild(card);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 6. HANDLE CLAIM BUTTON CLICK
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function pass_handleClaim(level) {
+  // Disable all claim buttons temporarily
+  var buttons = document.querySelectorAll('.pass-reward-card button');
+  buttons.forEach(function(btn) { btn.disabled = true; btn.style.opacity = '0.5'; });
+  
+  // Call YOUR wrapped claimPassReward function
+  await claimPassReward(level);
+  
+  // Re-enable buttons
+  buttons.forEach(function(btn) { btn.disabled = false; btn.style.opacity = '1'; });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 7. CLAIM SUCCESS NOTIFICATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function pass_showClaimSuccess(level) {
+  var reward = PASS_REWARDS[level];
+  if (!reward) return;
+  
+  var rewardText = '';
+  if (reward.type === 'points') {
+    rewardText = reward.amount + ' PP';
+  } else if (reward.type === 'item') {
+    rewardText = (reward.quantity || 1) + ' Item(s)';
+  } else if (reward.type === 'title') {
+    rewardText = 'New Title!';
+  }
+  
+  // Create floating notification
+  var notification = document.createElement('div');
+  notification.style.cssText = 
+    'position:fixed;top:80px;right:20px;background:linear-gradient(135deg,#4ade80,#22c55e);' +
+    'color:white;padding:16px 24px;border-radius:12px;box-shadow:0 4px 12px rgba(74,222,128,0.4);' +
+    'z-index:10001;animation:slideInRight 0.3s,fadeOut 0.3s 2.7s;font-weight:500;';
+  notification.innerHTML = 
+    '<div style="display:flex;align-items:center;gap:12px;">' +
+    '<span style="font-size:24px;">🎁</span>' +
+    '<div>' +
+    '<div style="font-weight:bold;margin-bottom:4px;">Reward Claimed!</div>' +
+    '<div style="font-size:14px;opacity:0.9;">Level ' + level + ': ' + rewardText + '</div>' +
+    '</div>' +
+    '</div>';
+  
+  document.body.appendChild(notification);
+  
+  setTimeout(function() {
+    if (notification.parentNode) {
+      notification.parentNode.removeChild(notification);
+    }
+  }, 3000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 8. LEVEL UP NOTIFICATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function pass_showLevelUpNotification(newLevel) {
+  // Create celebration modal
+  var modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10002;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s;';
+  
+  var content = document.createElement('div');
+  content.style.cssText = 
+    'background:linear-gradient(135deg,#667eea,#764ba2);padding:40px;border-radius:20px;' +
+    'text-align:center;box-shadow:0 8px 32px rgba(102,126,234,0.6);max-width:400px;' +
+    'animation:bounceIn 0.5s;';
+  
+  content.innerHTML = 
+    '<div style="font-size:80px;margin-bottom:20px;animation:bounce 1s infinite;">🎉</div>' +
+    '<h2 style="color:white;font-size:32px;margin:0 0 12px 0;">LEVEL UP!</h2>' +
+    '<div style="color:rgba(255,255,255,0.9);font-size:24px;margin-bottom:24px;">You reached <strong>Level ' + newLevel + '</strong>!</div>' +
+    '<button onclick="this.closest(\'.modal-overlay\').remove();pass_showModal();" style="background:white;color:#667eea;border:none;padding:14px 32px;border-radius:12px;font-weight:bold;font-size:16px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.transform=\'scale(1.05)\';this.style.boxShadow=\'0 4px 12px rgba(255,255,255,0.3)\';" onmouseout="this.style.transform=\'scale(1)\';this.style.boxShadow=\'none\';">Claim Reward 🎁</button>' +
+    '<div style="margin-top:16px;"><button onclick="this.closest(\'.modal-overlay\').remove();" style="background:none;border:none;color:rgba(255,255,255,0.7);text-decoration:underline;cursor:pointer;font-size:14px;">Later</button></div>';
+  
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+  
+  // Auto-close after 10 seconds
+  setTimeout(function() {
+    if (modal.parentNode) {
+      modal.parentNode.removeChild(modal);
+    }
+  }, 10000);
+  
+  // Close on backdrop click
+  modal.onclick = function(e) {
+    if (e.target === modal) {
+      modal.parentNode.removeChild(modal);
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 9. CLOSE MODAL
+// ═══════════════════════════════════════════════════════════════════════════
+
+function pass_closeModal() {
+  passUI.isModalOpen = false;
+  var modal = document.getElementById('pass-modal-overlay');
+  if (modal) {
+    modal.style.animation = 'fadeOut 0.2s';
+    setTimeout(function() {
+      if (modal.parentNode) {
+        modal.parentNode.removeChild(modal);
+      }
+    }, 200);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 10. INITIALIZE PASS UI (Call after loadPassProgress)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Wrap loadPassProgress to update UI after load
+var originalLoadPassProgress = loadPassProgress;
+
+loadPassProgress = async function() {
+  await originalLoadPassProgress();
+  pass_updateNavbar();
+};
+
+console.log('✅ PawketPass UI system loaded (wrapper pattern)');
+// ═══════════════════════════════════════════════════════════════════════════
+// CENTERED MODAL NOTIFICATION SYSTEM
+// Completely standalone - does NOT modify any existing functions
+// Add this to the VERY END of game.js
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 1. INJECT CSS STYLES (Only once)
+// ═══════════════════════════════════════════════════════════════════════════
+
+(function injectModalStyles() {
+  // Check if styles already injected
+  if (document.getElementById('centered-modal-styles')) return;
+  
+  var style = document.createElement('style');
+  style.id = 'centered-modal-styles';
+  style.textContent = `
+    /* Modal Overlay */
+    .centered-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(4px);
+      z-index: 100000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: modalOverlayFadeIn 0.3s ease-out;
+    }
+    
+    @keyframes modalOverlayFadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+    
+    /* Modal Container */
+    .centered-modal-container {
+      background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      max-width: 450px;
+      width: 90%;
+      padding: 0;
+      position: relative;
+      animation: modalPopIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      border: 2px solid rgba(102, 126, 234, 0.3);
+    }
+    
+    @keyframes modalPopIn {
+      0% {
+        opacity: 0;
+        transform: scale(0.7) translateY(-20px);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+    
+    /* Close Button */
+    .centered-modal-close {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: #cbd5e1;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      z-index: 1;
+    }
+    
+    .centered-modal-close:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      transform: rotate(90deg);
+    }
+    
+    /* Modal Header */
+    .centered-modal-header {
+      padding: 32px 24px 24px 24px;
+      text-align: center;
+      border-bottom: 2px solid rgba(102, 126, 234, 0.2);
+    }
+    
+    .centered-modal-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+      display: inline-block;
+      animation: modalIconBounce 1s ease-in-out infinite;
+    }
+    
+    @keyframes modalIconBounce {
+      0%, 100% {
+        transform: translateY(0) scale(1);
+      }
+      50% {
+        transform: translateY(-10px) scale(1.1);
+      }
+    }
+    
+    .centered-modal-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #667eea;
+      margin: 0;
+      line-height: 1.3;
+    }
+    
+    /* Modal Body */
+    .centered-modal-body {
+      padding: 24px;
+      text-align: center;
+    }
+    
+    .centered-modal-message {
+      font-size: 16px;
+      color: #e2e8f0;
+      line-height: 1.6;
+      margin: 0;
+    }
+    
+    /* Modal Footer */
+    .centered-modal-footer {
+      padding: 20px 24px 24px 24px;
+      text-align: center;
+    }
+    
+    .centered-modal-button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 14px 32px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      min-width: 140px;
+    }
+    
+    .centered-modal-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(102, 126, 234, 0.6);
+    }
+    
+    .centered-modal-button:active {
+      transform: translateY(0);
+    }
+    
+    /* Fade Out Animations */
+    .centered-modal-overlay.closing {
+      animation: modalOverlayFadeOut 0.2s ease-out forwards;
+    }
+    
+    @keyframes modalOverlayFadeOut {
+      from {
+        opacity: 1;
+      }
+      to {
+        opacity: 0;
+      }
+    }
+    
+    .centered-modal-container.closing {
+      animation: modalPopOut 0.2s ease-out forwards;
+    }
+    
+    @keyframes modalPopOut {
+      from {
+        opacity: 1;
+        transform: scale(1);
+      }
+      to {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+    }
+    
+    /* Mobile Responsive */
+    @media (max-width: 480px) {
+      .centered-modal-container {
+        width: 95%;
+        max-width: 95%;
+      }
+      
+      .centered-modal-icon {
+        font-size: 48px;
+      }
+      
+      .centered-modal-title {
+        font-size: 20px;
+      }
+      
+      .centered-modal-message {
+        font-size: 14px;
+      }
+      
+      .centered-modal-button {
+        width: 100%;
+        padding: 12px 24px;
+      }
+    }
+    
+    /* Accessibility */
+    .centered-modal-overlay:focus {
+      outline: none;
+    }
+    
+    .centered-modal-button:focus,
+    .centered-modal-close:focus {
+      outline: 3px solid rgba(102, 126, 234, 0.5);
+      outline-offset: 2px;
+    }
+    
+    /* Prevent body scroll when modal is open */
+    body.modal-open {
+      overflow: hidden;
+    }
+  `;
+  
+  document.head.appendChild(style);
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 2. MAIN FUNCTION - showCenteredModal
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Show a centered modal notification
+ * @param {string} title - Modal title
+ * @param {string} message - Modal message
+ * @param {string} icon - Emoji or text icon (default: 🎉)
+ * @param {function} onConfirm - Optional callback when modal closes
+ * @returns {Promise} Resolves when modal is closed
+ */
+function showCenteredModal(title, message, icon, onConfirm) {
+  return new Promise(function(resolve) {
+    // Default icon
+    if (!icon) icon = '🎉';
+    
+    // Prevent body scroll
+    document.body.classList.add('modal-open');
+    
+    // Create overlay
+    var overlay = document.createElement('div');
+    overlay.className = 'centered-modal-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'centered-modal-title');
+    overlay.setAttribute('aria-describedby', 'centered-modal-message');
+    
+    // Create modal container
+    var container = document.createElement('div');
+    container.className = 'centered-modal-container';
+    
+    // Close button
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'centered-modal-close';
+    closeBtn.innerHTML = '×';
+    closeBtn.setAttribute('aria-label', 'Close modal');
+    closeBtn.onclick = function() { closeModal(); };
+    
+    // Header
+    var header = document.createElement('div');
+    header.className = 'centered-modal-header';
+    
+    var iconEl = document.createElement('div');
+    iconEl.className = 'centered-modal-icon';
+    iconEl.textContent = icon;
+    
+    var titleEl = document.createElement('h2');
+    titleEl.className = 'centered-modal-title';
+    titleEl.id = 'centered-modal-title';
+    titleEl.textContent = title;
+    
+    header.appendChild(iconEl);
+    header.appendChild(titleEl);
+    
+    // Body
+    var body = document.createElement('div');
+    body.className = 'centered-modal-body';
+    
+    var messageEl = document.createElement('p');
+    messageEl.className = 'centered-modal-message';
+    messageEl.id = 'centered-modal-message';
+    messageEl.textContent = message;
+    
+    body.appendChild(messageEl);
+    
+    // Footer
+    var footer = document.createElement('div');
+    footer.className = 'centered-modal-footer';
+    
+    var button = document.createElement('button');
+    button.className = 'centered-modal-button';
+    button.textContent = getRandomButtonText();
+    button.onclick = function() { closeModal(); };
+    
+    footer.appendChild(button);
+    
+    // Assemble modal
+    container.appendChild(closeBtn);
+    container.appendChild(header);
+    container.appendChild(body);
+    container.appendChild(footer);
+    overlay.appendChild(container);
+    
+    // Add to page
+    document.body.appendChild(overlay);
+    
+    // Focus management
+    setTimeout(function() {
+      button.focus();
+    }, 100);
+    
+    // Close function
+    function closeModal() {
+      // Add closing animation
+      overlay.classList.add('closing');
+      container.classList.add('closing');
+      
+      // Wait for animation
+      setTimeout(function() {
+        // Remove from DOM
+        if (overlay.parentNode) {
+          overlay.parentNode.removeChild(overlay);
+        }
+        
+        // Restore body scroll
+        document.body.classList.remove('modal-open');
+        
+        // Call callback if provided
+        if (typeof onConfirm === 'function') {
+          onConfirm();
+        }
+        
+        // Resolve promise
+        resolve();
+      }, 200);
+    }
+    
+    // Click outside to close
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) {
+        closeModal();
+      }
+    });
+    
+    // ESC key to close
+    function handleEscape(e) {
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        closeModal();
+        document.removeEventListener('keydown', handleEscape);
+      }
+    }
+    
+    document.addEventListener('keydown', handleEscape);
+    
+    // Cleanup listener when modal closes
+    var originalClose = closeModal;
+    closeModal = function() {
+      document.removeEventListener('keydown', handleEscape);
+      originalClose();
+    };
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 3. HELPER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Get random button text for variety
+ */
+function getRandomButtonText() {
+  var texts = [
+    'Awesome!',
+    'Got it!',
+    'Sweet!',
+    'Nice!',
+    'Thanks!',
+    'Cool!',
+    'Perfect!',
+    'Yay!'
+  ];
+  return texts[Math.floor(Math.random() * texts.length)];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4. CONVENIENCE WRAPPERS (Optional)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Show success modal
+ */
+function showSuccessModal(title, message, onConfirm) {
+  return showCenteredModal(title, message, '✅', onConfirm);
+}
+
+/**
+ * Show celebration modal
+ */
+function showCelebrationModal(title, message, onConfirm) {
+  return showCenteredModal(title, message, '🎉', onConfirm);
+}
+
+/**
+ * Show achievement modal
+ */
+function showAchievementModal(title, message, onConfirm) {
+  return showCenteredModal(title, message, '🏆', onConfirm);
+}
+
+/**
+ * Show reward modal
+ */
+function showRewardModal(title, message, onConfirm) {
+  return showCenteredModal(title, message, '🎁', onConfirm);
+}
+
+/**
+ * Show level up modal
+ */
+function showLevelUpModal(title, message, onConfirm) {
+  return showCenteredModal(title, message, '⬆️', onConfirm);
+}
+
+/**
+ * Show rare drop modal
+ */
+function showRareDropModal(title, message, onConfirm) {
+  return showCenteredModal(title, message, '✨', onConfirm);
+}
+
+console.log('✅ Centered modal notification system loaded');
