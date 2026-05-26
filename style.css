@@ -15279,3 +15279,483 @@ body.modal-open {
     overflow-wrap: break-word !important;
 }
 
+
+/* ╔══════════════════════════════════════════════════════════════════╗
+   ║   Y2K EDU-TAINMENT OVERHAUL — PawketPetsVT                     ║
+   ║   "Digital Sticker Book" — Lisa Frank meets Neopets, 2002       ║
+   ╚══════════════════════════════════════════════════════════════════╝ */
+
+/* ── 1. CSS VARIABLES ADDITIONS ───────────────────────────────────── */
+:root {
+  --y2k-hot-pink:   #FF66CC;
+  --y2k-electric:   #FF9933;
+  --y2k-lime:       #66FF66;
+  --y2k-sky:        #66CCFF;
+  --y2k-lemon:      #FFDD00;
+  --y2k-lavender:   #CCAFFF;
+  --y2k-bubblegum:  #FFB3E6;
+  --y2k-mint:       #AAFFDD;
+  --y2k-coral:      #FF7755;
+  --y2k-shadow:     5px 5px 0 rgba(0,0,0,0.12);
+  --y2k-shadow-hot: 5px 5px 0 #FF66CC;
+  --y2k-shadow-elec:5px 5px 0 #FF9933;
+}
+
+/* ── 2. BODY BACKGROUND — layered sticker-sheet chaos ─────────────── */
+body {
+  background-image:
+    repeating-linear-gradient(45deg,  rgba(255,102,204,0.07) 0px, rgba(255,102,204,0.07) 2px, transparent 2px, transparent 10px),
+    repeating-linear-gradient(135deg, rgba(153,102,255,0.07) 0px, rgba(153,102,255,0.07) 2px, transparent 2px, transparent 10px),
+    radial-gradient(circle at 15% 25%, rgba(255,221,0,0.13) 0%, transparent 45%),
+    radial-gradient(circle at 85% 75%, rgba(102,204,255,0.13) 0%, transparent 45%),
+    radial-gradient(circle at 50% 50%, rgba(102,255,102,0.07) 0%, transparent 55%) !important;
+  background-attachment: fixed !important;
+}
+
+/* ── 3. GLITTER HEADERS ───────────────────────────────────────────── */
+h1, .page-hero h1 {
+  background: linear-gradient(135deg, #FF66CC, #9966FF, #66FFCC, #FFCC00, #FF9933, #FF66CC) !important;
+  background-size: 400% 400% !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+  animation: y2k-glitter 5s ease infinite !important;
+  text-shadow: none !important;
+  filter: drop-shadow(2px 3px 0 rgba(153,102,255,0.35)) !important;
+}
+
+@keyframes y2k-glitter {
+  0%   { background-position: 0%   50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0%   50%; }
+}
+
+/* Keep h2/h3 readable but punchy */
+h2 {
+  text-shadow: 3px 3px 0 var(--y2k-bubblegum), -1px -1px 0 rgba(255,255,255,0.9) !important;
+}
+h3 {
+  text-shadow: 2px 2px 0 var(--y2k-lavender) !important;
+}
+
+/* ── 4. BUTTONS — Blob shapes, bouncy spring ──────────────────────── */
+.btn {
+  border-radius: 30% 70% 70% 30% / 30% 30% 70% 70% !important;
+  transition: all 0.22s cubic-bezier(0.68, -0.55, 0.265, 1.55) !important;
+  box-shadow: var(--y2k-shadow) !important;
+  overflow: visible !important;
+  position: relative !important;
+}
+.btn:hover {
+  transform: translateY(-5px) rotate(-1.5deg) scale(1.07) !important;
+  box-shadow: 8px 8px 0 rgba(0,0,0,0.13) !important;
+}
+.btn:active {
+  transform: translateY(2px) rotate(0.5deg) scale(0.97) !important;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.1) !important;
+}
+
+.btn-primary {
+  border-radius: 40% 60% 60% 40% / 40% 50% 50% 60% !important;
+  background: linear-gradient(135deg, #FF66CC, #9966FF) !important;
+  box-shadow: 5px 5px 0 #CC44AA !important;
+}
+.btn-primary:hover {
+  box-shadow: 8px 8px 0 #CC44AA !important;
+}
+
+.btn-secondary {
+  border-radius: 50% 50% 30% 70% / 60% 40% 60% 40% !important;
+  background: linear-gradient(135deg, #FFDD00, #FF9933) !important;
+  box-shadow: 5px 5px 0 #CC7700 !important;
+  color: #4A2B6B !important;
+}
+.btn-secondary:hover {
+  box-shadow: 8px 8px 0 #CC7700 !important;
+}
+
+.btn-outline {
+  border-radius: 55% 45% 45% 55% / 45% 55% 45% 55% !important;
+  border: 3px dashed var(--purple) !important;
+  background: rgba(255,255,255,0.85) !important;
+  box-shadow: 4px 4px 0 var(--y2k-lavender) !important;
+}
+.btn-outline:hover {
+  border-style: solid !important;
+  box-shadow: 6px 6px 0 var(--y2k-lavender) !important;
+}
+
+/* Action buttons (feed/play) */
+.btn-action {
+  border-radius: 65% 35% 70% 30% / 30% 55% 45% 70% !important;
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.12) !important;
+}
+
+/* Feed button: lime green */
+.btn-feed {
+  background: linear-gradient(135deg, #66FF66, #33CC33) !important;
+  color: #1a4a1a !important;
+  box-shadow: 4px 4px 0 #22AA22 !important;
+  border-radius: 65% 35% 70% 30% / 30% 55% 45% 70% !important;
+}
+.btn-feed:hover {
+  box-shadow: 7px 7px 0 #22AA22 !important;
+}
+
+/* Play button: electric orange */
+.btn-play {
+  background: linear-gradient(135deg, #FF9933, #FF6600) !important;
+  color: #fff !important;
+  box-shadow: 4px 4px 0 #CC5500 !important;
+  border-radius: 40% 60% 50% 50% / 55% 45% 55% 45% !important;
+}
+.btn-play:hover {
+  box-shadow: 7px 7px 0 #CC5500 !important;
+}
+
+/* Nav action buttons (Profile, Logout) */
+.btn-nav-action {
+  border-radius: 50% 50% 40% 60% / 50% 40% 60% 50% !important;
+  transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55) !important;
+}
+.btn-nav-action:hover {
+  transform: translateY(-4px) rotate(2deg) !important;
+}
+
+/* ── 5. SIDEBAR BUTTONS — Bubble + color-coded ─────────────────────── */
+.sidebar-nav-btn {
+  border-radius: 40% 60% 50% 50% / 40% 40% 60% 60% !important;
+  margin-bottom: 6px !important;
+  transition: all 0.22s cubic-bezier(0.68, -0.55, 0.265, 1.55) !important;
+  box-shadow: 3px 3px 0 rgba(0,0,0,0.08) !important;
+  border: 2px solid transparent !important;
+}
+.sidebar-nav-btn:nth-child(odd) {
+  border-radius: 50% 50% 40% 60% / 50% 40% 60% 50% !important;
+}
+.sidebar-nav-btn:hover {
+  transform: translateX(8px) rotate(1deg) scale(1.04) !important;
+  box-shadow: 5px 5px 0 rgba(0,0,0,0.1) !important;
+  border-color: var(--y2k-lavender) !important;
+}
+.sidebar-nav-btn.active {
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.15),
+              0 0 12px rgba(153,102,255,0.4) !important;
+}
+
+/* Color-coded sidebar sections */
+#sidebar-btn-home        { background: rgba(102,255,102,0.15) !important; border-color: rgba(102,255,102,0.3) !important; }
+#sidebar-btn-home:hover  { background: rgba(102,255,102,0.28) !important; }
+#sidebar-btn-home.active { background: linear-gradient(135deg,#66FF66,#33CC33) !important; color:#1a4a1a !important; }
+
+#sidebar-btn-adopt        { background: rgba(255,102,204,0.15) !important; border-color: rgba(255,102,204,0.3) !important; }
+#sidebar-btn-adopt:hover  { background: rgba(255,102,204,0.28) !important; }
+#sidebar-btn-adopt.active { background: linear-gradient(135deg,#FF66CC,#CC0099) !important; color:#fff !important; }
+
+#sidebar-btn-mypets        { background: rgba(255,179,230,0.2) !important; border-color: rgba(255,102,204,0.3) !important; }
+#sidebar-btn-mypets:hover  { background: rgba(255,179,230,0.38) !important; }
+#sidebar-btn-mypets.active { background: linear-gradient(135deg,#FFB3E6,#FF66CC) !important; color:#4A2B6B !important; }
+
+#sidebar-btn-shop        { background: rgba(255,221,0,0.15) !important; border-color: rgba(255,153,51,0.3) !important; }
+#sidebar-btn-shop:hover  { background: rgba(255,221,0,0.28) !important; }
+#sidebar-btn-shop.active { background: linear-gradient(135deg,#FFDD00,#FF9933) !important; color:#4A2B6B !important; }
+
+#sidebar-btn-battle        { background: rgba(255,100,80,0.12) !important; border-color: rgba(255,80,60,0.3) !important; }
+#sidebar-btn-battle:hover  { background: rgba(255,100,80,0.25) !important; }
+#sidebar-btn-battle.active { background: linear-gradient(135deg,#FF6644,#CC3322) !important; color:#fff !important; }
+
+#sidebar-btn-minigames        { background: rgba(102,204,255,0.15) !important; border-color: rgba(102,204,255,0.3) !important; }
+#sidebar-btn-minigames:hover  { background: rgba(102,204,255,0.28) !important; }
+#sidebar-btn-minigames.active { background: linear-gradient(135deg,#66CCFF,#3399DD) !important; color:#fff !important; }
+
+#sidebar-btn-friends        { background: rgba(170,255,221,0.18) !important; border-color: rgba(102,255,170,0.3) !important; }
+#sidebar-btn-friends:hover  { background: rgba(170,255,221,0.32) !important; }
+#sidebar-btn-friends.active { background: linear-gradient(135deg,#AAFFDD,#44DDAA) !important; color:#1a4a3a !important; }
+
+#sidebar-btn-leaderboard        { background: rgba(255,215,0,0.15) !important; border-color: rgba(255,200,0,0.3) !important; }
+#sidebar-btn-leaderboard:hover  { background: rgba(255,215,0,0.28) !important; }
+#sidebar-btn-leaderboard.active { background: linear-gradient(135deg,#FFD700,#FFA500) !important; color:#4A2B6B !important; }
+
+#sidebar-btn-settings        { background: rgba(200,200,200,0.15) !important; border-color: rgba(180,180,180,0.3) !important; }
+#sidebar-btn-settings:hover  { background: rgba(200,200,200,0.28) !important; }
+#sidebar-btn-settings.active { background: linear-gradient(135deg,#CCCCCC,#999999) !important; color:#fff !important; }
+
+/* ── 6. PET CARDS — Sticker-wall chaos ────────────────────────────── */
+
+/* Slightly tilted per position */
+.my-pet-card:nth-child(1)  { rotate: -1.5deg !important; }
+.my-pet-card:nth-child(2)  { rotate:  2deg   !important; }
+.my-pet-card:nth-child(3)  { rotate: -0.8deg !important; }
+.my-pet-card:nth-child(4)  { rotate:  1.2deg !important; }
+.my-pet-card:nth-child(5)  { rotate: -2deg   !important; }
+.my-pet-card:nth-child(6)  { rotate:  0.5deg !important; }
+.my-pet-card:nth-child(7)  { rotate: -1deg   !important; }
+.my-pet-card:nth-child(8)  { rotate:  1.8deg !important; }
+
+/* Colored accent borders per position */
+.my-pet-card:nth-child(1) { border-color: #FF66CC !important; box-shadow: 6px 6px 0 #FF66CC, 0 8px 24px rgba(255,102,204,0.2) !important; }
+.my-pet-card:nth-child(2) { border-color: #9966FF !important; box-shadow: 6px 6px 0 #9966FF, 0 8px 24px rgba(153,102,255,0.2) !important; }
+.my-pet-card:nth-child(3) { border-color: #66CCFF !important; box-shadow: 6px 6px 0 #66CCFF, 0 8px 24px rgba(102,204,255,0.2) !important; }
+.my-pet-card:nth-child(4) { border-color: #FF9933 !important; box-shadow: 6px 6px 0 #FF9933, 0 8px 24px rgba(255,153,51,0.2) !important; }
+.my-pet-card:nth-child(5) { border-color: #66FF66 !important; box-shadow: 6px 6px 0 #66FF66, 0 8px 24px rgba(102,255,102,0.2) !important; }
+.my-pet-card:nth-child(6) { border-color: #FFDD00 !important; box-shadow: 6px 6px 0 #FFDD00, 0 8px 24px rgba(255,221,0,0.2) !important; }
+.my-pet-card:nth-child(7) { border-color: #FF66CC !important; box-shadow: 6px 6px 0 #FF66CC, 0 8px 24px rgba(255,102,204,0.2) !important; }
+.my-pet-card:nth-child(8) { border-color: #9966FF !important; box-shadow: 6px 6px 0 #9966FF, 0 8px 24px rgba(153,102,255,0.2) !important; }
+
+/* Tape corner effect */
+.my-pet-card::before {
+  content: '' !important;
+  position: absolute !important;
+  top: -10px !important;
+  left: 22px !important;
+  width: 44px !important;
+  height: 22px !important;
+  background: rgba(255,255,200,0.75) !important;
+  transform: rotate(-4deg) !important;
+  pointer-events: none !important;
+  z-index: 5 !important;
+  border-radius: 3px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15) !important;
+}
+.my-pet-card:nth-child(even)::before {
+  left: auto !important;
+  right: 22px !important;
+  transform: rotate(4deg) !important;
+}
+
+/* Wobble on hover */
+.my-pet-card {
+  transition: transform 0.25s cubic-bezier(0.68,-0.55,0.265,1.55), box-shadow 0.25s, rotate 0.25s !important;
+  overflow: visible !important;
+}
+.my-pet-card:hover {
+  animation: y2k-wobble 0.4s ease-in-out !important;
+  box-shadow: 10px 10px 0 rgba(0,0,0,0.12), 0 20px 40px rgba(153,102,255,0.3) !important;
+  z-index: 10 !important;
+  rotate: 0deg !important;
+}
+
+@keyframes y2k-wobble {
+  0%,100% { transform: translateY(-6px) rotate(0deg); }
+  25%      { transform: translateY(-8px) rotate(-2deg); }
+  75%      { transform: translateY(-8px) rotate(2deg); }
+}
+
+/* Grid: staggered gap for zig-zag feel */
+.mypets-grid {
+  gap: 36px 28px !important;
+  align-items: start !important;
+}
+/* Every second card drops down slightly */
+.mypets-grid .my-pet-card:nth-child(even) {
+  margin-top: 18px !important;
+}
+
+/* ── 7. NAVBAR — Floating hover, slightly irregular spacing ────────── */
+.navbar {
+  box-shadow: 0 6px 20px rgba(153,102,255,0.35), 0 2px 0 rgba(255,255,255,0.4) inset !important;
+}
+
+/* Pass and Bingo buttons get blob treatment */
+.pass-button, .bingo-button {
+  border-radius: 50% 50% 40% 60% / 45% 55% 45% 55% !important;
+  transition: all 0.22s cubic-bezier(0.68,-0.55,0.265,1.55) !important;
+  box-shadow: 3px 3px 0 rgba(0,0,0,0.15) !important;
+}
+.pass-button:hover, .bingo-button:hover {
+  transform: translateY(-4px) rotate(-2deg) scale(1.08) !important;
+  box-shadow: 6px 6px 0 rgba(0,0,0,0.18) !important;
+}
+
+/* Notification bell: subtle pulse glow */
+.notification-bell {
+  animation: y2k-bell-float 3s ease-in-out infinite !important;
+}
+@keyframes y2k-bell-float {
+  0%,100% { transform: translateY(0) rotate(0deg); }
+  30%     { transform: translateY(-3px) rotate(-8deg); }
+  60%     { transform: translateY(-2px) rotate(5deg); }
+}
+
+/* ── 8. RIGHT SIDEBAR — Speech bubble streamers ────────────────────── */
+.streamer-item, .streamer-card {
+  border-radius: 18px 18px 18px 4px !important;
+  position: relative !important;
+  border: 2px solid rgba(153,102,255,0.3) !important;
+  box-shadow: 3px 3px 0 rgba(153,102,255,0.15) !important;
+  transition: all 0.22s cubic-bezier(0.68,-0.55,0.265,1.55) !important;
+}
+.streamer-item:hover, .streamer-card:hover {
+  transform: translateX(-4px) rotate(-0.5deg) !important;
+  box-shadow: 5px 5px 0 rgba(153,102,255,0.2) !important;
+}
+/* Live indicator pulsing neon */
+.live-indicator, .stream-live, [class*="live"] {
+  animation: y2k-live-pulse 1.2s ease-in-out infinite !important;
+  border-radius: 20px !important;
+}
+@keyframes y2k-live-pulse {
+  0%,100% { box-shadow: 0 0 0   0   rgba(255,60,60,0.7), 0 0 6px  rgba(255,60,60,0.5); }
+  50%     { box-shadow: 0 0 0   8px rgba(255,60,60,0),   0 0 18px rgba(255,60,60,0.8); }
+}
+
+/* Latest news widget: dashed border, yellow accent */
+.news-widget, [id*="news"], .latest-news {
+  border: 3px dashed var(--y2k-lemon) !important;
+  box-shadow: 4px 4px 0 var(--y2k-lemon) !important;
+}
+
+/* ── 9. CARDS — Construction-paper look ───────────────────────────── */
+.shop-card, .quicklink-card, .stat-card, .info-card, .settings-modal-item {
+  border-width: 3px !important;
+  border-style: solid !important;
+  box-shadow: 5px 5px 0 rgba(0,0,0,0.1) !important;
+  transition: all 0.22s cubic-bezier(0.68,-0.55,0.265,1.55) !important;
+}
+.shop-card:hover, .quicklink-card:hover {
+  transform: translateY(-5px) rotate(-0.8deg) !important;
+  box-shadow: 8px 8px 0 rgba(0,0,0,0.12) !important;
+}
+
+/* Alternating card border colors */
+.shop-card:nth-child(3n+1), .quicklink-card:nth-child(3n+1) { border-color: var(--y2k-hot-pink) !important; }
+.shop-card:nth-child(3n+2), .quicklink-card:nth-child(3n+2) { border-color: var(--y2k-sky) !important; }
+.shop-card:nth-child(3n+3), .quicklink-card:nth-child(3n+3) { border-color: var(--y2k-lemon) !important; }
+
+/* ── 10. CONTAINERS & SECTIONS — Staggered feel ───────────────────── */
+.page-section, .section-content {
+  position: relative !important;
+}
+
+/* Sparkle dividers */
+.page-hero {
+  position: relative !important;
+}
+.page-hero::after {
+  content: '✦ ✦ ✦ ✦ ✦' !important;
+  display: block !important;
+  text-align: center !important;
+  font-size: 1rem !important;
+  color: var(--y2k-hot-pink) !important;
+  letter-spacing: 12px !important;
+  margin-top: 16px !important;
+  animation: y2k-sparkle-row 2s ease-in-out infinite alternate !important;
+}
+@keyframes y2k-sparkle-row {
+  from { opacity: 0.5; letter-spacing: 10px; }
+  to   { opacity: 1;   letter-spacing: 16px; }
+}
+
+/* ── 11. MODALS — Double border, bubbly ───────────────────────────── */
+.modal, .modal-content, .form-card {
+  border: 4px solid var(--y2k-hot-pink) !important;
+  outline: 2px dashed var(--y2k-lavender) !important;
+  outline-offset: 4px !important;
+  box-shadow: 8px 8px 0 rgba(153,102,255,0.25) !important;
+}
+
+/* ── 12. INPUTS — Friendly rounded ───────────────────────────────────*/
+input[type="text"], input[type="email"], input[type="password"], textarea, select {
+  border: 3px solid var(--y2k-lavender) !important;
+  border-radius: 30px !important;
+  transition: all 0.2s !important;
+  box-shadow: 3px 3px 0 rgba(153,102,255,0.1) !important;
+}
+input[type="text"]:focus, input[type="email"]:focus,
+input[type="password"]:focus, textarea:focus, select:focus {
+  border-color: var(--y2k-hot-pink) !important;
+  box-shadow: 3px 3px 0 var(--y2k-hot-pink), 0 0 0 4px rgba(255,102,204,0.15) !important;
+  outline: none !important;
+}
+
+/* ── 13. TOASTS — Bouncy entrance ────────────────────────────────────*/
+.toast, .notification-toast {
+  border-radius: 50% 50% 40% 60% / 45% 55% 45% 55% !important;
+  border: 3px solid rgba(255,255,255,0.5) !important;
+  box-shadow: 5px 5px 0 rgba(0,0,0,0.12) !important;
+  animation: y2k-toast-in 0.4s cubic-bezier(0.68,-0.55,0.265,1.55) !important;
+}
+@keyframes y2k-toast-in {
+  from { transform: translateY(30px) rotate(-3deg) scale(0.8); opacity: 0; }
+  to   { transform: translateY(0)    rotate(0deg)  scale(1);   opacity: 1; }
+}
+
+/* ── 14. STICKER / CUSTOM ART PLACEHOLDERS ────────────────────────── */
+.custom-sticker {
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  text-indent: -9999px;
+  width: auto;
+  min-width: 80px;
+}
+.tape-corner { position: relative; }
+.tape-corner::before {
+  content: '';
+  position: absolute;
+  top: -8px; left: 20px;
+  width: 40px; height: 20px;
+  background: rgba(255,255,200,0.7);
+  transform: rotate(-5deg);
+  pointer-events: none;
+}
+
+/* Custom nav icon placeholders */
+.custom-nav-icon-home   { background-image: url('images/icons/home-custom.png'); }
+.custom-nav-icon-adopt  { background-image: url('images/icons/adopt-custom.png'); }
+.custom-nav-icon-mypets { background-image: url('images/icons/mypets-custom.png'); }
+.custom-nav-icon-shop   { background-image: url('images/icons/shop-custom.png'); }
+.custom-nav-icon-battle { background-image: url('images/icons/battle-custom.png'); }
+.custom-nav-icon-home span,
+.custom-nav-icon-adopt span,
+.custom-nav-icon-mypets span,
+.custom-nav-icon-shop span,
+.custom-nav-icon-battle span { display: none; }
+
+/* ── 15. ACHIEVEMENT / BADGE ELEMENTS ────────────────────────────── */
+.ach-badge {
+  border-radius: 40% 60% 55% 45% / 50% 45% 55% 50% !important;
+  box-shadow: 3px 3px 0 rgba(0,0,0,0.1) !important;
+  transition: transform 0.2s !important;
+}
+.ach-badge:hover {
+  transform: scale(1.15) rotate(-3deg) !important;
+}
+
+/* ── 16. STAT BARS — Chunky Y2K style ────────────────────────────── */
+.stat-bar-fill, .xp-bar-fill, .hp-bar-fill {
+  border-radius: 20px !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+.stat-bar-fill::after {
+  content: '' !important;
+  position: absolute !important;
+  top: 0; left: -100% !important;
+  width: 60% !important;
+  height: 100% !important;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent) !important;
+  animation: y2k-bar-shine 2.5s ease-in-out infinite !important;
+}
+@keyframes y2k-bar-shine {
+  from { left: -60%; }
+  to   { left: 160%;  }
+}
+
+/* ── 17. MOBILE — Keep blob shapes but simpler ───────────────────── */
+@media (max-width: 768px) {
+  .my-pet-card:nth-child(n) {
+    rotate: 0deg !important;
+    margin-top: 0 !important;
+  }
+  .my-pet-card::before { display: none !important; }
+  .sidebar-nav-btn { border-radius: 20px !important; }
+  .sidebar-nav-btn:hover { transform: translateX(4px) !important; }
+  .btn { border-radius: 30px !important; }
+  .mypets-grid { gap: 20px !important; }
+  h1, .page-hero h1 {
+    filter: none !important;
+    font-size: clamp(1.6rem, 6vw, 2.5rem) !important;
+  }
+}
+

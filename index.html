@@ -58,6 +58,7 @@
 .tutorial-mascot-image{width:180px;height:180px;object-fit:contain;filter:drop-shadow(0 8px 24px rgba(0,0,0,0.3));animation:tutorial-mascot-float 3s ease-in-out infinite}
 .tutorial-mascot-name{font-family:'Chewy',cursive;font-size:1.2rem;color:#fff;margin-top:12px;text-shadow:0 2px 8px rgba(0,0,0,0.5)}
 .tutorial-mascot-excited .tutorial-mascot-image{animation:tutorial-mascot-excited 0.5s ease-in-out infinite}
+.tutorial-mascot-explaining .tutorial-mascot-image{animation:tutorial-mascot-explaining 1.5s ease-in-out infinite}
 .tutorial-mascot-concerned .tutorial-mascot-image{filter:drop-shadow(0 8px 24px rgba(255,165,0,0.3))}
 .tutorial-mascot-worried .tutorial-mascot-image{filter:drop-shadow(0 8px 24px rgba(255,100,100,0.3))}
 .tutorial-mascot-scared .tutorial-mascot-image{filter:drop-shadow(0 8px 24px rgba(255,0,0,0.5));animation:tutorial-mascot-shake 0.3s ease-in-out infinite}
@@ -75,16 +76,32 @@
 .tutorial-next:disabled{opacity:0.5;cursor:not-allowed}
 .tutorial-choice-buttons{display:flex;flex-direction:column;gap:12px;width:100%}
 .tutorial-choice-buttons .btn{width:100%;padding:16px 24px;font-size:1.1rem}
+/* Tab highlight pulse when tutorial mentions a tab */
+.tutorial-tab-highlight{animation:tutorial-tab-pulse 1s ease-in-out infinite!important;box-shadow:0 0 0 0 rgba(153,102,255,0.7)!important;outline:3px solid #9966ff!important;outline-offset:2px!important;position:relative!important;z-index:10!important}
+@keyframes tutorial-tab-pulse{0%{box-shadow:0 0 0 0 rgba(153,102,255,0.7)}70%{box-shadow:0 0 0 10px rgba(153,102,255,0)}100%{box-shadow:0 0 0 0 rgba(153,102,255,0)}}
+/* Arrow pointing at highlighted tab */
+.tutorial-tab-arrow{position:fixed;z-index:1000003;pointer-events:none;font-size:2rem;animation:tutorial-arrow-bounce 0.6s ease-in-out infinite alternate;filter:drop-shadow(0 2px 6px rgba(153,102,255,0.8))}
+@keyframes tutorial-arrow-bounce{from{transform:translateX(-8px)}to{transform:translateX(4px)}}
+/* Recap modal */
+.tutorial-recap-modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000010;background:linear-gradient(135deg,#fff,#fff5ff);border:4px solid var(--purple);border-radius:24px;padding:40px;max-width:500px;width:90%;box-shadow:0 20px 60px rgba(153,102,255,0.5);text-align:center;pointer-events:all}
+.tutorial-recap-modal h2{font-family:'Chewy',cursive;font-size:2rem;color:var(--purple-dark);margin-bottom:16px}
+.tutorial-recap-list{text-align:left;margin:16px 0;list-style:none;padding:0}
+.tutorial-recap-list li{padding:8px 0;border-bottom:1px solid var(--purple-light);font-size:1rem;color:var(--text)}
+.tutorial-recap-list li:before{content:"✅ ";margin-right:6px}
 @keyframes tutorial-dialogue-enter{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 @keyframes tutorial-mascot-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
 @keyframes tutorial-mascot-float{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-15px) rotate(3deg)}}
 @keyframes tutorial-mascot-excited{0%,100%{transform:scale(1) rotate(0)}25%{transform:scale(1.1) rotate(-5deg)}75%{transform:scale(1.1) rotate(5deg)}}
+@keyframes tutorial-mascot-explaining{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.03)}}
 @keyframes tutorial-mascot-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
 body.night-mode .tutorial-dialogue-box{background:linear-gradient(135deg,#2a2440,#3a3050);border-color:#9966ff;box-shadow:0 12px 48px rgba(153,102,255,0.6)}
 body.night-mode .tutorial-dialogue-text{color:#e8d5ff}
 body.night-mode .tutorial-dot{background:#9966ff}
 body.night-mode .tutorial-dot.active{background:#b589ff}
 body.night-mode .tutorial-skip{color:#b589ff!important}
+body.night-mode .tutorial-recap-modal{background:linear-gradient(135deg,#2a2440,#3a3050);border-color:#9966ff}
+body.night-mode .tutorial-recap-modal h2{color:#e8d5ff}
+body.night-mode .tutorial-recap-list li{color:#e8d5ff;border-color:#4a3a6a}
 @media (max-width:768px){.tutorial-mascot{right:20px;bottom:220px;transform:scale(0.7)}.tutorial-mascot-image{font-size:6rem}.tutorial-dialogue-box{bottom:20px;width:95%;padding:20px}.tutorial-dialogue-text{font-size:1.1rem;min-height:60px}.tutorial-buttons{flex-direction:column;gap:8px}.tutorial-skip,.tutorial-next{width:100%}}
 @media (max-width:480px){.tutorial-mascot{right:10px;bottom:200px;transform:scale(0.5)}.tutorial-dialogue-text{font-size:1rem}}
 .settings-modal-item{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:24px;background:var(--cream);border:3px solid var(--purple);border-radius:16px;box-shadow:0 4px 12px rgba(153,102,255,0.2)}
@@ -1905,6 +1922,17 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
           </label>
         </div>
         
+        <!-- Replay Tutorial -->
+        <div class="settings-modal-item" style="margin-top:15px;flex-direction:column;align-items:flex-start;gap:10px;">
+          <div>
+            <strong>🎓 Tutorial</strong>
+            <div style="font-size:0.85rem;color:var(--text-light);margin-top:4px;">Replay Melon's guide. No extra PP awarded on replay.</div>
+          </div>
+          <button class="btn btn-outline" onclick="Tutorial.replay()" style="border-color:var(--purple);color:var(--purple);">
+            🍈 Replay Tutorial
+          </button>
+        </div>
+
         <!-- Referral System -->
         <div style="margin-top:40px;padding-top:30px;border-top:2px solid var(--border);">
           <h3 style="text-align:center;color:var(--purple);margin-bottom:15px;">💰 Invite Friends</h3>
@@ -2264,9 +2292,367 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
 <script src="game.js" defer></script>
 <script>
 // ═══════════════════════════════════════════════════════════
-// TUTORIAL SYSTEM
+// TUTORIAL SYSTEM - Enhanced
 // ═══════════════════════════════════════════════════════════
-var Tutorial={active:false,currentStep:0,overlay:null,waitingForPet:false,steps:[{id:'welcome',tab:'home',dialogue:[{text:"Hi there! I'm Melon, your guide to PawketPets! 🍈",mascot:"happy"},{text:"This is your Home page. You can always come back here to see what's new!",mascot:"explaining"},{text:"Ready to meet your first pet? Let's go!",mascot:"excited"}]},{id:'adoption',tab:'adopt',dialogue:[{text:"Welcome to the Adoption Center! This is where you'll find your new companion.",mascot:"happy"},{text:"Your FIRST pet is completely FREE! But each pet after that costs PawketPoints.",mascot:"explaining"},{text:"Pets have different personalities and looks. Choose one you like!",mascot:"happy"},{text:"Go ahead - click on a pet to adopt them! I'll wait here while you choose! 😊",mascot:"excited",waitForPet:true}]},{id:'mypets',tab:'mypets',requiresPet:true,dialogue:[{text:"Aww, what a cutie! Welcome to your new friend! 💕",mascot:"happy"},{text:"This is your My Pets page. You can see all your pets here!",mascot:"explaining"},{text:"Pets have Hunger and Energy levels. Keep them fed and rested to keep them happy!",mascot:"explaining"},{text:"You can play with them, feed them items, and even equip them with gear!",mascot:"excited"}]},{id:'shop',tab:'shop',dialogue:[{text:"The Shop is where you buy items with PawketPoints (PP).",mascot:"explaining"},{text:"You can buy food, toys, equipment, and more!",mascot:"happy"},{text:"But how do you earn PP? Let me show you!",mascot:"excited"}]},{id:'minigames',tab:'minigames',dialogue:[{text:"The Minigames page is where you earn PP!",mascot:"excited"},{text:"Play games like Memory Match, Dice Roll, and more!",mascot:"happy"},{text:"Each game gives you PP as a reward. You can play most of them once per day!",mascot:"explaining"},{text:"Try them out whenever you like! The more you play, the more you earn!",mascot:"excited"}]},{id:'battle',tab:'battle',dialogue:[{text:"The Battle Arena lets your pets fight opponents and earn rewards!",mascot:"explaining"},{text:"Battles are automatic - just click Battle and watch! Your pet's stats determine who wins.",mascot:"happy"},{text:"Win battles to earn PP, items, and level up your pets!",mascot:"excited"},{text:"That covers the basics! You're all set to play! But... there's one more thing...",mascot:"concerned"}]},{id:'spooky',tab:null,dialogue:[{text:"I've been here a while, and... something feels off about this place.",mascot:"worried"},{text:"Sometimes I see things. Shadows. Glitches in the code. Strange encounters...",mascot:"scared"},{text:"There are rumors of creepy bosses, unsettling events, and hidden secrets.",mascot:"serious"},{text:"Are you okay with things that go bump in the night?",mascot:"serious",showChoice:true}]}],start:function(){console.log('🎓 Starting tutorial...');this.active=true;this.currentStep=0;this.createOverlay();this.runStep()},createOverlay:function(){var overlay=document.createElement('div');overlay.id='tutorial-overlay';overlay.className='tutorial-overlay';overlay.innerHTML='<div class="tutorial-backdrop"></div><div class="tutorial-mascot" id="tutorial-mascot"><div class="tutorial-mascot-image"><img src="images/melon.png" alt="Melon" style="width:100%;height:100%;object-fit:contain;"></div><div class="tutorial-mascot-name">Melon</div></div><div class="tutorial-dialogue-box"><div class="tutorial-dialogue-content"><div class="tutorial-dialogue-text" id="tutorial-text">Welcome to PawketPets!</div><div class="tutorial-progress" id="tutorial-progress"></div><div class="tutorial-buttons" id="tutorial-buttons"><button class="btn tutorial-skip" onclick="Tutorial.skip()">Skip Tutorial</button><button class="btn btn-primary tutorial-next" onclick="Tutorial.next()">Continue</button></div></div></div>';document.body.appendChild(overlay);this.overlay=overlay},runStep:function(){var step=this.steps[this.currentStep];if(!step){console.error('Invalid tutorial step:',this.currentStep);return}console.log('📖 Tutorial step:',step.id);if(step.tab&&typeof showTab==='function'){showTab(step.tab)}setTimeout(function(){Tutorial.showDialogue(0)},500)},showDialogue:function(dialogueIndex){var step=this.steps[this.currentStep];if(!step||!step.dialogue[dialogueIndex])return;var dialogue=step.dialogue[dialogueIndex];var textEl=document.getElementById('tutorial-text');var progressEl=document.getElementById('tutorial-progress');var buttonsEl=document.getElementById('tutorial-buttons');if(textEl){textEl.textContent=dialogue.text}var mascotEl=document.getElementById('tutorial-mascot');if(mascotEl){mascotEl.className='tutorial-mascot tutorial-mascot-'+(dialogue.mascot||'happy')}if(progressEl){var dots='';for(var i=0;i<step.dialogue.length;i++){dots+='<span class="tutorial-dot'+(i===dialogueIndex?' active':'')+'"></span>'}progressEl.innerHTML=dots}if(dialogue.showChoice){buttonsEl.innerHTML='<div class="tutorial-choice-buttons"><button class="btn btn-primary btn-lg" onclick="Tutorial.makeChoice(true)">👻 YES - Bring on the spooky!</button><button class="btn btn-outline btn-lg" onclick="Tutorial.makeChoice(false)">🌈 NO - Keep it cozy</button></div>'}else if(dialogue.waitForPet){this.waitingForPet=true;buttonsEl.innerHTML='<button class="btn tutorial-skip" onclick="Tutorial.skip()">Skip Tutorial</button><button class="btn btn-primary tutorial-next" disabled>⏳ Adopt a pet to continue...</button>'}else{this.waitingForPet=false;buttonsEl.innerHTML='<button class="btn tutorial-skip" onclick="Tutorial.skip()">Skip Tutorial</button><button class="btn btn-primary tutorial-next" onclick="Tutorial.next()">Continue</button>'}this.currentDialogueIndex=dialogueIndex},next:function(){var step=this.steps[this.currentStep];var nextDialogueIndex=(this.currentDialogueIndex||0)+1;if(nextDialogueIndex<step.dialogue.length){this.showDialogue(nextDialogueIndex)}else{this.currentStep++;if(this.currentStep>=this.steps.length){this.complete(false)}else{this.runStep()}}},onPetAdopted:function(){if(this.active&&this.waitingForPet){console.log('🐾 Pet adopted! Continuing tutorial...');this.waitingForPet=false;var buttonsEl=document.getElementById('tutorial-buttons');if(buttonsEl){buttonsEl.innerHTML='<button class="btn tutorial-skip" onclick="Tutorial.skip()">Skip Tutorial</button><button class="btn btn-primary tutorial-next" onclick="Tutorial.next()">Continue</button>'}setTimeout(function(){Tutorial.next()},1500)}},makeChoice:function(enableSpooky){console.log('👻 Spooky choice:',enableSpooky);this.complete(enableSpooky)},complete:async function(spookyEnabled){console.log('✅ Tutorial complete! Spooky:',spookyEnabled);if(currentUser&&typeof supabaseClient!=='undefined'){try{var ppReward=100;await supabaseClient.from('players').update({tutorial_completed:true,spooky_enabled:spookyEnabled,pawketpoints:currentPoints+ppReward}).eq('id',currentUser.id);currentPoints+=ppReward;if(typeof updatePointsDisplay==='function'){updatePointsDisplay()}if(typeof playerSettings!=='undefined'){playerSettings.tutorial_completed=true;playerSettings.spooky_enabled=spookyEnabled}console.log('💾 Tutorial progress saved!');console.log('🎁 Awarded '+ppReward+' PP!')}catch(err){console.error('Error saving tutorial progress:',err)}}var textEl=document.getElementById('tutorial-text');var buttonsEl=document.getElementById('tutorial-buttons');if(textEl){if(spookyEnabled){textEl.innerHTML="Brave choice! Here's <strong>100 PP</strong> to get you started. Keep your eyes open... you never know what you might find. 👁️✨"}else{textEl.innerHTML="A wise choice! Here's <strong>100 PP</strong> to get you started. Enjoy your cozy adventure with your new pet! 🌈✨"}}if(buttonsEl){buttonsEl.innerHTML='<button class="btn btn-primary btn-lg" onclick="Tutorial.close()">Lets Go! 🚀</button>'}setTimeout(function(){Tutorial.close()},4000)},skip:function(){if(!confirm('Are you sure you want to skip the tutorial? You can replay it later from Settings.')){return}console.log('⏭️ Tutorial skipped');this.complete(false)},close:function(){console.log('🎓 Closing tutorial...');this.active=false;var existingOverlay=document.getElementById('tutorial-overlay');if(existingOverlay&&existingOverlay.parentNode){existingOverlay.parentNode.removeChild(existingOverlay)}if(this.overlay&&this.overlay.parentNode){this.overlay.parentNode.removeChild(this.overlay)}this.overlay=null;document.body.style.overflow='';console.log('✅ Tutorial closed - overlay removed')}};window.Tutorial=Tutorial;console.log('🎓 Tutorial system loaded!');
+var Tutorial = {
+  active: false,
+  isReplay: false,
+  currentStep: 0,
+  currentDialogueIndex: 0,
+  overlay: null,
+  waitingForPet: false,
+  _arrowEl: null,
+  _highlightedTab: null,
+
+  steps: [
+    {id:'welcome', tab:'home', dialogue:[
+      {text:"Hi there! I'm Melon, your guide to PawketPets! 🍈", mascot:"excited"},
+      {text:"This is your Home page. You can always come back here to see what's new!", mascot:"explaining", highlightTab:"home"},
+      {text:"Ready to meet your first pet? Let's go!", mascot:"excited"}
+    ]},
+    {id:'adoption', tab:'adopt', dialogue:[
+      {text:"Welcome to the Adoption Center! This is where you'll find your new companion.", mascot:"happy", highlightTab:"adopt"},
+      {text:"Your FIRST pet is completely FREE! But each pet after that costs PawketPoints.", mascot:"explaining"},
+      {text:"Pets have different personalities and looks. Choose one you like!", mascot:"happy"},
+      {text:"Go ahead - click on a pet to adopt them! I'll wait here while you choose! 😊", mascot:"excited", waitForPet:true}
+    ]},
+    {id:'mypets', tab:'mypets', requiresPet:true, dialogue:[
+      {text:"Aww, what a cutie! Welcome to your new friend! 💕", mascot:"excited"},
+      {text:"This is your My Pets page. You can see all your pets here!", mascot:"explaining", highlightTab:"mypets"},
+      {text:"Pets have Hunger and Energy levels. Keep them fed and rested to keep them happy!", mascot:"explaining"},
+      {text:"Use the Feed and Play buttons to care for them, and equip gear from the Equipment section!", mascot:"excited"}
+    ]},
+    {id:'equipment', tab:'mypets', dialogue:[
+      {text:"Speaking of gear - see that Equipment section on each pet card? ⚔️", mascot:"explaining"},
+      {text:"Click Manage to equip weapons and armor. Better gear means stronger battles!", mascot:"excited"},
+      {text:"You can buy equipment from the Shop. Keep an eye on the rotating stock!", mascot:"happy"}
+    ]},
+    {id:'shop', tab:'shop', dialogue:[
+      {text:"The Shop is where you buy items with PawketPoints (PP).", mascot:"explaining", highlightTab:"shop"},
+      {text:"You can buy food, toys, equipment, and more! Stock rotates so check back often!", mascot:"happy"},
+      {text:"But how do you earn PP? Let me show you!", mascot:"excited"}
+    ]},
+    {id:'minigames', tab:'minigames', dialogue:[
+      {text:"The Minigames page is where you earn PP!", mascot:"excited", highlightTab:"minigames"},
+      {text:"Play games like Memory Match, Dice Roll, and more!", mascot:"happy"},
+      {text:"Each game gives you PP as a reward. You can play most of them once per day!", mascot:"explaining"},
+      {text:"Try them out whenever you like! The more you play, the more you earn!", mascot:"excited"}
+    ]},
+    {id:'battle', tab:'battle', dialogue:[
+      {text:"The Battle Arena lets your pets fight opponents and earn rewards!", mascot:"explaining", highlightTab:"battle"},
+      {text:"Battles are automatic - just click Battle and watch! Your pet's stats determine who wins.", mascot:"happy"},
+      {text:"Win battles to earn PP, items, and level up your pets!", mascot:"excited"}
+    ]},
+    {id:'pass', tab:null, dialogue:[
+      {text:"See that 🎫 Pass button in the top bar? That's the PawketPass!", mascot:"excited"},
+      {text:"Every time you play, feed pets, or battle, you earn Pass XP and level up!", mascot:"explaining"},
+      {text:"Each Pass level unlocks a reward - PP, items, even rare cosmetics! Claim them from the Pass screen.", mascot:"happy"}
+    ]},
+    {id:'bingo', tab:null, dialogue:[
+      {text:"And the 🎯 Bingo button? That's your Daily Bingo card!", mascot:"excited"},
+      {text:"Each day you get a fresh bingo card with tasks like 'Feed a pet' or 'Win a battle'.", mascot:"explaining"},
+      {text:"Complete a full row, column, or diagonal for bonus rewards. Blackout the whole card for a big prize! 🎉", mascot:"happy"}
+    ]},
+    {id:'spooky', tab:null, dialogue:[
+      {text:"Almost done! But... I've been here a while, and something feels off about this place.", mascot:"worried"},
+      {text:"Sometimes I see things. Shadows. Glitches in the code. Strange encounters...", mascot:"scared"},
+      {text:"There are rumors of creepy bosses, unsettling events, and hidden secrets.", mascot:"serious"},
+      {text:"Are you okay with things that go bump in the night?", mascot:"serious", showChoice:true}
+    ]}
+  ],
+
+  // ── helpers ──────────────────────────────────────────────
+  _saveProgress: function() {
+    try { localStorage.setItem('tutorial_step', this.currentStep); } catch(e) {}
+  },
+  _loadProgress: function() {
+    try { return parseInt(localStorage.getItem('tutorial_step') || '0'); } catch(e) { return 0; }
+  },
+  _clearProgress: function() {
+    try { localStorage.removeItem('tutorial_step'); } catch(e) {}
+  },
+
+  _highlightTabBtn: function(tabId) {
+    // Remove previous highlight
+    this._clearTabHighlight();
+    if (!tabId) return;
+    var btn = document.getElementById('sidebar-btn-' + tabId);
+    if (!btn) return;
+    this._highlightedTab = btn;
+    btn.classList.add('tutorial-tab-highlight');
+    // Position bouncing arrow
+    var rect = btn.getBoundingClientRect();
+    var arrow = document.createElement('div');
+    arrow.className = 'tutorial-tab-arrow';
+    arrow.textContent = '👉';
+    arrow.style.top = (rect.top + rect.height / 2 - 16) + 'px';
+    arrow.style.left = (rect.right + 4) + 'px';
+    document.body.appendChild(arrow);
+    this._arrowEl = arrow;
+  },
+  _clearTabHighlight: function() {
+    if (this._highlightedTab) {
+      this._highlightedTab.classList.remove('tutorial-tab-highlight');
+      this._highlightedTab = null;
+    }
+    if (this._arrowEl && this._arrowEl.parentNode) {
+      this._arrowEl.parentNode.removeChild(this._arrowEl);
+      this._arrowEl = null;
+    }
+  },
+
+  // ── lifecycle ─────────────────────────────────────────────
+  start: function() {
+    this.active = true;
+    this.isReplay = false;
+    this.currentStep = 0;
+    this.waitingForPet = false;
+    this._clearProgress();
+    this.createOverlay();
+    this.runStep();
+    // ESC key support
+    this._escHandler = function(e) { if (e.key === 'Escape') Tutorial.promptSkip(); };
+    document.addEventListener('keydown', this._escHandler);
+  },
+
+  replay: function() {
+    if (this.active) return;
+    this.active = true;
+    this.isReplay = true;
+    this.currentStep = 0;
+    this.waitingForPet = false;
+    this._clearProgress();
+    this.createOverlay();
+    this.runStep();
+    this._escHandler = function(e) { if (e.key === 'Escape') Tutorial.promptSkip(); };
+    document.addEventListener('keydown', this._escHandler);
+  },
+
+  createOverlay: function() {
+    var existing = document.getElementById('tutorial-overlay');
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+    var overlay = document.createElement('div');
+    overlay.id = 'tutorial-overlay';
+    overlay.className = 'tutorial-overlay';
+    overlay.innerHTML =
+      '<div class="tutorial-backdrop"></div>' +
+      '<div class="tutorial-mascot" id="tutorial-mascot">' +
+        '<div class="tutorial-mascot-image"><img src="images/melon.png" alt="Melon" style="width:100%;height:100%;object-fit:contain;"></div>' +
+        '<div class="tutorial-mascot-name">Melon</div>' +
+      '</div>' +
+      '<div class="tutorial-dialogue-box">' +
+        '<div class="tutorial-dialogue-content">' +
+          '<div class="tutorial-dialogue-text" id="tutorial-text">Welcome to PawketPets!</div>' +
+          '<div class="tutorial-progress" id="tutorial-progress"></div>' +
+          '<div class="tutorial-buttons" id="tutorial-buttons">' +
+            '<button class="btn tutorial-skip" onclick="Tutorial.promptSkip()">Skip Tutorial</button>' +
+            '<button class="btn btn-primary tutorial-next" onclick="Tutorial.next()">Continue</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    this.overlay = overlay;
+  },
+
+  runStep: function() {
+    var step = this.steps[this.currentStep];
+    if (!step) { this.complete(false); return; }
+    this._saveProgress();
+    if (step.tab && typeof showTab === 'function') { showTab(step.tab); }
+    var self = this;
+    setTimeout(function() { self.showDialogue(0); }, 500);
+  },
+
+  showDialogue: function(dialogueIndex) {
+    var step = this.steps[this.currentStep];
+    if (!step || !step.dialogue[dialogueIndex]) return;
+    var dialogue = step.dialogue[dialogueIndex];
+    this.currentDialogueIndex = dialogueIndex;
+
+    var textEl = document.getElementById('tutorial-text');
+    var progressEl = document.getElementById('tutorial-progress');
+    var buttonsEl = document.getElementById('tutorial-buttons');
+    var mascotEl = document.getElementById('tutorial-mascot');
+
+    if (textEl) textEl.textContent = dialogue.text;
+    if (mascotEl) mascotEl.className = 'tutorial-mascot tutorial-mascot-' + (dialogue.mascot || 'happy');
+
+    // Tab highlight + arrow
+    if (dialogue.highlightTab) {
+      this._highlightTabBtn(dialogue.highlightTab);
+    } else {
+      this._clearTabHighlight();
+    }
+
+    // Progress dots
+    if (progressEl) {
+      var dots = '';
+      for (var i = 0; i < step.dialogue.length; i++) {
+        dots += '<span class="tutorial-dot' + (i === dialogueIndex ? ' active' : '') + '"></span>';
+      }
+      progressEl.innerHTML = dots;
+    }
+
+    // Buttons
+    if (dialogue.showChoice) {
+      buttonsEl.innerHTML =
+        '<div class="tutorial-choice-buttons">' +
+          '<button class="btn btn-primary btn-lg" onclick="Tutorial.makeChoice(true)">👻 YES - Bring on the spooky!</button>' +
+          '<button class="btn btn-outline btn-lg" onclick="Tutorial.makeChoice(false)">🌈 NO - Keep it cozy</button>' +
+        '</div>';
+    } else if (dialogue.waitForPet) {
+      this.waitingForPet = true;
+      buttonsEl.innerHTML =
+        '<button class="btn tutorial-skip" onclick="Tutorial.promptSkip()">Skip Tutorial</button>' +
+        '<button class="btn btn-primary tutorial-next" disabled>⏳ Adopt a pet to continue...</button>';
+    } else {
+      this.waitingForPet = false;
+      buttonsEl.innerHTML =
+        '<button class="btn tutorial-skip" onclick="Tutorial.promptSkip()">Skip Tutorial</button>' +
+        '<button class="btn btn-primary tutorial-next" onclick="Tutorial.next()">Continue</button>';
+    }
+  },
+
+  next: function() {
+    var step = this.steps[this.currentStep];
+    var nextIdx = this.currentDialogueIndex + 1;
+    if (nextIdx < step.dialogue.length) {
+      this.showDialogue(nextIdx);
+    } else {
+      this._clearTabHighlight();
+      this.currentStep++;
+      if (this.currentStep >= this.steps.length) {
+        this.complete(false);
+      } else {
+        this.runStep();
+      }
+    }
+  },
+
+  onPetAdopted: function() {
+    if (!this.active || !this.waitingForPet) return;
+    this.waitingForPet = false;
+    var buttonsEl = document.getElementById('tutorial-buttons');
+    if (buttonsEl) {
+      buttonsEl.innerHTML =
+        '<button class="btn tutorial-skip" onclick="Tutorial.promptSkip()">Skip Tutorial</button>' +
+        '<button class="btn btn-primary tutorial-next" onclick="Tutorial.next()">Continue</button>';
+    }
+    setTimeout(function() { Tutorial.next(); }, 1500);
+  },
+
+  makeChoice: function(enableSpooky) {
+    this.complete(enableSpooky);
+  },
+
+  promptSkip: function() {
+    if (confirm('Skip the tutorial? You can replay it anytime from Settings.\n\nYou\'ll still receive 50 PP for starting.')) {
+      this.complete(false, true);
+    }
+  },
+
+  complete: async function(spookyEnabled, isSkip) {
+    this._clearTabHighlight();
+    if (document.removeEventListener && this._escHandler) {
+      document.removeEventListener('keydown', this._escHandler);
+    }
+
+    if (typeof currentUser !== 'undefined' && currentUser && typeof supabaseClient !== 'undefined') {
+      try {
+        // First-time: award 100 PP. Skip: award 50 PP. Replay: 0 PP.
+        var ppReward = 0;
+        if (!this.isReplay) {
+          ppReward = isSkip ? 50 : 100;
+        }
+
+        var updateData = { tutorial_completed: true, spooky_enabled: spookyEnabled };
+        if (ppReward > 0) updateData.pawketpoints = (typeof currentPoints !== 'undefined' ? currentPoints : 0) + ppReward;
+
+        await supabaseClient.from('players').update(updateData).eq('id', currentUser.id);
+
+        if (ppReward > 0 && typeof currentPoints !== 'undefined') {
+          currentPoints += ppReward;
+          // Use updateAllPoints (the real function) instead of updatePointsDisplay
+          if (typeof updateAllPoints === 'function') updateAllPoints();
+        }
+        if (typeof playerSettings !== 'undefined') {
+          playerSettings.tutorial_completed = true;
+          playerSettings.spooky_enabled = spookyEnabled;
+        }
+        this._clearProgress();
+      } catch(err) {
+        console.error('[Tutorial] Error saving progress:', err);
+      }
+    }
+
+    if (isSkip) {
+      this.close();
+      return;
+    }
+
+    // Show recap modal before closing
+    this._showRecap(spookyEnabled);
+  },
+
+  _showRecap: function(spookyEnabled) {
+    var overlay = this.overlay;
+    // Replace dialogue box content with recap
+    var dialogueBox = overlay ? overlay.querySelector('.tutorial-dialogue-box') : null;
+    if (!dialogueBox) { this.close(); return; }
+
+    var ppText = this.isReplay ? 'Thanks for reviewing!' : "Here's <strong>100 PP</strong> to get you started!";
+    var moodText = spookyEnabled
+      ? "Brave choice! Keep your eyes open... 👁️✨"
+      : "A wise choice! Enjoy your cozy adventure! 🌈✨";
+
+    dialogueBox.innerHTML =
+      '<div class="tutorial-dialogue-content">' +
+        '<div style="text-align:center;margin-bottom:16px;">' +
+          '<div style="font-size:2.5rem;margin-bottom:8px;">🎉</div>' +
+          '<div style="font-family:\'Chewy\',cursive;font-size:1.8rem;color:var(--purple-dark);">You\'re all set!</div>' +
+          '<div style="font-size:1rem;color:var(--text-light);margin-top:8px;">' + moodText + '</div>' +
+          (!this.isReplay ? '<div style="font-size:1rem;color:var(--purple);font-weight:bold;margin-top:8px;">' + ppText + '</div>' : '') +
+        '</div>' +
+        '<ul class="tutorial-recap-list">' +
+          '<li>Home page for daily news & updates</li>' +
+          '<li>Adopt Center to get pets (first one is free!)</li>' +
+          '<li>My Pets to feed, play & equip your companions</li>' +
+          '<li>Equipment from the Shop to boost battle stats</li>' +
+          '<li>Minigames to earn PawketPoints daily</li>' +
+          '<li>Battle Arena to fight and level up pets</li>' +
+          '<li>PawketPass 🎫 for leveling rewards</li>' +
+          '<li>Daily Bingo 🎯 for bonus prizes</li>' +
+        '</ul>' +
+        '<div style="text-align:center;margin-top:20px;">' +
+          '<button class="btn btn-primary btn-lg" onclick="Tutorial.close()">Let\'s Go! 🚀</button>' +
+        '</div>' +
+      '</div>';
+
+    // Also update mascot to excited
+    var mascotEl = document.getElementById('tutorial-mascot');
+    if (mascotEl) mascotEl.className = 'tutorial-mascot tutorial-mascot-excited';
+
+    // Auto-close after 8 seconds
+    var self = this;
+    setTimeout(function() { if (self.active) self.close(); }, 8000);
+  },
+
+  close: function() {
+    this.active = false;
+    this.waitingForPet = false;
+    this._clearTabHighlight();
+    if (document.removeEventListener && this._escHandler) {
+      document.removeEventListener('keydown', this._escHandler);
+    }
+    var existingOverlay = document.getElementById('tutorial-overlay');
+    if (existingOverlay && existingOverlay.parentNode) existingOverlay.parentNode.removeChild(existingOverlay);
+    if (this.overlay && this.overlay.parentNode) this.overlay.parentNode.removeChild(this.overlay);
+    this.overlay = null;
+    document.body.style.overflow = '';
+  }
+};
+window.Tutorial = Tutorial;
+console.log('🎓 Tutorial system loaded!');
 </script>
   <script>
 // Sync sidebar navigation with main tab switching
