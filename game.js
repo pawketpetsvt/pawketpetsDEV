@@ -1566,10 +1566,14 @@ async function loadMyPets() {
   if (!container.hasAttribute('data-delegation-setup')) {
     container.setAttribute('data-delegation-setup', 'true');
     container.addEventListener('click', function(e) {
+      console.log('🔍 Click detected:', e.target, e.target.className);
+      
       // Check for feed button click
       var feedBtn = e.target.closest('.btn-feed');
       if (feedBtn) {
+        console.log('🍽️ Feed button clicked!', feedBtn);
         var petId = feedBtn.getAttribute('data-pet-id');
+        console.log('Pet ID:', petId, 'Feed function exists:', typeof feed);
         if (petId && typeof feed === 'function') {
           feed(parseInt(petId));
         }
@@ -1579,7 +1583,9 @@ async function loadMyPets() {
       // Check for play button click
       var playBtn = e.target.closest('.btn-play');
       if (playBtn) {
+        console.log('🎮 Play button clicked!', playBtn);
         var petId = playBtn.getAttribute('data-pet-id');
+        console.log('Pet ID:', petId, 'Play function exists:', typeof play);
         if (petId && typeof play === 'function') {
           play(parseInt(petId));
         }

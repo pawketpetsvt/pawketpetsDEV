@@ -15160,3 +15160,31 @@ body.modal-open {
     display: none !important;
 }
 
+
+/* ============================================
+   PET CARD OVERFLOW FIX
+   ============================================ */
+
+.pet-card {
+    overflow: visible !important;
+    min-height: 450px !important;
+    position: relative !important;
+}
+
+/* Ensure pet name doesn't get cut off */
+.pet-name {
+    overflow: visible !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    max-width: 100% !important;
+}
+
+/* Watch Stream button should be fully visible */
+.watch-stream-btn,
+button[onclick*="watchStream"],
+button[onclick*="Watch Stream"] {
+    margin-top: 8px !important;
+    overflow: visible !important;
+    z-index: 1 !important;
+}
+
