@@ -15283,3 +15283,298 @@ body.modal-open {
     accent-color: #ffdd00 !important;
 }
 
+/* ============================================
+   SINGLE-ROW NAVBAR - EXACT SPECIFICATIONS
+   Add to the END of your style.css
+   ============================================ */
+
+/* Main navbar container */
+.navbar {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+    padding: 12px 24px !important;
+    gap: 16px !important;
+    flex-wrap: nowrap !important;
+    background: linear-gradient(135deg, #9966ff, #ff66cc, #00ddff) !important;
+    border-radius: 0 0 24px 24px !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 100 !important;
+    min-height: 60px !important;
+}
+
+/* Left group: Logo, Beta, Bell, Pass, Bingo */
+.navbar-left-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 16px !important;
+    flex-shrink: 0 !important;
+}
+
+/* Right group: Username, Points, Profile, Logout, Music */
+.navbar-right-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 16px !important;
+    flex-shrink: 0 !important;
+    margin-left: auto !important; /* Push to right */
+}
+
+/* Prevent shrinking of all navbar items */
+.navbar-left-group > *,
+.navbar-right-group > * {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+}
+
+/* Logo */
+.navbar-logo {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    font-family: 'Chewy', cursive !important;
+    font-size: 1.2rem !important;
+    color: white !important;
+    cursor: pointer !important;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3) !important;
+}
+
+.navbar-logo img {
+    width: 32px !important;
+    height: 32px !important;
+}
+
+/* Beta badge */
+.beta-badge {
+    background: rgba(0,0,0,0.3) !important;
+    color: #ffcc00 !important;
+    padding: 6px 12px !important;
+    border-radius: 20px !important;
+    font-size: 11px !important;
+    font-weight: bold !important;
+}
+
+/* Notification bell */
+.notification-bell {
+    position: relative !important;
+    cursor: pointer !important;
+    font-size: 20px !important;
+    padding: 8px !important;
+    background: rgba(255,255,255,0.15) !important;
+    border-radius: 50% !important;
+    width: 40px !important;
+    height: 40px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.2s !important;
+}
+
+.notification-bell:hover {
+    background: rgba(255,255,255,0.25) !important;
+}
+
+.notification-badge {
+    position: absolute !important;
+    top: 2px !important;
+    right: 2px !important;
+    background: #ff4444 !important;
+    color: white !important;
+    border-radius: 10px !important;
+    padding: 2px 6px !important;
+    font-size: 10px !important;
+    font-weight: bold !important;
+}
+
+/* Pass button */
+.pass-button {
+    background: rgba(0,0,0,0.2) !important;
+    border: 1px solid rgba(255,255,255,0.3) !important;
+    color: white !important;
+    padding: 8px 14px !important;
+    border-radius: 20px !important;
+    cursor: pointer !important;
+    font-weight: bold !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    font-size: 13px !important;
+    transition: all 0.2s !important;
+}
+
+.pass-button:hover {
+    background: rgba(0,0,0,0.3) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Bingo button */
+.bingo-button {
+    background: rgba(0,0,0,0.2) !important;
+    border: 1px solid rgba(255,255,255,0.3) !important;
+    color: white !important;
+    padding: 8px 14px !important;
+    border-radius: 20px !important;
+    cursor: pointer !important;
+    font-weight: bold !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    font-size: 13px !important;
+    transition: all 0.2s !important;
+}
+
+.bingo-button:hover {
+    background: rgba(0,0,0,0.3) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Username */
+.navbar-username {
+    color: white !important;
+    font-weight: bold !important;
+    font-size: 14px !important;
+    padding: 6px 12px !important;
+    background: rgba(255,255,255,0.15) !important;
+    border-radius: 15px !important;
+}
+
+/* Points counter */
+.navbar-points {
+    color: #ffdd00 !important;
+    font-weight: bold !important;
+    font-size: 14px !important;
+    padding: 6px 12px !important;
+    background: rgba(0,0,0,0.3) !important;
+    border-radius: 15px !important;
+}
+
+/* Profile button */
+.navbar-profile-btn {
+    background: rgba(255,255,255,0.2) !important;
+    border: none !important;
+    color: white !important;
+    padding: 8px 14px !important;
+    border-radius: 20px !important;
+    cursor: pointer !important;
+    font-size: 13px !important;
+    font-weight: bold !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    transition: all 0.2s !important;
+}
+
+.navbar-profile-btn:hover {
+    background: rgba(255,255,255,0.3) !important;
+}
+
+/* Logout button */
+.navbar-logout-btn {
+    background: rgba(255,0,0,0.2) !important;
+    border: 1px solid rgba(255,255,255,0.3) !important;
+    color: white !important;
+    padding: 8px 14px !important;
+    border-radius: 20px !important;
+    cursor: pointer !important;
+    font-size: 13px !important;
+    font-weight: bold !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    transition: all 0.2s !important;
+}
+
+.navbar-logout-btn:hover {
+    background: rgba(255,0,0,0.4) !important;
+}
+
+/* Music controls */
+.music-controls {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.music-btn {
+    background: rgba(255,255,255,0.2) !important;
+    border: none !important;
+    color: white !important;
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 50% !important;
+    cursor: pointer !important;
+    font-size: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.2s !important;
+}
+
+.music-btn:hover {
+    background: rgba(255,255,255,0.3) !important;
+}
+
+.music-volume {
+    width: 80px !important;
+    height: 4px !important;
+    accent-color: #ffdd00 !important;
+    cursor: pointer !important;
+}
+
+/* Hide old/conflicting navbar structures */
+.navbar-consolidated,
+.navbar-inner,
+.navbar-top,
+.navbar-bottom,
+.top-header-bar {
+    display: none !important;
+}
+
+/* Mobile responsive (<768px) */
+@media (max-width: 768px) {
+    .navbar {
+        padding: 10px 12px !important;
+        gap: 10px !important;
+    }
+    
+    .navbar-left-group,
+    .navbar-right-group {
+        gap: 10px !important;
+    }
+    
+    /* Hide on mobile */
+    .beta-badge,
+    .profile-label,
+    .logout-label,
+    .music-volume {
+        display: none !important;
+    }
+    
+    /* Make buttons smaller on mobile */
+    .navbar-profile-btn,
+    .navbar-logout-btn {
+        padding: 6px 10px !important;
+    }
+    
+    /* Just show icons on mobile */
+    .pass-label,
+    .bingo-label {
+        display: none !important;
+    }
+}
+
+/* Very small screens (<480px) */
+@media (max-width: 480px) {
+    .navbar-logo span {
+        display: none !important;
+    }
+    
+    .navbar-logo img {
+        width: 28px !important;
+        height: 28px !important;
+    }
+}
+
