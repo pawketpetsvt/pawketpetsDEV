@@ -21150,6 +21150,9 @@ endBattle = function() {
 };
 */
 
+// NOTE: feedPet and playWithPet wrappers commented out - functions don't exist
+// Pass XP is already granted via existing game hooks
+/*
 // Grant Pass XP after feeding
 var original_feedPet = feedPet;
 feedPet = async function() {
@@ -21165,6 +21168,7 @@ playWithPet = async function() {
   pass_grantXP(5, 'play');
   return result;
 };
+*/
 
 // Check for rare drops after battles
 var original_awardBattleRewards = awardBattleRewards;
@@ -21490,11 +21494,25 @@ function calendar_showFull() {
   
   html += '</div>';
   
-  // Use existing showModal if available, fallback to showCenteredModal
+  // Always use showModal or showCenteredModal with actual content
   if (typeof showModal === 'function') {
     showModal('Login Calendar', html);
   } else {
-    showCenteredModal('📅 Login Calendar', 'View full calendar in modal', '📅');
+    // Create custom modal with calendar content
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay centered-modal-overlay';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    
+    var container = document.createElement('div');
+    container.style.cssText = 'background:#1e1e2e;border-radius:16px;max-width:900px;width:95%;max-height:85vh;overflow-y:auto;padding:20px;';
+    container.innerHTML = html + '<div style="text-align:center;margin-top:20px;"><button onclick="this.closest(\'.modal-overlay\').remove()" style="background:#667eea;color:white;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-weight:bold;">Close</button></div>';
+    
+    modal.appendChild(container);
+    document.body.appendChild(modal);
+    
+    modal.onclick = function(e) {
+      if (e.target === modal) modal.remove();
+    };
   }
 }
 
