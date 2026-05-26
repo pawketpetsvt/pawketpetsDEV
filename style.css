@@ -14914,418 +14914,52 @@ body.modal-open {
 
 
 /* ============================================
-   HEADER LAYOUT - COMPLETE REPLACEMENT
-   Overrides all previous navbar rules
-   ============================================ */
-.navbar, .navbar-consolidated {
-  width: 100% !important;
-  background: linear-gradient(135deg, #9966ff, #ff66cc, #00ddff) !important;
-  border-radius: 0 0 32px 32px !important;
-  padding: 8px 20px !important;
-}
-
-.navbar-inner {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  width: 100% !important;
-  gap: 16px !important;
-}
-
-/* LEFT section: Logo + Beta badge */
-.navbar-left {
-  display: flex !important;
-  align-items: center !important;
-  gap: 16px !important;
-  order: 1 !important;
-}
-
-/* CENTER section: Bell + Pass + Bingo */
-.navbar-center {
-  display: flex !important;
-  align-items: center !important;
-  gap: 12px !important;
-  order: 2 !important;
-  margin-left: auto !important;
-}
-
-/* RIGHT section: Username + PP + Profile + Logout + Music */
-.navbar-right {
-  display: flex !important;
-  align-items: center !important;
-  gap: 12px !important;
-  order: 3 !important;
-  margin-left: 0 !important;
-}
-
-/* Mobile - hide left/center on small screens */
-@media (max-width: 768px) {
-  .navbar-left, .navbar-center {
-    display: none !important;
-  }
-  .navbar-right {
-    margin-left: auto !important;
-  }
-}
-
 
 /* ============================================
-   CALENDAR WIDGET - SMALLER SIZE
-   ============================================ */
-.calendar-widget {
-  background: rgba(255, 255, 255, 0.1) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  border-radius: 8px !important;
-  padding: 8px 12px !important;
-  margin-bottom: 12px !important;
-  cursor: pointer !important;
-  font-size: 12px !important;
-}
-
-.calendar-dots {
-  display: flex !important;
-  gap: 4px !important;
-  justify-content: center !important;
-  margin-top: 6px !important;
-}
-
-.calendar-widget .dot {
-  width: 28px !important;
-  height: 28px !important;
-  font-size: 11px !important;
-}
-
-
-/* ============================================
-   DOUBLE HEADER - COMPLETE REPLACEMENT
-   This overrides ALL previous navbar CSS
+   SINGLE-ROW NAVBAR - SIMPLE & WORKING
    ============================================ */
 
-.navbar {
-  background: linear-gradient(135deg, #9966ff, #ff66cc, #00ddff) !important;
-  border-radius: 0 0 24px 24px !important;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 100 !important;
-  width: 100% !important;
-  padding: 0 !important;
-}
-
-.navbar-top {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  padding: 10px 24px !important;
-  border-bottom: 1px solid rgba(255,255,255,0.2) !important;
-}
-
-.navbar-top-left {
-  display: flex !important;
-  align-items: center !important;
-  gap: 16px !important;
-}
-
-.navbar-logo {
-  font-family: 'Chewy', cursive !important;
-  font-size: 1.2rem !important;
-  color: white !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  cursor: pointer !important;
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.3) !important;
-}
-
-.navbar-logo img {
-  width: 32px !important;
-  height: 32px !important;
-}
-
-.beta-badge {
-  background: rgba(0,0,0,0.3) !important;
-  color: #ffcc00 !important;
-  padding: 4px 10px !important;
-  border-radius: 20px !important;
-  font-size: 10px !important;
-  font-weight: bold !important;
-}
-
-.navbar-top-center {
-  display: flex !important;
-  align-items: center !important;
-  gap: 16px !important;
-}
-
-.navbar-top-right {
-  display: flex !important;
-  align-items: center !important;
-  gap: 16px !important;
-  font-size: 14px !important;
-  color: white !important;
-}
-
-.navbar-top-right #nav-user,
-.navbar-top-right #nav-points {
-  color: white !important;
-  font-weight: bold !important;
-}
-
-.navbar-bottom {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
-  padding: 8px 24px !important;
-  overflow-x: auto !important;
-  scrollbar-width: none !important;
-}
-
-.navbar-bottom::-webkit-scrollbar {
-  display: none !important;
-}
-
-.nav-tab {
-  background: rgba(255,255,255,0.15) !important;
-  border: none !important;
-  color: white !important;
-  font-family: 'Chewy', cursive !important;
-  font-size: 0.85rem !important;
-  padding: 8px 16px !important;
-  border-radius: 25px !important;
-  cursor: pointer !important;
-  transition: all 0.2s !important;
-  white-space: nowrap !important;
-}
-
-.nav-tab:hover {
-  background: rgba(255,255,255,0.3) !important;
-  transform: translateY(-2px) !important;
-}
-
-.nav-tab.active {
-  background: #ffdd00 !important;
-  color: #6633cc !important;
-}
-
-.pass-button, 
-.bingo-button {
-  background: rgba(0,0,0,0.2) !important;
-  border: 1px solid rgba(255,255,255,0.3) !important;
-  color: white !important;
-  padding: 6px 12px !important;
-  border-radius: 20px !important;
-  cursor: pointer !important;
-  font-weight: bold !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 6px !important;
-  font-size: 13px !important;
-}
-
-.pass-button:hover,
-.bingo-button:hover {
-  background: rgba(0,0,0,0.3) !important;
-}
-
-.btn-nav-action {
-  background: rgba(255,255,255,0.2) !important;
-  border: none !important;
-  color: white !important;
-  padding: 6px 12px !important;
-  border-radius: 15px !important;
-  cursor: pointer !important;
-  font-size: 12px !important;
-  font-weight: bold !important;
-  transition: all 0.2s !important;
-}
-
-.btn-nav-action:hover {
-  background: rgba(255,255,255,0.3) !important;
-}
-
-.notification-bell {
-  position: relative !important;
-  cursor: pointer !important;
-  font-size: 20px !important;
-}
-
-.notification-badge {
-  position: absolute !important;
-  top: -5px !important;
-  right: -8px !important;
-  background: #ff4444 !important;
-  color: white !important;
-  border-radius: 10px !important;
-  padding: 2px 6px !important;
-  font-size: 10px !important;
-  font-weight: bold !important;
-}
-
-.music-controls {
-  display: flex !important;
-  align-items: center !important;
-  gap: 6px !important;
-}
-
-.music-btn {
-  background: rgba(255,255,255,0.2) !important;
-  border: none !important;
-  color: white !important;
-  width: 28px !important;
-  height: 28px !important;
-  border-radius: 50% !important;
-  cursor: pointer !important;
-  font-size: 12px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-.music-btn:hover {
-  background: rgba(255,255,255,0.3) !important;
-}
-
-.music-volume {
-  width: 60px !important;
-  height: 4px !important;
-  accent-color: #ffdd00 !important;
-}
-
-@media (max-width: 768px) {
-  .navbar-top {
-    flex-wrap: wrap !important;
-    gap: 10px !important;
-  }
-  
-  .navbar-top-left {
-    order: 1 !important;
-    flex: 1 !important;
-  }
-  
-  .navbar-top-center {
-    order: 3 !important;
-    width: 100% !important;
-    justify-content: center !important;
-    padding-top: 8px !important;
-  }
-  
-  .navbar-top-right {
-    order: 2 !important;
-  }
-  
-  .navbar-bottom {
-    justify-content: flex-start !important;
-  }
-  
-  .music-volume {
-    display: none !important;
-  }
-  
-  .beta-badge {
-    display: none !important;
-  }
-}
-
-
-/* ============================================
-   DEEPSEEK'S FIX - Hide Old Navbar & Fix Conflicts
-   ============================================ */
-
-/* Hide old navbar elements that might conflict */
-.navbar-consolidated,
-.navbar-inner,
-.old-navbar,
-.top-header-bar {
-    display: none !important;
-}
-
-/* Ensure double header displays correctly */
-.navbar {
-    background: linear-gradient(135deg, #9966ff, #ff66cc, #00ddff) !important;
-    border-radius: 0 0 24px 24px !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 100 !important;
-    width: 100% !important;
-    display: block !important;
-}
-
-/* Music controls inline fix */
-.music-controls {
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-}
-
-.music-btn {
-    background: rgba(255,255,255,0.2) !important;
-    border: none !important;
-    color: white !important;
-    width: 28px !important;
-    height: 28px !important;
-    border-radius: 50% !important;
-    cursor: pointer !important;
-    font-size: 12px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-}
-
-.music-btn:hover {
-    background: rgba(255,255,255,0.3) !important;
-}
-
-.music-volume {
-    width: 60px !important;
-    height: 4px !important;
-    accent-color: #ffdd00 !important;
-}
-
-/* ============================================
-   SINGLE-ROW NAVBAR - EXACT SPECIFICATIONS
-   Add to the END of your style.css
-   ============================================ */
-
-/* Main navbar container */
 .navbar {
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
     width: 100% !important;
-    padding: 12px 24px !important;
-    gap: 16px !important;
-    flex-wrap: nowrap !important;
+    padding: 10px 24px !important;
     background: linear-gradient(135deg, #9966ff, #ff66cc, #00ddff) !important;
     border-radius: 0 0 24px 24px !important;
     box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
     position: sticky !important;
     top: 0 !important;
     z-index: 100 !important;
-    min-height: 60px !important;
+    box-sizing: border-box !important;
 }
 
-/* Left group: Logo, Beta, Bell, Pass, Bingo */
-.navbar-left-group {
+/* LEFT SIDE */
+.navbar-left {
     display: flex !important;
     align-items: center !important;
     gap: 16px !important;
-    flex-shrink: 0 !important;
 }
 
-/* Right group: Username, Points, Profile, Logout, Music */
-.navbar-right-group {
+/* CENTER GROUP */
+.navbar-center {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+
+/* RIGHT SIDE - PUSHED TO EDGE */
+.navbar-right {
     display: flex !important;
     align-items: center !important;
     gap: 16px !important;
-    flex-shrink: 0 !important;
-    margin-left: auto !important; /* Push to right */
+    margin-left: auto !important;
 }
 
-/* Prevent shrinking of all navbar items */
-.navbar-left-group > *,
-.navbar-right-group > * {
+/* Prevent ANY shrinking or wrapping */
+.navbar-left > *,
+.navbar-center > *,
+.navbar-right > * {
     flex-shrink: 0 !important;
     white-space: nowrap !important;
 }
@@ -15347,7 +14981,7 @@ body.modal-open {
     height: 32px !important;
 }
 
-/* Beta badge */
+/* Beta Badge */
 .beta-badge {
     background: rgba(0,0,0,0.3) !important;
     color: #ffcc00 !important;
@@ -15357,16 +14991,16 @@ body.modal-open {
     font-weight: bold !important;
 }
 
-/* Notification bell */
+/* Notification Bell */
 .notification-bell {
     position: relative !important;
     cursor: pointer !important;
-    font-size: 20px !important;
-    padding: 8px !important;
+    font-size: 1.3rem !important;
+    padding: 6px !important;
     background: rgba(255,255,255,0.15) !important;
     border-radius: 50% !important;
-    width: 40px !important;
-    height: 40px !important;
+    width: 38px !important;
+    height: 38px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -15375,26 +15009,27 @@ body.modal-open {
 
 .notification-bell:hover {
     background: rgba(255,255,255,0.25) !important;
+    transform: scale(1.05) !important;
 }
 
 .notification-badge {
     position: absolute !important;
-    top: 2px !important;
-    right: 2px !important;
+    top: -2px !important;
+    right: -2px !important;
     background: #ff4444 !important;
     color: white !important;
-    border-radius: 10px !important;
+    border-radius: 12px !important;
     padding: 2px 6px !important;
     font-size: 10px !important;
     font-weight: bold !important;
 }
 
-/* Pass button */
-.pass-button {
+/* Pass & Bingo Buttons */
+.pass-button, .bingo-button {
     background: rgba(0,0,0,0.2) !important;
     border: 1px solid rgba(255,255,255,0.3) !important;
     color: white !important;
-    padding: 8px 14px !important;
+    padding: 8px 16px !important;
     border-radius: 20px !important;
     cursor: pointer !important;
     font-weight: bold !important;
@@ -15405,93 +15040,49 @@ body.modal-open {
     transition: all 0.2s !important;
 }
 
-.pass-button:hover {
-    background: rgba(0,0,0,0.3) !important;
+.pass-button:hover, .bingo-button:hover {
+    background: rgba(0,0,0,0.35) !important;
     transform: translateY(-2px) !important;
 }
 
-/* Bingo button */
-.bingo-button {
-    background: rgba(0,0,0,0.2) !important;
-    border: 1px solid rgba(255,255,255,0.3) !important;
-    color: white !important;
-    padding: 8px 14px !important;
-    border-radius: 20px !important;
-    cursor: pointer !important;
-    font-weight: bold !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    font-size: 13px !important;
-    transition: all 0.2s !important;
-}
-
-.bingo-button:hover {
-    background: rgba(0,0,0,0.3) !important;
-    transform: translateY(-2px) !important;
-}
-
-/* Username */
-.navbar-username {
+/* Username & Points */
+#nav-user, .navbar-username {
     color: white !important;
     font-weight: bold !important;
     font-size: 14px !important;
-    padding: 6px 12px !important;
+    padding: 6px 14px !important;
     background: rgba(255,255,255,0.15) !important;
-    border-radius: 15px !important;
+    border-radius: 20px !important;
 }
 
-/* Points counter */
-.navbar-points {
+#nav-points, .navbar-points {
     color: #ffdd00 !important;
     font-weight: bold !important;
     font-size: 14px !important;
-    padding: 6px 12px !important;
+    padding: 6px 14px !important;
     background: rgba(0,0,0,0.3) !important;
-    border-radius: 15px !important;
+    border-radius: 20px !important;
 }
 
-/* Profile button */
-.navbar-profile-btn {
+/* Action Buttons */
+.btn-nav-action {
     background: rgba(255,255,255,0.2) !important;
     border: none !important;
     color: white !important;
-    padding: 8px 14px !important;
+    padding: 8px 16px !important;
     border-radius: 20px !important;
     cursor: pointer !important;
     font-size: 13px !important;
     font-weight: bold !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
     transition: all 0.2s !important;
 }
 
-.navbar-profile-btn:hover {
-    background: rgba(255,255,255,0.3) !important;
+.btn-nav-action:hover {
+    background: rgba(255,255,255,0.35) !important;
+    transform: translateY(-2px) !important;
 }
 
-/* Logout button */
-.navbar-logout-btn {
-    background: rgba(255,0,0,0.2) !important;
-    border: 1px solid rgba(255,255,255,0.3) !important;
-    color: white !important;
-    padding: 8px 14px !important;
-    border-radius: 20px !important;
-    cursor: pointer !important;
-    font-size: 13px !important;
-    font-weight: bold !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    transition: all 0.2s !important;
-}
-
-.navbar-logout-btn:hover {
-    background: rgba(255,0,0,0.4) !important;
-}
-
-/* Music controls */
+/* Music Controls */
 .music-controls {
     display: flex !important;
     align-items: center !important;
@@ -15506,7 +15097,7 @@ body.modal-open {
     height: 32px !important;
     border-radius: 50% !important;
     cursor: pointer !important;
-    font-size: 12px !important;
+    font-size: 14px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -15514,7 +15105,8 @@ body.modal-open {
 }
 
 .music-btn:hover {
-    background: rgba(255,255,255,0.3) !important;
+    background: rgba(255,255,255,0.35) !important;
+    transform: scale(1.05) !important;
 }
 
 .music-volume {
@@ -15524,57 +15116,39 @@ body.modal-open {
     cursor: pointer !important;
 }
 
-/* Hide old/conflicting navbar structures */
-.navbar-consolidated,
-.navbar-inner,
-.navbar-top,
-.navbar-bottom,
-.top-header-bar {
-    display: none !important;
-}
-
-/* Mobile responsive (<768px) */
-@media (max-width: 768px) {
+/* Mobile Responsive */
+@media (max-width: 900px) {
     .navbar {
-        padding: 10px 12px !important;
-        gap: 10px !important;
+        padding: 8px 16px !important;
+        gap: 12px !important;
     }
     
-    .navbar-left-group,
-    .navbar-right-group {
-        gap: 10px !important;
+    .beta-badge {
+        display: none !important;
     }
     
-    /* Hide on mobile */
-    .beta-badge,
-    .profile-label,
-    .logout-label,
     .music-volume {
         display: none !important;
     }
     
-    /* Make buttons smaller on mobile */
-    .navbar-profile-btn,
-    .navbar-logout-btn {
-        padding: 6px 10px !important;
+    .btn-nav-action span {
+        display: none !important;
     }
     
-    /* Just show icons on mobile */
-    .pass-label,
-    .bingo-label {
+    .btn-nav-action {
+        padding: 8px 12px !important;
+    }
+}
+
+@media (max-width: 700px) {
+    #nav-user {
         display: none !important;
     }
 }
 
-/* Very small screens (<480px) */
-@media (max-width: 480px) {
-    .navbar-logo span {
+@media (max-width: 600px) {
+    .music-controls {
         display: none !important;
-    }
-    
-    .navbar-logo img {
-        width: 28px !important;
-        height: 28px !important;
     }
 }
 
