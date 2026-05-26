@@ -36,7 +36,7 @@ var battleSounds = {
 
 var audioCache = {};
 var lastSoundTime = 0;
-var soundCooldown = GAME_CONSTANTS.SOUND_COOLDOWN_MS; // Minimum ms between sounds to avoid spam
+var soundCooldown = 300; // Default; updated to GAME_CONSTANTS.SOUND_COOLDOWN_MS after constants are defined
 
 // ═══════════════════════════════════════════════════════════════════════
 // AUDIO PRELOADING - Lazy load strategy for better performance
@@ -484,6 +484,8 @@ var GAME_CONSTANTS = {
   TUTORIAL_PP_REWARD:  100,   // PP awarded for completing tutorial
   TUTORIAL_SKIP_PP:    50,    // PP awarded for skipping tutorial
 };
+// Sync soundCooldown now that GAME_CONSTANTS is defined
+soundCooldown = GAME_CONSTANTS.SOUND_COOLDOWN_MS;
 
 // ══════════════════════════════════════════════════════════════════════════
 // STUB FUNCTIONS - Prevent "not defined" console errors
