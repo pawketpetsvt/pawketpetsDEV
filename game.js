@@ -1,6 +1,12 @@
 'use strict';
 
 // ══════════════════════════════════════════════════════════════════════════
+// DEBUG FLAG — set to true locally to see verbose logs; false for production
+// ══════════════════════════════════════════════════════════════════════════
+var DEBUG = false;
+function dbg() { if (DEBUG) console.log.apply(console, arguments); }
+
+// ══════════════════════════════════════════════════════════════════════════
 // SUPABASE INITIALIZATION
 // ══════════════════════════════════════════════════════════════════════════
 var SUPABASE_URL = 'https://hqzugbxutgefjilgmxqu.supabase.co';
@@ -46,7 +52,7 @@ function preloadPrioritySounds() {
       audio.volume = 0.35;
       audio.preload = 'auto';
       audio.onerror = function() {
-        console.log('Sound file not available:', battleSounds[key]);
+        dbg('Sound file not available:', battleSounds[key]);
         audioCache[key] = null;
       };
       audioCache[key] = audio;
@@ -64,7 +70,7 @@ function loadSoundOnDemand(soundKey) {
   audio.volume = 0.35;
   audio.preload = 'auto';
   audio.onerror = function() {
-    console.log('Sound file not available:', battleSounds[soundKey]);
+    dbg('Sound file not available:', battleSounds[soundKey]);
     audioCache[soundKey] = null;
   };
   audioCache[soundKey] = audio;
@@ -132,7 +138,7 @@ function cleanupAllTimers() {
   activeTimers.intervals = [];
   activeTimers.timeouts = [];
   
-  console.log('✅ All timers cleaned up');
+  dbg('✅ All timers cleaned up');
 }
 
 function playBattleSound(soundKey, volume, forceBoss) {
@@ -470,7 +476,7 @@ function playSound(soundName) {
 
 function awardBattleRewards(victory, exp, pp, itemDropped) {
   // Stub - battle rewards handled by saveBattleHistory; this is a no-op
-  console.log('[stub] awardBattleRewards called:', { victory, exp, pp, itemDropped });
+  dbg('[stub] awardBattleRewards called:', { victory, exp, pp, itemDropped });
 }
 
 async function grantCosmetic(cosmeticId, type) {
@@ -1560,8 +1566,6 @@ async function loadMyPets() {
     
     // Only regenerate if HP > 0 (don't auto-revive fainted pets!)
     var regenedHP = currentHP > 0 ? calculateHPRegen(currentHP, maxHP, pet.updated_at) : 0;
-    
-    console.log('🐾 Loading pet:', pet.nickname, 'DB HP:', pet.current_hp, 'Displayed HP:', regenedHP);
     
     petState[pet.id] = Object.assign({}, pet, {
       energy: decayedEnergy,
@@ -5501,7 +5505,7 @@ function viewProfile(username) {
 }
 
 async function loadProfile(username) {
-  console.log('[loadProfile] Starting for username:', username);
+  dbg('[loadProfile] Starting for username:', username);
   
   // Set loading states immediately
   el('profile-username').textContent = 'Loading...';
@@ -5513,10 +5517,10 @@ async function loadProfile(username) {
   
   try {
     // Get profile data
-    console.log('[loadProfile] Calling RPC get_player_profile...');
+    dbg('[loadProfile] Calling RPC get_player_profile...');
     var profileRes = await supabaseClient.rpc('get_player_profile', { p_username: username });
     
-    console.log('[loadProfile] RPC result:', profileRes);
+    dbg('[loadProfile] RPC result:', profileRes);
     
     if (profileRes.error || !profileRes.data || profileRes.data.length === 0) {
       console.log('Using fallback query, RPC error:', profileRes.error);
@@ -5582,7 +5586,7 @@ async function loadProfile(username) {
     }
     
     // Update UI
-    console.log('[loadProfile] Updating UI with profile data:', profile);
+    dbg('[loadProfile] Updating UI with profile data:', profile);
     el('profile-avatar').textContent = profile.username.charAt(0).toUpperCase();
     el('profile-username').textContent = profile.username;
     el('profile-bio').textContent = profile.bio || 'No bio yet';
@@ -5611,7 +5615,7 @@ async function loadProfile(username) {
         el('profile-username').innerHTML = profile.username + titleBadge;
       }
     } catch (titleErr) {
-      console.log('[loadProfile] Could not load player title:', titleErr);
+      dbg('[loadProfile] Could not load player title:', titleErr);
     }
     
     var joinDate = new Date(profile.created_at);
@@ -5621,7 +5625,7 @@ async function loadProfile(username) {
       year: 'numeric' 
     });
     
-    console.log('[loadProfile] Setting stats - Points:', profile.pawketpoints, 'Pets:', profile.total_pets, 'Levels:', profile.total_levels);
+    dbg('[loadProfile] Setting stats - Points:', profile.pawketpoints, 'Pets:', profile.total_pets, 'Levels:', profile.total_levels);
     el('profile-points').textContent = (profile.pawketpoints || 0).toLocaleString();
     el('profile-pet-count').textContent = profile.total_pets || 0;
     el('profile-total-level').textContent = profile.total_levels || 0;
@@ -5643,7 +5647,7 @@ async function loadProfile(username) {
     var petsGrid = el('profile-pets-grid');
     petsGrid.innerHTML = '<div class="spinner"></div>';
     
-    console.log('[loadProfile] Loading pets for user_id:', profile.id);
+    dbg('[loadProfile] Loading pets for user_id:', profile.id);
     
     var petsRes = await supabaseClient
       .from('user_pets')
@@ -5651,7 +5655,7 @@ async function loadProfile(username) {
       .eq('user_id', profile.id)
       .order('adopted_at', { ascending: true });
     
-    console.log('[loadProfile] Pets query result:', petsRes);
+    dbg('[loadProfile] Pets query result:', petsRes);
     
     if (petsRes.error) throw petsRes.error;
     
@@ -6444,13 +6448,8 @@ async function showEquipmentModal(petId) {
   closeBtn.onclick = function() { document.body.removeChild(modal); };
   modalContent.appendChild(closeBtn);
   
-  console.log('About to append modal to body...');
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
-  console.log('Modal appended! Should be visible now.');
-  console.log('Modal element in DOM:', document.getElementById(modal.id));
-  console.log('Modal computed style display:', window.getComputedStyle(modal).display);
-  console.log('Modal computed style z-index:', window.getComputedStyle(modal).zIndex);
   } catch (error) {
     console.error('Error in showEquipmentModal:', error);
     showToast('Error opening equipment manager!');
@@ -6848,7 +6847,7 @@ async function startBattle(petId, enemyId) {
 async function startBattleWithEnemy(petId, enemy) {
   if (!currentUser) return;
   
-  console.log('⚔️ BATTLE START - Pet ID:', petId, 'Enemy:', enemy.name);
+  dbg('⚔️ BATTLE START - Pet ID:', petId, 'Enemy:', enemy.name);
   
   // Get player pet stats (includes current HP and energy)
   var playerStats = await calculatePetStats(petId);
@@ -6857,7 +6856,7 @@ async function startBattleWithEnemy(petId, enemy) {
     return;
   }
   
-  console.log('👤 Player HP at battle start:', playerStats.currentHP);
+  dbg('👤 Player HP at battle start:', playerStats.currentHP);
   
   // Check if pet has enough energy (need at least 5)
   if (playerStats.energy < 5) {
@@ -6961,7 +6960,7 @@ async function executeBattle(playerStats, enemyStats, petId) {
   // Simulate the battle
   var battleResult = simulateBattle(playerStats, enemyStats);
   
-  console.log('🎲 BATTLE RESULT:', {
+  dbg('🎲 BATTLE RESULT:', {
     victory: battleResult.victory,
     playerFinalHP: battleResult.playerFinalHP,
     enemyFinalHP: battleResult.enemyFinalHP,
@@ -6974,13 +6973,13 @@ async function executeBattle(playerStats, enemyStats, petId) {
   
   // Save battle to history and get rewards
   // For dynamically scaled enemies, use the base enemy ID
-  console.log('💾 About to save battle - Victory:', battleResult.victory, 'Final HP:', battleResult.playerFinalHP);
+  dbg('💾 About to save battle - Victory:', battleResult.victory, 'Final HP:', battleResult.playerFinalHP);
   battleRewards = await saveBattleHistory(petId, enemyStats.id, battleResult, enemyStats);
   
-  console.log('✅ saveBattleHistory completed. Rewards:', battleRewards);
+  dbg('✅ saveBattleHistory completed. Rewards:', battleRewards);
   
   // CRITICAL: Force reload pet data AFTER HP is saved
-  console.log('🔄 Forcing pet data reload after battle...');
+  dbg('🔄 Forcing pet data reload after battle...');
   await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to ensure DB write completes
   tabsLoaded['mypets'] = false;
   tabsLoaded['battle'] = false;
@@ -6990,7 +6989,7 @@ async function executeBattle(playerStats, enemyStats, petId) {
  * Save battle to database
  */
 async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
-  console.log('💾 saveBattleHistory called - Victory:', battleResult.victory, 'Final HP:', battleResult.playerFinalHP);
+  dbg('💾 saveBattleHistory called - Victory:', battleResult.victory, 'Final HP:', battleResult.playerFinalHP);
   
   // FIX: Handle integer enemy IDs correctly
   var actualEnemyId = enemyId;
@@ -8257,10 +8256,13 @@ async function getRandomEnemy(zone, playerLevel) {
     return null;
   }
   
-  // CRITICAL: Filter out raccoons completely
+  // CRITICAL: Filter out raccoons completely (guard against null species/name)
   var filteredEnemies = res.data.filter(function(enemy) {
-    return enemy.species !== 'raccoon' && 
-           enemy.name.toLowerCase().indexOf('raccoon') === -1;
+    if (!enemy.name) return false;
+    var speciesOk = !enemy.species || enemy.species !== 'raccoon';
+    var nameOk = enemy.name.toLowerCase().indexOf('raccoon') === -1;
+    return speciesOk && nameOk;
+  });
   });
   
   if (filteredEnemies.length === 0) {
@@ -11777,7 +11779,7 @@ async function checkReferralCode() {
   
   // Store referral code for signup
   localStorage.setItem('pendingReferralCode', refCode);
-  console.log('[Referral] Referral code detected:', refCode);
+  dbg('[Referral] Referral code detected:', refCode);
 }
 
 // Process referral after first pet adoption
@@ -11795,23 +11797,24 @@ async function processReferral() {
       .single();
     
     if (error || !referrer) {
-      console.log('[Referral] Referrer not found');
+      dbg('[Referral] Referrer not found');
       localStorage.removeItem('pendingReferralCode');
       return;
     }
     
     // Don't allow self-referral
     if (referrer.id === currentUser.id) {
-      console.log('[Referral] Cannot refer yourself');
+      dbg('[Referral] Cannot refer yourself');
       localStorage.removeItem('pendingReferralCode');
       return;
     }
     
     // Award referrer
+    var referralLabel = currentUser.user_metadata?.username || currentUser.email?.split('@')[0] || 'a new player';
     await supabaseClient.rpc('award_pp_secure', {
       p_user_id: referrer.id,
       p_amount: 250,
-      p_reason: 'Referral: ' + currentUser.email
+      p_reason: 'Referral: ' + referralLabel
     });
     
     // Increment referral count
@@ -11862,11 +11865,12 @@ sendFriendRequest = async function() {
     
     // Create notification for the other user
     var username = document.getElementById('profile-username').textContent;
+    var senderName = username || currentUser.user_metadata?.username || currentUser.email?.split('@')[0] || 'Someone';
     await createNotification(
       currentProfileUserId,
       'friend_request',
       'New Friend Request',
-      currentUser.email.split('@')[0] + ' sent you a friend request!',
+      senderName + ' sent you a friend request!',
       'tab:friends',
       currentUser.id
     );
@@ -12097,10 +12101,13 @@ async function generateDungeonEnemies(playerStats) {
     return [];
   }
   
-  // CRITICAL: Filter out raccoons completely
+  // CRITICAL: Filter out raccoons completely (guard against null species/name)
   var filteredEnemies = res.data.filter(function(enemy) {
-    return enemy.species !== 'raccoon' && 
-           enemy.name.toLowerCase().indexOf('raccoon') === -1;
+    if (!enemy.name) return false;
+    var speciesOk = !enemy.species || enemy.species !== 'raccoon';
+    var nameOk = enemy.name.toLowerCase().indexOf('raccoon') === -1;
+    return speciesOk && nameOk;
+  });
   });
   
   if (filteredEnemies.length === 0) return [];
@@ -16966,7 +16973,7 @@ async function addPassXP(amount, source) {
   if (dailyXPCaps[source]) {
     var remaining = dailyXPCaps[source].max - dailyXPCaps[source].earned;
     if (remaining <= 0) {
-      console.log('[Pass] Daily XP cap reached for ' + source);
+      dbg('[Pass] Daily XP cap reached for ' + source);
       return;
     }
     amount = Math.min(amount, remaining);
