@@ -14857,3 +14857,58 @@ body.modal-open {
   }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CRITICAL FIXES - Bingo Night Mode & Header Layout
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Bingo Modal Night Mode Fix */
+.night-mode .bingo-modal .rewards-info,
+.night-mode .bingo-modal .info-box,
+.night-mode #bingo-modal .rewards-info {
+  background: rgba(0, 0, 0, 0.6) !important;
+  color: #e8d5ff !important;
+  border: 1px solid #9966ff !important;
+}
+
+.night-mode .bingo-modal .rewards-info p,
+.night-mode .bingo-modal .info-box p {
+  color: #e8d5ff !important;
+}
+
+.night-mode .bingo-modal .rewards-info strong {
+  color: #ffd700 !important;
+}
+
+/* Header Layout Fix */
+@media (min-width: 769px) {
+  .navbar-inner {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+  
+  .navbar-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 16px !important;
+    order: 1 !important;
+  }
+  
+  .navbar-center {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    order: 2 !important;
+    margin-left: auto !important;
+  }
+  
+  .navbar-right {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    order: 3 !important;
+    margin-left: 0 !important;
+  }
+}
+

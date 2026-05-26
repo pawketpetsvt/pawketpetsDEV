@@ -353,8 +353,28 @@ function setVolume(v) { bgMusic.volume = parseFloat(v); }
 var toastQueue = [];
 var isShowingToast = false;
 
-function showToast(msg, type) {
-  showPixelToast(msg, type || 'info');
+function showToast(msg, type, useModal) {
+  // If useModal is true, use centered modal for important notifications
+  if (useModal === true) {
+    var icon = '🎉';
+    var title = 'Notice';
+    
+    if (type === 'success') {
+      icon = '✅';
+      title = 'Success!';
+    } else if (type === 'error') {
+      icon = '❌';
+      title = 'Error';
+    } else if (type === 'warning') {
+      icon = '⚠️';
+      title = 'Warning';
+    }
+    
+    showCenteredModal(title, msg, icon);
+  } else {
+    // Keep old toast behavior for minor notifications
+    showPixelToast(msg, type || 'info');
+  }
 }
 
 function showPixelToast(message, type) {
@@ -3280,6 +3300,11 @@ function showFlash(petId,msg,color) {
 
 // ── SHOP TAB ─────────────────────────────
 function showShopTab(tab) {
+  // Update Bingo progress for visiting shop
+  if (typeof updateBingoProgress === 'function') {
+    updateBingoProgress('visit_shop', 1);
+  }
+  
   // Update tab buttons
   el('shop-tab-btn').classList.remove('active');
   el('equip-tab-btn').classList.remove('active');
@@ -17188,7 +17213,7 @@ async function addPassXP(amount, source) {
   updatePassUI();
   
   if (levelsGained > 0) {
-    showToast('🎫 Pass Level Up! Now Level ' + passProgress.level + '!', 'success');
+    showToast('🎫 Pass Level Up! Now Level ' + passProgress.level + '!', 'success', true);
     playSound('levelup');
   }
 }
@@ -17285,7 +17310,7 @@ async function grantPassReward(level, reward) {
         .single();
       
       if (titleData.data) {
-        showToast('🏆 Title unlocked: "' + titleData.data.display_name + '"!', 'success');
+        showToast('🏆 Title unlocked: "' + titleData.data.display_name + '"!', 'success', true);
       }
       break;
   }
@@ -17606,7 +17631,7 @@ async function checkBingoLines() {
         
         await addPassXP(50, 'bingo_line');
         
-        showToast('🎯 Bingo Line Complete! +100 PP, +50 XP', 'success');
+        showToast('🎯 Bingo Line Complete! +100 PP, +50 XP', 'success', true);
         playSound('victory');
       }
     }
@@ -17637,7 +17662,7 @@ async function checkBingoLines() {
       showToast('🏆 WEEKLY BLACKOUT! +500 PP, +200 XP, +1 Skin Key!', 'success');
     } else {
       // Additional blackout this week - no Skin Key
-      showToast('🏆 BLACKOUT BINGO! +500 PP, +200 XP', 'success');
+      showToast('🏆 BLACKOUT BINGO! +500 PP, +200 XP', 'success', true);
     }
     
     playSound('jackpot');
@@ -19092,7 +19117,7 @@ async function phase1_unlockCosmetic(type, cosmeticId) {
     
     // Show notification
     if (typeof showToast === 'function') {
-      showToast('🎨 New cosmetic unlocked!', 'success');
+      showToast('🎨 New cosmetic unlocked!', 'success', true);
     }
     
     console.log('✅ Phase 1: Unlocked cosmetic:', type, cosmeticId);
@@ -19900,7 +19925,7 @@ async function skinkey_unlockVariant(userPetId, variantId) {
     skinKeyState.unlockedVariants[userPetId].push(variantId);
     skinkey_updateDisplay();
     var variantName = BASIC_VARIANTS[variantId].name;
-    showToast('✨ Unlocked ' + variantName + ' variant!', 'success');
+    showToast('✨ Unlocked ' + variantName + ' variant!', 'success', true);
     console.log('🔑 Unlocked variant:', variantId, 'for pet', userPetId);
     return true;
   } catch (error) {
@@ -21114,12 +21139,16 @@ async function newFeatures_init() {
   console.log('✅ New features initialized!');
 }
 
+// NOTE: endBattle wrapper commented out - function doesn't exist in game
+// Pass XP from battles is already granted via existing battle completion hooks
+/*
 // Grant Pass XP after battles
 var original_endBattle = endBattle;
 endBattle = function() {
   original_endBattle.apply(this, arguments);
   pass_grantXP(10, 'battle');
 };
+*/
 
 // Grant Pass XP after feeding
 var original_feedPet = feedPet;
@@ -21193,12 +21222,10 @@ async function founder_checkAndGrant() {
       founder_granted_at: new Date().toISOString()
     }).eq('id', currentUser.id);
     
-    showModal('👑 Founder Status Granted!',
-      '<div style="text-align:center; padding:20px;">' +
-      '<h2 style="color:#fbbf24; margin-bottom:15px;">' + founderBadges.tiers[tier].name + '</h2>' +
-      '<p style="margin:15px 0;">Thank you for being an early supporter!</p>' +
-      '<p style="color:#f59e0b; font-weight:bold; margin-top:20px;">This status can never be obtained again!</p>' +
-      '</div>'
+    showCenteredModal(
+      '👑 Founder Status Granted!',
+      founderBadges.tiers[tier].name + '\n\nThank you for being an early supporter!\n\nThis status can never be obtained again!',
+      '👑'
     );
     
     console.log('🎉 Founder status granted:', tier);
@@ -21246,15 +21273,9 @@ async function rare_checkDrop(source, sourceId) {
         var rarityColors = { rare: '#3b82f6', epic: '#a855f7', legendary: '#f59e0b', mythic: '#ec4899' };
         var color = rarityColors[rare.rarity] || '#3b82f6';
         
-        showModal('✨ ' + rare.rarity.toUpperCase() + ' DROP!',
-          '<div style="text-align:center; padding:20px;">' +
-          '<h2 style="color:' + color + '; margin-bottom:15px;">' + rare.name + '</h2>' +
-          '<p style="margin:15px 0;">' + rare.description + '</p>' +
-          '<div style="margin-top:20px; padding:15px; background:rgba(0,0,0,0.2); border-radius:8px;">' +
-          '<div style="margin:8px 0;">Rarity: <span style="color:' + color + '; font-weight:bold;">' + rare.rarity + '</span></div>' +
-          '<div style="margin:8px 0;">Drop Rate: <strong>' + (rare.drop_rate * 100).toFixed(2) + '%</strong></div>' +
-          '<div style="margin:8px 0;">Obtained By: <strong>' + (rare.obtained_count + 1) + ' players</strong></div>' +
-          '</div></div>'
+        showRareDropModal(
+          rare.rarity.toUpperCase() + ' DROP!',
+          rare.name + '\n' + rare.description + '\n\nRarity: ' + rare.rarity + '\nDrop Rate: ' + (rare.drop_rate * 100).toFixed(2) + '%\nObtained By: ' + (rare.obtained_count + 1) + ' players'
         );
         
         console.log('🎉 Rare drop:', rare.name);
@@ -21468,7 +21489,13 @@ function calendar_showFull() {
   }
   
   html += '</div>';
-  showModal('Login Calendar', html);
+  
+  // Use existing showModal if available, fallback to showCenteredModal
+  if (typeof showModal === 'function') {
+    showModal('Login Calendar', html);
+  } else {
+    showCenteredModal('📅 Login Calendar', 'View full calendar in modal', '📅');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -21535,7 +21562,12 @@ function dailyWelcome_show() {
   
   html += '</div></div>';
   
-  showModal('Welcome Back!', html);
+  // Use existing showModal if available, fallback to showCenteredModal
+  if (typeof showModal === 'function') {
+    showModal('Welcome Back!', html);
+  } else {
+    showCelebrationModal('Welcome Back!', 'Day ' + streak + ' Streak!');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -21611,12 +21643,17 @@ async function screenshot_generate(petId) {
       a.download = (pet.nickname || pet.pet_type) + '_card.png';
       a.click();
       
-      showModal('📸 Screenshot Generated!',
-        '<div style="text-align:center;padding:20px;">' +
-        '<p style="margin-bottom:20px;">Your pet card has been downloaded!</p>' +
-        '<img src="' + url + '" style="max-width:300px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">' +
-        '</div>'
-      );
+      // Use existing showModal if available, fallback to showCenteredModal
+      if (typeof showModal === 'function') {
+        showModal('📸 Screenshot Generated!',
+          '<div style="text-align:center;padding:20px;">' +
+          '<p style="margin-bottom:20px;">Your pet card has been downloaded!</p>' +
+          '<img src="' + url + '" style="max-width:300px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">' +
+          '</div>'
+        );
+      } else {
+        showSuccessModal('Screenshot Generated!', 'Your pet card has been downloaded!');
+      }
     });
   } catch (err) {
     console.error('Screenshot error:', err);
