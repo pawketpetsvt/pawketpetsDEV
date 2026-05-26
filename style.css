@@ -15162,64 +15162,120 @@ body.modal-open {
 
 
 /* ============================================
-   PET CARD OVERFLOW FIX
+   MY PETS PAGE - CLEAN CARD LAYOUT
+   Matches the class names used in makeMyPetCard()
    ============================================ */
 
-.pet-card {
+/* Name row: nickname + edit button side by side, centered */
+.pet-name-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+    margin: 8px 0 4px !important;
+    width: 100% !important;
     overflow: visible !important;
-    min-height: 450px !important;
-    position: relative !important;
 }
 
-/* Ensure pet name doesn't get cut off */
-.pet-name {
-    overflow: visible !important;
+.pet-nickname {
+    font-family: 'Chewy', cursive !important;
+    font-size: 1.4rem !important;
+    color: var(--purple-dark) !important;
+    text-align: center !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
     white-space: normal !important;
-    word-wrap: break-word !important;
-    max-width: 100% !important;
+    text-shadow: 2px 2px 0 var(--pink-light) !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
 }
 
-/* Watch Stream button should be fully visible */
-.watch-stream-btn,
-button[onclick*="watchStream"],
-button[onclick*="Watch Stream"] {
-    margin-top: 8px !important;
-    overflow: visible !important;
-    z-index: 1 !important;
+.pet-edit-btn {
+    background: none !important;
+    border: none !important;
+    font-size: 1rem !important;
+    cursor: pointer !important;
+    padding: 4px 8px !important;
+    border-radius: 8px !important;
+    transition: all 0.2s !important;
+    flex-shrink: 0 !important;
 }
 
-
-/* ============================================
-   MY PETS PAGE - TEXT WRAPPING FIX
-   ============================================ */
-
-/* Fix pet card text wrapping */
-.my-pet-card {
-    overflow: hidden !important;
+.pet-edit-btn:hover {
+    background: var(--purple-light) !important;
+    transform: scale(1.05) !important;
 }
 
-.pet-card-body {
-    overflow-x: hidden !important;
+/* Evolution stage line */
+.pet-stage {
+    text-align: center !important;
+    font-size: 0.85rem !important;
+    color: var(--text-light) !important;
+    margin: 0 0 6px !important;
+    white-space: normal !important;
+}
+
+/* Species/VTuber name pill */
+.pet-species {
+    text-align: center !important;
+    font-size: 0.9rem !important;
+    font-weight: bold !important;
+    color: var(--text) !important;
+    background: rgba(153,102,255,0.1) !important;
+    padding: 4px 12px !important;
+    border-radius: 20px !important;
+    display: block !important;
+    margin: 0 auto 6px !important;
+    word-break: break-word !important;
+}
+
+/* Bio text */
+.pet-bio {
+    font-size: 0.85rem !important;
+    color: var(--text-light) !important;
+    text-align: center !important;
+    font-style: italic !important;
+    line-height: 1.4 !important;
+    padding: 0 8px !important;
     word-wrap: break-word !important;
     overflow-wrap: break-word !important;
-}
-
-.pet-card-bio {
     white-space: normal !important;
-    word-break: break-word !important;
-    overflow: hidden !important;
+    margin: 0 0 6px !important;
     display: -webkit-box !important;
     -webkit-line-clamp: 3 !important;
     -webkit-box-orient: vertical !important;
-}
-
-.pet-card-header-info {
-    max-width: 100% !important;
     overflow: hidden !important;
 }
 
-.pet-card-nickname {
-    font-size: 1.3rem !important;
-    word-break: break-word !important;
+/* Level pill */
+.pet-level {
+    text-align: center !important;
+    font-size: 0.8rem !important;
+    font-weight: bold !important;
+    color: var(--purple) !important;
+    background: rgba(153,102,255,0.15) !important;
+    padding: 4px 12px !important;
+    border-radius: 20px !important;
+    display: block !important;
+    margin: 0 auto 6px !important;
+}
+
+/* Variant/title badge wrappers */
+.pet-variant-badge-wrap,
+.pet-title-display-wrap {
+    text-align: center !important;
+    margin: 4px 0 !important;
+}
+
+/* Ensure card body has room and doesn't clip */
+.my-pet-card {
+    overflow: visible !important;
+}
+
+.pet-card-body {
+    overflow: visible !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
 }
 
