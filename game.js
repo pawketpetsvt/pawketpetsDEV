@@ -545,9 +545,21 @@ function makeModal() {
 }
 
 function openModal(modalElement) {
+  // modalElement is the inner content div; its parent is the overlay created by makeModal()
   var overlay = modalElement.parentElement;
+  if (!overlay) {
+    // Fallback: wrap in a new overlay if somehow detached
+    console.warn('openModal: modal has no parent overlay, creating one');
+    overlay = document.createElement('div');
+    overlay.className = 'modal-overlay-custom';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10000;';
+    overlay.appendChild(modalElement);
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) closeModal();
+    });
+  }
   document.body.appendChild(overlay);
-  document.body.style.overflow = 'hidden'; // Prevent background scroll
+  document.body.style.overflow = 'hidden';
 }
 
 function closeModal() {
@@ -2592,16 +2604,20 @@ function calculateLevelUp(newXp, currentLevel, currentMaxHunger, currentMaxEnerg
 async function feed(petId) {
   // Rate limiting
   if (!canPerformAction('feed_' + petId, 500)) {
-    return; // Silently reject if too fast
+    return;
   }
   
   var pet = petState[petId]; 
-  if (!pet) return;
-  
-  // REMOVED: Daily limit check - free option always available
-  // var today = new Date().toISOString().split('T')[0];
-  // var alreadyFedToday = localStorage.getItem('feed_' + petId + '_' + today) === 'done';
-  
+  if (!pet) {
+    console.warn('feed(): no pet found in petState for id', petId, '- petState keys:', Object.keys(petState));
+    return;
+  }
+
+  // Show loading state on button immediately so user knows click registered
+  var feedBtnEl = document.getElementById('feed-' + petId);
+  if (feedBtnEl) { feedBtnEl.textContent = '...'; feedBtnEl.disabled = true; }
+
+  try {
   // Get user's food inventory
   var { data: inventory, error: invError } = await supabaseClient
     .from('user_inventory')
@@ -2611,6 +2627,7 @@ async function feed(petId) {
   
   if (invError) {
     showToast('Error loading inventory', 3000);
+    if (feedBtnEl) { feedBtnEl.textContent = 'Feed'; feedBtnEl.disabled = false; }
     return;
   }
   
@@ -2711,7 +2728,15 @@ async function feed(petId) {
   cancelBtn.onclick = closeModal;
   modal.appendChild(cancelBtn);
   
+  // Restore button before showing modal
+  if (feedBtnEl) { feedBtnEl.textContent = 'Feed'; feedBtnEl.disabled = false; }
   openModal(modal);
+
+  } catch(err) {
+    console.error('feed() error:', err);
+    showToast('Error opening feed menu', 3000);
+    if (feedBtnEl) { feedBtnEl.textContent = 'Feed'; feedBtnEl.disabled = false; }
+  }
 }
 
 // FREE DAILY FEED - Called when clicking free option
@@ -2896,16 +2921,20 @@ async function feedWithItem(petId, itemId, itemName) {
 async function play(petId) {
   // Rate limiting
   if (!canPerformAction('play_' + petId, 500)) {
-    return; // Silently reject if too fast
+    return;
   }
   
   var pet = petState[petId]; 
-  if (!pet) return;
-  
-  // REMOVED: Daily limit check - free option always available
-  // var today = new Date().toISOString().split('T')[0];
-  // var alreadyPlayedToday = localStorage.getItem('play_' + petId + '_' + today) === 'done';
-  
+  if (!pet) {
+    console.warn('play(): no pet found in petState for id', petId, '- petState keys:', Object.keys(petState));
+    return;
+  }
+
+  // Show loading state on button immediately
+  var playBtnEl = document.getElementById('play-' + petId);
+  if (playBtnEl) { playBtnEl.textContent = '...'; playBtnEl.disabled = true; }
+
+  try {
   // Get user's toy inventory
   var { data: inventory, error: invError } = await supabaseClient
     .from('user_inventory')
@@ -2915,6 +2944,7 @@ async function play(petId) {
   
   if (invError) {
     showToast('Error loading inventory', 3000);
+    if (playBtnEl) { playBtnEl.textContent = 'Play'; playBtnEl.disabled = false; }
     return;
   }
   
@@ -3027,7 +3057,15 @@ async function play(petId) {
   cancelBtn.onclick = closeModal;
   modal.appendChild(cancelBtn);
   
+  // Restore button before showing modal
+  if (playBtnEl) { playBtnEl.textContent = 'Play'; playBtnEl.disabled = false; }
   openModal(modal);
+
+  } catch(err) {
+    console.error('play() error:', err);
+    showToast('Error opening play menu', 3000);
+    if (playBtnEl) { playBtnEl.textContent = 'Play'; playBtnEl.disabled = false; }
+  }
 }
 
 // FREE DAILY PLAY
@@ -17290,9 +17328,12 @@ function showPassModal() {
       var claimBtn = makeEl('button', {class: 'btn btn-primary btn-sm'});
       claimBtn.textContent = 'Claim';
       claimBtn.onclick = function(lvl) {
-        return function() {
-          claimPassReward(lvl);
-          modal.remove();
+        return async function() {
+          this.disabled = true;
+          this.textContent = '...';
+          await claimPassReward(lvl);
+          // closeModal removes the overlay correctly, then reopen
+          closeModal();
           showPassModal();
         };
       }(level);
@@ -17313,12 +17354,16 @@ function showPassModal() {
   }
   
   content.appendChild(track);
-  
-  // Fix: makeModal() returns modal which is already inside overlay
-  // Just append content directly to modal
+
+  // Close button
+  var closeBtn = makeEl('button', {class: 'btn btn-outline'});
+  closeBtn.textContent = '✕ Close';
+  closeBtn.style.cssText = 'display:block;margin:20px auto 0;';
+  closeBtn.onclick = closeModal;
   modal.appendChild(content);
-  
-  // Get the overlay parent and append to body
+  modal.appendChild(closeBtn);
+
+  // Append overlay (parent of modal) to body
   var overlay = modal.parentElement;
   document.body.appendChild(overlay);
   document.body.style.overflow = 'hidden';
