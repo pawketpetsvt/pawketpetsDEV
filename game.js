@@ -187,33 +187,38 @@ function getBattleSoundKey(attacker, variance) {
    MAIN GAME CODE
    ═══════════════════════════════════════════════════════════════════════ */
 
-var supabaseClient;
-if (typeof supabase !== 'undefined') {
-  supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-      flowType: 'pkce'
-    }
-  });
-} else {
-  // Wait for Supabase library to load
-  console.log('Waiting for Supabase library...');
+var supabaseClient = null;
+
+function initSupabase() {
+  if (typeof supabase !== 'undefined' && supabase.createClient) {
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        flowType: 'pkce'
+      }
+    });
+    dbg('✅ Supabase initialized');
+    return true;
+  }
+  return false;
+}
+
+// Try to initialize immediately
+if (!initSupabase()) {
+  // If library not loaded yet, poll until it is
+  dbg('Waiting for Supabase library...');
   var checkSupabase = setInterval(function() {
-    if (typeof supabase !== 'undefined') {
-      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-        auth: {
-          autoRefreshToken: true,
-          persistSession: true,
-          detectSessionInUrl: true,
-          flowType: 'pkce'
-        }
-      });
-      console.log('Supabase initialized!');
+    if (typeof supabase !== 'undefined' && supabase.createClient) {
+      initSupabase();
       clearInterval(checkSupabase);
+      // Retry the auth gate after initialization
+      if (typeof initApp === 'function') {
+        initApp();
+      }
     }
-  }, 50);
+  }, 100);
 }
 
 // ── CONFIG ──────────────────────────────
@@ -684,14 +689,21 @@ function showForgotPassword() {
 }
 
 async function initApp() {
+  // Guard: wait for Supabase client to be ready
+  if (!supabaseClient) {
+    dbg('Waiting for Supabase client to initialize...');
+    setTimeout(initApp, 500);
+    return;
+  }
+
   // Check if user is coming from password reset email
   var hash = window.location.hash;
   if (hash && hash.includes('type=recovery')) {
-    console.log('Password recovery mode detected');
+    dbg('Password recovery mode detected');
     el('auth-gate').style.display = 'none';
     el('reset-password-gate').style.display = 'block';
     el('app-content').style.display = 'none';
-    return; // Stop here, show reset form
+    return;
   }
   
   var session = await requireLogin();
@@ -700,14 +712,18 @@ async function initApp() {
   } else {
     showAuth();
   }
+
+  // Set up auth state listener
   supabaseClient.auth.onAuthStateChange(function(event, session) {
+    dbg('Auth state changed:', event);
     if (event === 'PASSWORD_RECOVERY') {
-      // Show reset password form
       el('auth-gate').style.display = 'none';
       el('reset-password-gate').style.display = 'block';
       el('app-content').style.display = 'none';
     } else if (event === 'SIGNED_IN' && session) {
-      showApp(session.user);
+      setTimeout(function() {
+        showApp(session.user);
+      }, 100);
     } else if (event === 'SIGNED_OUT') {
       showAuth();
     }
@@ -715,6 +731,15 @@ async function initApp() {
 }
 
 async function showApp(user) {
+  dbg('showApp called with user:', user?.id || 'null');
+
+  // Guard: ensure user is valid before proceeding
+  if (!user || !user.id) {
+    console.error('showApp called with invalid user');
+    showAuth();
+    return;
+  }
+
   currentUser = user;
   el('auth-gate').style.display = 'none';
   el('app-content').style.display = 'block';
@@ -1081,13 +1106,26 @@ async function registerUser(email, password, username) {
 }
 
 async function requireLogin() {
-  // Check if user is already logged in
-  var { data, error } = await supabaseClient.auth.getSession();
-  if (error) {
-    console.error('Error checking session:', error);
+  // Guard: check if Supabase is ready
+  if (!supabaseClient) {
+    dbg('Supabase not ready in requireLogin');
     return null;
   }
-  return data.session;
+
+  try {
+    var { data, error } = await supabaseClient.auth.getSession();
+    if (error) {
+      console.error('Error checking session:', error);
+      return null;
+    }
+    if (data && data.session) {
+      return data.session;
+    }
+    return null;
+  } catch (err) {
+    console.error('Session check error:', err);
+    return null;
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -1102,21 +1140,42 @@ async function handleLogin() {
   var suc = el('login-success');
   err.classList.remove('show');
   suc.classList.remove('show');
-  if (!email || !password) { err.textContent = 'Please fill in all fields!'; err.classList.add('show'); return; }
+
+  if (!email || !password) {
+    err.textContent = 'Please fill in all fields!';
+    err.classList.add('show');
+    return;
+  }
+
+  // Guard: check if Supabase is ready
+  if (!supabaseClient) {
+    err.textContent = 'Loading... Please wait and try again.';
+    err.classList.add('show');
+    return;
+  }
+
   btn.textContent = 'Logging in...';
   btn.disabled = true;
+
   try {
     var result = await loginUser(email, password);
     suc.textContent = 'Logged in! Loading...';
     suc.classList.add('show');
-    // Wait a moment for the auth state to update, then manually trigger app load
+
+    // Wait for auth state to fully update, then verify session before showing app
     setTimeout(async function() {
       if (result && result.user) {
-        await showApp(result.user);
+        var session = await requireLogin();
+        if (session) {
+          await showApp(session.user);
+        } else {
+          throw new Error('Session not found after login');
+        }
       }
     }, 500);
   } catch(e) {
-    err.textContent = e.message || 'Login failed.';
+    console.error('Login error:', e);
+    err.textContent = e.message || 'Login failed. Check your email and password.';
     err.classList.add('show');
     btn.textContent = 'Login';
     btn.disabled = false;
@@ -18204,135 +18263,11 @@ async function community_handleClaim(e) {
     }
 }
 
-// Grant reward based on type
-async function community_grantReward(goal) {
-    var reward = goal.reward_value;
-    var type = goal.reward_type;
-    
-    try {
-        if (type === 'points') {
-            var amount = parseInt(reward);
-            // Add points (use your existing function)
-            if (typeof addPawketPoints === 'function') {
-                addPawketPoints(amount);
-            } else if (typeof updateAllPoints === 'function') {
-                updateAllPoints(currentPoints + amount);
-            }
-            return true;
-        }
-        if (type === 'items') {
-            var items = reward.split(',');
-            for (var i = 0; i < items.length; i++) {
-                var parts = items[i].split(':');
-                var itemId = parts[0];
-                var quantity = parseInt(parts[1]) || 1;
-                if (typeof addItemToInventory === 'function') {
-                    await addItemToInventory(itemId, quantity);
-                }
-            }
-            return true;
-        }
-        if (type === 'title') {
-            if (typeof unlockTitle === 'function') {
-                await unlockTitle(reward);
-            }
-            return true;
-        }
-        return false;
-    } catch(e) {
-        console.error('Reward grant error:', e);
-        return false;
-    }
-}
-
-// Format reward text for toast
-function community_formatRewardText(goal) {
-    if (goal.reward_type === 'points') return goal.reward_value + ' PawketPoints';
-    if (goal.reward_type === 'items') return goal.reward_value;
-    if (goal.reward_type === 'title') return 'Title: "' + goal.reward_value + '"';
-    return goal.reward_value;
-}
-
-// Show toast notification
-function community_showToast(message, type) {
-    type = type || 'info';
-    if (typeof showToast === 'function') {
-        showToast(message, type);
-    } else if (typeof showNotification === 'function') {
-        showNotification(message);
-    } else {
-        console.log('[Community] ' + message);
-        var toast = document.createElement('div');
-        toast.textContent = message;
-        toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#333;color:white;padding:10px 20px;border-radius:8px;z-index:9999;';
-        document.body.appendChild(toast);
-        setTimeout(function() { toast.remove(); }, 3000);
-    }
-}
-
-// Initialize community system
-function community_init() {
-    community_loadGoals();
-    setInterval(function() { community_loadGoals(); }, 300000);
-    window.addEventListener('beforeunload', function() {
-        if (Object.keys(community_pendingUpdates).length > 0) {
-            community_syncToDatabase();
-        }
-    });
-    console.log('🌍 Community Goals system initialized');
-}
-
-
 // ════════════════════════════════════════════════════════════════════════════
 // SCRAPBOOK SYSTEM - COMPLETE IMPLEMENTATION
 // ════════════════════════════════════════════════════════════════════════════
 
 // Memory templates
-var SCRAPBOOK_TEMPLATES = {
-  adopted: [
-    '{pet} found a forever home with {trainer}!',
-    '{pet} was adopted and joined the Pawket family!',
-    'A new journey begins for {pet} with {trainer}!'
-  ],
-  first_battle_win: [
-    '{pet} won their first battle against {enemy}!',
-    '{pet} defeated {enemy} for the very first time!',
-    'Victory! {pet} triumphed over {enemy}!'
-  ],
-  first_battle_loss: [
-    '{pet} lost to {enemy} but learned a valuable lesson.',
-    '{pet} gained experience from defeat against {enemy}.',
-    '{enemy} proved tough, but {pet} will try again!'
-  ],
-  level_milestone: [
-    '{pet} reached level {level}! Growing stronger every day!',
-    'Level {level} achieved for {pet}! More adventures await!',
-    '{pet} hit level {level} - what a journey so far!'
-  ],
-  favorite_food: [
-    '{pet} discovered they absolutely LOVE {food}!',
-    '{pet} went crazy for {food} - new favorite discovered!',
-    '{pet} tried {food} and couldn\'t get enough!'
-  ],
-  low_hp_victory: [
-    '{pet} won a battle with only {hp} HP remaining! Such determination!',
-    '{pet} pulled through a tough fight with {hp} HP left!',
-    'Against all odds, {pet} survived with {hp} HP!'
-  ],
-  random_flavor: [
-    '{pet} enjoyed a peaceful afternoon in the sun.',
-    '{pet} played with other pets at the park.',
-    '{pet} found a hidden treasure while exploring!',
-    '{pet} made a new friend during their adventures.',
-    '{pet} had a relaxing day by the pond.',
-    '{pet} chased butterflies in the meadow.',
-    '{pet} watched the sunset with their trainer.',
-    '{pet} discovered a mysterious hidden cave.'
-  ]
-};
-
-
-
 
 // Grant reward based on type
 async function community_grantReward(goal) {
