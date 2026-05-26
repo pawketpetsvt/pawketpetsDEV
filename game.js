@@ -2323,13 +2323,14 @@ async function loadEquippedItems(petId) {
 }
 
 async function updatePetStatsDisplay(petId, baseAtk, baseDef, baseSpd) {
-  // Fetch equipment and update stat display
+  // Fetch equipment for THIS specific pet and update stat display
   setTimeout(async function() {
     try {
       var equipRes = await supabaseClient
         .from('player_equipment')
         .select('equipment(*)')
         .eq('user_id', currentUser.id)
+        .eq('pet_id', petId)
         .eq('is_equipped', true);
       
       if (equipRes.error || !equipRes.data) return;
@@ -6151,34 +6152,21 @@ async function buyEquipment(equipmentId, equipmentName, price) {
     await awardBadge('big_spender');
   }
   
-  // Add to player equipment
-  var existingRes = await supabaseClient
+  // Add to player equipment — always insert a new unequipped row.
+  // Each row = one physical copy of the item, independently equippable on a different pet.
+  var insertRes = await supabaseClient
     .from('player_equipment')
-    .select('id, quantity')
-    .eq('user_id', currentUser.id)
-    .eq('equipment_id', equipmentId)
-    .limit(1);
+    .insert([{ 
+      user_id: currentUser.id, 
+      equipment_id: equipmentId,
+      quantity: 1,
+      is_equipped: false,
+      pet_id: null
+    }]);
   
-  if (existingRes.data && existingRes.data.length > 0) {
-    // Already owns - increase quantity
-    await supabaseClient
-      .from('player_equipment')
-      .update({ quantity: existingRes.data[0].quantity + 1 })
-      .eq('id', existingRes.data[0].id);
-  } else {
-    // New purchase
-    var insertRes = await supabaseClient
-      .from('player_equipment')
-      .insert([{ 
-        user_id: currentUser.id, 
-        equipment_id: equipmentId,
-        quantity: 1
-      }]);
-    
-    if (insertRes.error) {
-      showToast('Purchase failed!');
-      return;
-    }
+  if (insertRes.error) {
+    showToast('Purchase failed!');
+    return;
   }
   
   // Track stats (for new stats system)
@@ -6205,11 +6193,12 @@ function filterEquipment(type, evt) {
 }
 
 async function loadPetEquipment(petId) {
-  // Get equipped items for this pet
+  // Get equipped items for THIS specific pet
   var res = await supabaseClient
     .from('player_equipment')
     .select('equipment_id, equipped_slot, equipment(*)')
     .eq('user_id', currentUser.id)
+    .eq('pet_id', petId)
     .eq('is_equipped', true);
   
   if (res.error) return { weapon: null, armor: null };
@@ -6229,39 +6218,28 @@ async function loadPetEquipment(petId) {
 }
 
 async function showEquipmentModal(petId) {
-  console.log('=== EQUIPMENT MODAL DEBUG ===');
-  console.log('Opening equipment modal for pet:', petId);
-  
   try {
-    // Get pet's current equipment
+    // Get pet's current equipment (filtered to this pet)
     var equipped = await loadPetEquipment(petId);
-    console.log('Currently equipped:', equipped);
     
-    // Get all owned equipment
+    // Get all owned equipment rows (unequipped or equipped on any pet)
     var allEquipRes = await supabaseClient
       .from('player_equipment')
       .select('*, equipment(*)')
       .eq('user_id', currentUser.id)
-      .gt('quantity', 0);
-    
-    console.log('All owned equipment:', allEquipRes);
+      .eq('is_equipped', false); // only show unequipped (available) items
     
     if (allEquipRes.error) {
-      console.error('Error loading equipment:', allEquipRes.error);
       showToast('Error loading equipment!');
       return;
     }
     
     var ownedEquipment = allEquipRes.data || [];
   
-  console.log('Creating modal...');
-  
-  // Create modal with !important inline styles to override any CSS
+  // Create modal
   var modal = makeEl('div', { class: 'equipment-modal-dynamic' });
   modal.style.cssText = 'position:fixed !important;top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;width:100vw !important;height:100vh !important;background:rgba(0,0,0,0.8) !important;display:flex !important;align-items:center !important;justify-content:center !important;z-index:999999 !important;';
   modal.id = 'equipment-modal-' + Date.now();
-  console.log('Modal overlay created:', modal);
-  console.log('Modal styles:', modal.style.cssText);
   
   modal.onclick = function(e) { 
     if (e.target === modal) {
@@ -6277,8 +6255,6 @@ async function showEquipmentModal(petId) {
   title.textContent = 'Manage Equipment';
   title.style.cssText = 'color:var(--purple);margin:0 0 20px 0;font-family:Chewy,cursive;';
   modalContent.appendChild(title);
-  
-  console.log('Modal content created');
   
   // Equipment slots display
   var slotsDiv = makeEl('div', { class: 'equipment-slots' });
@@ -6298,7 +6274,6 @@ async function showEquipmentModal(petId) {
     weaponName.textContent = equipped.weapon.name;
     weaponSlot.appendChild(weaponName);
     
-    // Show stat bonuses
     var bonuses = [];
     if (equipped.weapon.attack_bonus) bonuses.push('+' + equipped.weapon.attack_bonus + ' ATK');
     if (equipped.weapon.defense_bonus) bonuses.push('+' + equipped.weapon.defense_bonus + ' DEF');
@@ -6314,7 +6289,7 @@ async function showEquipmentModal(petId) {
     var unequipBtn = makeEl('button', { class: 'btn btn-sm btn-unequip' });
     unequipBtn.textContent = 'Unequip';
     unequipBtn.onclick = function() { 
-      unequipItem('weapon');
+      unequipItem('weapon', petId); // ← pass petId
       document.body.removeChild(modal);
     };
     weaponSlot.appendChild(unequipBtn);
@@ -6340,23 +6315,22 @@ async function showEquipmentModal(petId) {
     armorName.textContent = equipped.armor.name;
     armorSlot.appendChild(armorName);
     
-    // Show stat bonuses
     var bonuses = [];
     if (equipped.armor.attack_bonus) bonuses.push('+' + equipped.armor.attack_bonus + ' ATK');
     if (equipped.armor.defense_bonus) bonuses.push('+' + equipped.armor.defense_bonus + ' DEF');
     if (equipped.armor.speed_bonus) bonuses.push('+' + equipped.armor.speed_bonus + ' SPD');
     if (equipped.armor.hp_bonus) bonuses.push('+' + equipped.armor.hp_bonus + ' HP');
     if (bonuses.length > 0) {
-      var bonusText = makeEl('div', { class: 'equipment-slot-bonus' });
-      bonusText.style.cssText = 'font-size:0.75rem;color:var(--text-light);margin-top:4px;';
-      bonusText.textContent = bonuses.join(', ');
-      armorSlot.appendChild(bonusText);
+      var bonusText2 = makeEl('div', { class: 'equipment-slot-bonus' });
+      bonusText2.style.cssText = 'font-size:0.75rem;color:var(--text-light);margin-top:4px;';
+      bonusText2.textContent = bonuses.join(', ');
+      armorSlot.appendChild(bonusText2);
     }
     
     var unequipBtn2 = makeEl('button', { class: 'btn btn-sm btn-unequip' });
     unequipBtn2.textContent = 'Unequip';
     unequipBtn2.onclick = function() { 
-      unequipItem('armor');
+      unequipItem('armor', petId); // ← pass petId
       document.body.removeChild(modal);
     };
     armorSlot.appendChild(unequipBtn2);
@@ -6369,7 +6343,7 @@ async function showEquipmentModal(petId) {
   
   modalContent.appendChild(slotsDiv);
   
-  // List available equipment to equip
+  // List available (unequipped) equipment
   var availableTitle = makeEl('h3');
   availableTitle.textContent = 'Available Equipment';
   availableTitle.style.cssText = 'margin-top:20px;color:var(--purple);font-family:Chewy,cursive;';
@@ -6378,7 +6352,6 @@ async function showEquipmentModal(petId) {
   var equipGrid = makeEl('div', { class: 'shop-grid' });
   
   if (ownedEquipment.length === 0) {
-    // No equipment owned - show helpful message
     var emptyState = makeEl('div');
     emptyState.style.cssText = 'text-align:center;padding:40px 20px;background:rgba(153,102,255,0.1);border-radius:12px;margin:20px 0;';
     
@@ -6387,15 +6360,15 @@ async function showEquipmentModal(petId) {
     emptyIcon.textContent = '🛡️';
     emptyState.appendChild(emptyIcon);
     
-    var emptyText = makeEl('p');
-    emptyText.style.cssText = 'color:var(--purple);font-size:1.1rem;margin:16px 0 8px 0;';
-    emptyText.textContent = 'You don\'t own any equipment yet!';
-    emptyState.appendChild(emptyText);
+    var emptyMsg = makeEl('p');
+    emptyMsg.style.cssText = 'color:var(--purple);font-size:1.1rem;margin:16px 0 8px 0;';
+    emptyMsg.textContent = 'No available equipment!';
+    emptyState.appendChild(emptyMsg);
     
-    var emptySubtext = makeEl('p');
-    emptySubtext.style.cssText = 'color:var(--text-light);font-size:0.9rem;margin-bottom:20px;';
-    emptySubtext.textContent = 'Visit the Equipment Shop to buy weapons and armor for your pets.';
-    emptyState.appendChild(emptySubtext);
+    var emptySubMsg = makeEl('p');
+    emptySubMsg.style.cssText = 'color:var(--text-light);font-size:0.9rem;margin-bottom:20px;';
+    emptySubMsg.textContent = 'All owned items are already equipped, or visit the Shop to buy more.';
+    emptyState.appendChild(emptySubMsg);
     
     var shopBtn = makeEl('button', { class: 'btn btn-primary' });
     shopBtn.textContent = '🛒 Go to Equipment Shop';
@@ -6408,9 +6381,9 @@ async function showEquipmentModal(petId) {
     
     equipGrid.appendChild(emptyState);
   } else {
-    // Has equipment - show list
     ownedEquipment.forEach(function(playerEquip) {
       var item = playerEquip.equipment;
+      if (!item) return;
       var card = makeEl('div', { class: 'equipment-card' });
       card.style.cssText = 'font-size:0.85rem;padding:15px;border:2px solid var(--purple-light);border-radius:12px;text-align:center;';
       
@@ -6424,7 +6397,6 @@ async function showEquipmentModal(petId) {
       name.textContent = item.name;
       card.appendChild(name);
       
-      // Show stat bonuses
       var bonuses = [];
       if (item.attack_bonus) bonuses.push('+' + item.attack_bonus + ' ATK');
       if (item.defense_bonus) bonuses.push('+' + item.defense_bonus + ' DEF');
@@ -6441,7 +6413,7 @@ async function showEquipmentModal(petId) {
       equipBtn.textContent = 'Equip';
       equipBtn.style.marginTop = '10px';
       equipBtn.onclick = function() { 
-        equipItem(playerEquip.id, item.equipment_type);
+        equipItem(playerEquip.id, item.equipment_type, petId); // ← pass petId
         document.body.removeChild(modal);
       };
       card.appendChild(equipBtn);
@@ -6466,18 +6438,21 @@ async function showEquipmentModal(petId) {
   }
 }
 
-async function equipItem(playerEquipmentId, equipmentType) {
-  // Unequip any existing item in that slot
+async function equipItem(playerEquipmentId, equipmentType, petId) {
+  if (!petId) { console.error('equipItem called without petId'); return; }
+  
+  // Unequip any existing item in that slot FOR THIS PET ONLY
   await supabaseClient
     .from('player_equipment')
-    .update({ is_equipped: false, equipped_slot: null })
+    .update({ is_equipped: false, equipped_slot: null, pet_id: null })
     .eq('user_id', currentUser.id)
+    .eq('pet_id', petId)
     .eq('equipped_slot', equipmentType);
   
-  // Equip new item
+  // Equip the new item, linking it to this pet
   await supabaseClient
     .from('player_equipment')
-    .update({ is_equipped: true, equipped_slot: equipmentType })
+    .update({ is_equipped: true, equipped_slot: equipmentType, pet_id: petId })
     .eq('id', playerEquipmentId);
   
   showToast('Equipment equipped!');
@@ -6485,11 +6460,15 @@ async function equipItem(playerEquipmentId, equipmentType) {
   loadMyPets();
 }
 
-async function unequipItem(slot) {
+async function unequipItem(slot, petId) {
+  if (!petId) { console.error('unequipItem called without petId'); return; }
+  
+  // Only unequip from this specific pet
   await supabaseClient
     .from('player_equipment')
-    .update({ is_equipped: false, equipped_slot: null })
+    .update({ is_equipped: false, equipped_slot: null, pet_id: null })
     .eq('user_id', currentUser.id)
+    .eq('pet_id', petId)
     .eq('equipped_slot', slot);
   
   showToast('Equipment unequipped!');
@@ -6523,11 +6502,12 @@ async function calculatePetStats(petId) {
   // Calculate max HP from base + evolution + equipment
   var maxHP = (pet.base_hp || 30) + evolutionBonuses.hp;
   
-  // Get equipped items
+  // Get equipped items for THIS specific pet (for battle stats)
   var equipRes = await supabaseClient
     .from('player_equipment')
     .select('equipment(*)')
     .eq('user_id', currentUser.id)
+    .eq('pet_id', petId)
     .eq('is_equipped', true);
   
   if (!equipRes.error && equipRes.data) {
