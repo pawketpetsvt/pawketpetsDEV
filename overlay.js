@@ -6,7 +6,6 @@
 // ============================================
 const STREAMER_NAME = 'Embertail';  // Your Twitch username (case-sensitive!)
 const API_BASE = 'https://pawketpets-twitch.pawketpetsvt.workers.dev';  // Your Cloudflare Worker URL
-const PROMO_URL = 'https://pawketpets.net';  // Your game URL
 // ============================================
 
 // ============================================
@@ -41,12 +40,6 @@ const QUIPS = {
     "😿 Anyone there?",
     "💤 So sleepy...",
     "🍪 Got any treats?"
-  ],
-  promo: [
-    "🎮 Get your own pet at pawketpets.net!",
-    "🐾 Adopt your VTuber pet today!",
-    "✨ Join PawketPetsVT! Free to play!",
-    "🎁 Your own companion awaits at pawketpets.net!"
   ]
 };
 
@@ -60,19 +53,14 @@ function getRandomQuip(happinessPercent, hungerPercent, energyPercent) {
     mood = 'sad';
   }
   
-  // 10% chance to show a promo quip instead
-  if (Math.random() < 0.1) {
-    return QUIPS.promo[Math.floor(Math.random() * QUIPS.promo.length)];
-  }
-  
   const quipList = QUIPS[mood];
   return quipList[Math.floor(Math.random() * quipList.length)];
 }
 
 // Rotate quips every 2 minutes
 let quipInterval = null;
-let currentQuipTimeout = null;
 let quipRotationActive = false;
+let currentQuipText = ''; // ← CHANGED: Track current quip to avoid re-rendering
 
 function startQuipRotation(pet) {
   // If rotation is already active, don't restart it
@@ -80,30 +68,26 @@ function startQuipRotation(pet) {
   
   quipRotationActive = true;
   
-  // Clear any existing intervals just in case
-  if (quipInterval) clearInterval(quipInterval);
-  if (currentQuipTimeout) clearTimeout(currentQuipTimeout);
-  
   // Show first quip after 5 seconds
-  currentQuipTimeout = setTimeout(() => {
+  setTimeout(() => {
     if (pet) {
-      const quip = getRandomQuip(pet.stats.happiness.percent, pet.stats.hunger.percent, pet.stats.energy.percent);
-      updateQuipDisplay(quip);
+      currentQuipText = getRandomQuip(pet.stats.happiness.percent, pet.stats.hunger.percent, pet.stats.energy.percent);
+      updateQuipDisplay(currentQuipText);
     }
   }, 5000);
   
   // Update quip every 2 minutes
   quipInterval = setInterval(() => {
     if (pet) {
-      const quip = getRandomQuip(pet.stats.happiness.percent, pet.stats.hunger.percent, pet.stats.energy.percent);
-      updateQuipDisplay(quip);
+      currentQuipText = getRandomQuip(pet.stats.happiness.percent, pet.stats.hunger.percent, pet.stats.energy.percent);
+      updateQuipDisplay(currentQuipText);
     }
-  }, 120000); // 2 minutes = 120,000 milliseconds
+  }, 120000); // 2 minutes
 }
 
 function updateQuipDisplay(quip) {
   const quipElement = document.getElementById('pet-quip');
-  if (quipElement) {
+  if (quipElement && quipElement.textContent !== quip) { // ← CHANGED: Only update if different
     quipElement.textContent = quip;
     quipElement.classList.add('quip-new');
     setTimeout(() => {
@@ -211,7 +195,8 @@ function updateDisplay(pet) {
   else tip = '✨ Happy and healthy! Thanks for watching!';
   
   document.getElementById('pet-tip').textContent = tip;
-  document.getElementById('pet-last').textContent = '🎮 Get your own pet at pawketpets.net!';
+  // Changed: Promo message instead of "Updated just now"
+  document.getElementById('pet-last').innerHTML = '🎮 <a href="https://pawketpets.net" target="_blank" style="color:#ffcc00; text-decoration:none;">Get your own pet!</a>';
   
   // Start quip rotation with pet data (only starts once)
   startQuipRotation(pet);
@@ -255,7 +240,7 @@ function showNoCompanionState(streamerName) {
   document.getElementById('energy-text').textContent = '0%';
   document.getElementById('happiness-fill').style.width = '0%';
   document.getElementById('happiness-text').textContent = '0%';
-  document.getElementById('pet-last').textContent = 'Set a companion in the game!';
+  document.getElementById('pet-last').innerHTML = '🎮 <a href="https://pawketpets.net" target="_blank" style="color:#ffcc00;">Get your own pet!</a>';
   document.getElementById('pet-tip').textContent = '✨ Go to "My Pets" and click "Set Companion"';
 }
 
@@ -265,6 +250,6 @@ function showErrorState() {
   document.getElementById('pet-species').textContent = 'Unable to load pet data';
   document.getElementById('mood-emoji').textContent = '⚠️';
   document.getElementById('mood-text').textContent = 'Error';
-  document.getElementById('pet-last').textContent = 'Check API URL in overlay.js';
+  document.getElementById('pet-last').innerHTML = '🎮 <a href="https://pawketpets.net" target="_blank" style="color:#ffcc00;">pawketpets.net</a>';
   document.getElementById('pet-tip').textContent = '🔧 Make sure STREAMER_NAME and API_BASE are correct';
 }
