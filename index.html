@@ -178,6 +178,8 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
 <!-- Consolidated Navigation Bar -->
 <nav class="navbar">
   <div class="navbar-left">
+    <!-- Hamburger: visible on mobile only, lives in navbar so it's always accessible -->
+    <button id="hamburger-menu-btn" class="hamburger-menu-btn" aria-label="Open menu">☰</button>
     <div class="navbar-logo" onclick="showTab('home')">
       <img src="images/pawket-logo.png" alt="PawketPetsVT">
       <span>PawketPets</span>
@@ -257,8 +259,7 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
         </div>
       </div>
       
-      <!-- Hamburger Menu Button (Mobile Only) -->
-      <button id="hamburger-menu-btn" class="hamburger-menu-btn" aria-label="Menu">☰</button>
+      <!-- Hamburger is now in the navbar (navbar-left) for proper mobile positioning -->
     </div>
     
     <!-- DESKTOP NAVIGATION (visible on desktop) -->
@@ -311,6 +312,26 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
           <button class="sidebar-nav-btn" id="sidebar-btn-team" onclick="showTab('team')">👥 Team</button>
           <button class="sidebar-nav-btn" id="sidebar-btn-forum" onclick="showTab('forum')">💬 Forum</button>
           <button class="sidebar-nav-btn" id="sidebar-btn-settings" onclick="showTab('settings')">⚙️ Settings</button>
+        </div>
+      </div>
+
+      <!-- Mobile-only: Live Streamers quick view -->
+      <div class="sidebar-section mobile-streamers-section" style="margin-top:16px;border-top:1px solid rgba(255,255,255,0.1);padding-top:16px;">
+        <div class="sidebar-title" style="color:#ff9966;font-size:0.85rem;margin-bottom:10px;">📺 Our Streamers</div>
+        <div id="mobile-streamer-list" style="display:flex;flex-direction:column;gap:8px;">
+          <div class="mobile-streamer-row" data-streamer="embertail">
+            <img src="images/pets/ember.png" alt="Embertail" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">
+            <span style="color:#e8d5ff;font-size:0.85rem;">Embertail</span>
+            <span class="mobile-live-dot" id="mobile-ember-dot" style="display:none;">🔴</span>
+          </div>
+          <div class="mobile-streamer-row" data-streamer="pyxshuul">
+            <img src="images/pets/pyxie.png" alt="Pyxshuul" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">
+            <span style="color:#e8d5ff;font-size:0.85rem;">Pyxshuul</span>
+            <span class="mobile-live-dot" id="mobile-pyxs-dot" style="display:none;">🔴</span>
+          </div>
+          <div class="mobile-streamer-row">
+            <a href="showTab('twitch')" onclick="showTab('twitch');return false;" style="color:#9966ff;font-size:0.8rem;text-decoration:none;">View all streamers →</a>
+          </div>
         </div>
       </div>
     </nav>
