@@ -1,11 +1,15 @@
 // Stream Overlay Widget - PawketPetsVT
-// Fetches pet data every 10 seconds and updates the display
+// Fetches pet data every 30 seconds and updates the display
 
 // ============================================
 // CONFIGURATION
 // ============================================
 const STREAMER_NAME = 'Embertail';  // Your Twitch username (case-sensitive!)
 const API_BASE = 'https://pawketpets-twitch.pawketpetsvt.workers.dev';  // Your Cloudflare Worker URL
+
+// Animation timing (in milliseconds)
+const EXPAND_DURATION = 30000;      // How long it stays expanded (30 seconds)
+const COLLAPSE_DURATION = 600000;   // How long it stays collapsed (10 minutes = 600,000 ms)
 // ============================================
 
 // ============================================
@@ -57,37 +61,44 @@ function getRandomQuip(happinessPercent, hungerPercent, energyPercent) {
   return quipList[Math.floor(Math.random() * quipList.length)];
 }
 
-// Rotate quips every 2 minutes
-let quipInterval = null;
-let quipRotationActive = false;
-let currentQuipText = ''; // ← CHANGED: Track current quip to avoid re-rendering
+// ============================================
+// FOLD/SHRINK ANIMATION
+// ============================================
+let animationIntervalStarted = false;
+let isExpanded = false;
+let currentPetData = null;
 
-function startQuipRotation(pet) {
-  // If rotation is already active, don't restart it
-  if (quipRotationActive) return;
+function expandCard() {
+  const container = document.getElementById('overlay');
+  if (!container) return;
   
-  quipRotationActive = true;
+  isExpanded = true;
+  container.classList.remove('collapsed');
+  container.classList.add('expanded');
   
-  // Show first quip after 5 seconds
-  setTimeout(() => {
-    if (pet) {
-      currentQuipText = getRandomQuip(pet.stats.happiness.percent, pet.stats.hunger.percent, pet.stats.energy.percent);
-      updateQuipDisplay(currentQuipText);
-    }
-  }, 5000);
+  // Update quip when expanding (fresh message)
+  if (currentPetData) {
+    const newQuip = getRandomQuip(
+      currentPetData.stats.happiness.percent,
+      currentPetData.stats.hunger.percent,
+      currentPetData.stats.energy.percent
+    );
+    updateQuipDisplay(newQuip);
+  }
+}
+
+function collapseCard() {
+  const container = document.getElementById('overlay');
+  if (!container) return;
   
-  // Update quip every 2 minutes
-  quipInterval = setInterval(() => {
-    if (pet) {
-      currentQuipText = getRandomQuip(pet.stats.happiness.percent, pet.stats.hunger.percent, pet.stats.energy.percent);
-      updateQuipDisplay(currentQuipText);
-    }
-  }, 120000); // 2 minutes
+  isExpanded = false;
+  container.classList.remove('expanded');
+  container.classList.add('collapsed');
 }
 
 function updateQuipDisplay(quip) {
   const quipElement = document.getElementById('pet-quip');
-  if (quipElement && quipElement.textContent !== quip) { // ← CHANGED: Only update if different
+  if (quipElement && quipElement.textContent !== quip) {
     quipElement.textContent = quip;
     quipElement.classList.add('quip-new');
     setTimeout(() => {
@@ -96,20 +107,46 @@ function updateQuipDisplay(quip) {
   }
 }
 
+function startAnimationCycle() {
+  if (animationIntervalStarted) return;
+  animationIntervalStarted = true;
+  
+  // First expand after 5 seconds (so viewers see it initially)
+  setTimeout(() => {
+    expandCard();
+    
+    // Then schedule collapse after EXPAND_DURATION
+    setTimeout(() => {
+      collapseCard();
+      
+      // Set up the recurring cycle
+      setInterval(() => {
+        if (!isExpanded) {
+          expandCard();
+          
+          // Collapse after EXPAND_DURATION
+          setTimeout(() => {
+            if (isExpanded) {
+              collapseCard();
+            }
+          }, EXPAND_DURATION);
+        }
+      }, COLLAPSE_DURATION);
+      
+    }, EXPAND_DURATION);
+  }, 5000);
+}
+
 let refreshInterval = null;
-let currentPetData = null;
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
   fetchPetData();
-  // Refresh every 10 seconds
-  refreshInterval = setInterval(fetchPetData, 60000); // 60 seconds
+  // Refresh data every 30 seconds
+  refreshInterval = setInterval(fetchPetData, 30000);
 });
 
 async function fetchPetData() {
-  const overlay = document.getElementById('overlay');
-  if (overlay) overlay.classList.add('loading');
-  
   try {
     const response = await fetch(`${API_BASE}/api/overlay?streamer=${encodeURIComponent(STREAMER_NAME)}`, {
       headers: {
@@ -126,10 +163,8 @@ async function fetchPetData() {
     if (data.success) {
       updateDisplay(data.pet);
       currentPetData = data.pet;
-      if (overlay) overlay.classList.remove('loading');
     } else if (data.error === 'No companion pet set') {
       showNoCompanionState(STREAMER_NAME);
-      if (overlay) overlay.classList.remove('loading');
     } else {
       throw new Error(data.error || 'Unknown error');
     }
@@ -137,12 +172,15 @@ async function fetchPetData() {
   } catch (error) {
     console.error('Failed to fetch pet data:', error);
     showErrorState();
-    if (overlay) overlay.classList.remove('loading');
   }
 }
 
 function updateDisplay(pet) {
-  // Pet name and level
+  // Update collapsed view
+  document.getElementById('collapsed-pet-name').textContent = pet.name;
+  document.getElementById('collapsed-pet-level').textContent = `Lv.${pet.level}`;
+  
+  // Update expanded view
   document.getElementById('pet-name').textContent = pet.name;
   document.getElementById('pet-level').textContent = `Lv.${pet.level}`;
   document.getElementById('pet-species').textContent = pet.species;
@@ -187,7 +225,7 @@ function updateDisplay(pet) {
   document.getElementById('happiness-fill').style.width = `${happinessPercent}%`;
   document.getElementById('happiness-text').textContent = `${happinessPercent}%`;
   
-  // Tip message (fallback)
+  // Tip message
   let tip = '';
   if (hungerPercent < 30) tip = '🍽️ Hungry! Feed me in the game!';
   else if (energyPercent < 30) tip = '😴 Tired! Let me rest...';
@@ -195,13 +233,8 @@ function updateDisplay(pet) {
   else tip = '✨ Happy and healthy! Thanks for watching!';
   
   document.getElementById('pet-tip').textContent = tip;
-  // Changed: Promo message instead of "Updated just now"
-  document.getElementById('pet-last').innerHTML = '🎮 <a href="https://pawketpets.net" target="_blank" style="color:#ffcc00; text-decoration:none;">Get your own pet!</a>';
   
-  // Start quip rotation with pet data (only starts once)
-  startQuipRotation(pet);
-  
-  // Pet image (if available)
+  // Pet image
   if (pet.image) {
     const img = document.getElementById('pet-image');
     const placeholder = document.getElementById('pet-avatar-placeholder');
@@ -216,40 +249,23 @@ function updateDisplay(pet) {
     };
   }
   
-  // Apply variant class to card
-  const card = document.querySelector('.pet-card');
-  if (card) {
-    card.classList.remove('variant-golden', 'variant-shiny', 'variant-shadow', 'variant-cosmic', 'variant-fire', 'variant-ice');
-    if (pet.variant) {
-      card.classList.add(`variant-${pet.variant}`);
-    }
+  // Start the animation cycle (only once)
+  if (!animationIntervalStarted) {
+    startAnimationCycle();
   }
 }
 
 function showNoCompanionState(streamerName) {
+  document.getElementById('collapsed-pet-name').textContent = 'No Pet';
+  document.getElementById('collapsed-pet-level').textContent = '';
   document.getElementById('pet-name').textContent = 'No Pet Selected';
-  document.getElementById('pet-level').textContent = '';
   document.getElementById('pet-species').textContent = `${streamerName} hasn't set a companion pet!`;
-  document.getElementById('mood-emoji').textContent = '😢';
-  document.getElementById('mood-text').textContent = 'Lonely';
-  document.getElementById('hp-fill').style.width = '0%';
-  document.getElementById('hp-text').textContent = '0/0';
-  document.getElementById('hunger-fill').style.width = '0%';
-  document.getElementById('hunger-text').textContent = '0%';
-  document.getElementById('energy-fill').style.width = '0%';
-  document.getElementById('energy-text').textContent = '0%';
-  document.getElementById('happiness-fill').style.width = '0%';
-  document.getElementById('happiness-text').textContent = '0%';
-  document.getElementById('pet-last').innerHTML = '🎮 <a href="https://pawketpets.net" target="_blank" style="color:#ffcc00;">Get your own pet!</a>';
   document.getElementById('pet-tip').textContent = '✨ Go to "My Pets" and click "Set Companion"';
 }
 
 function showErrorState() {
+  document.getElementById('collapsed-pet-name').textContent = 'Error';
+  document.getElementById('collapsed-pet-level').textContent = '';
   document.getElementById('pet-name').textContent = 'Connection Error';
-  document.getElementById('pet-level').textContent = '';
-  document.getElementById('pet-species').textContent = 'Unable to load pet data';
-  document.getElementById('mood-emoji').textContent = '⚠️';
-  document.getElementById('mood-text').textContent = 'Error';
-  document.getElementById('pet-last').innerHTML = '🎮 <a href="https://pawketpets.net" target="_blank" style="color:#ffcc00;">pawketpets.net</a>';
-  document.getElementById('pet-tip').textContent = '🔧 Make sure STREAMER_NAME and API_BASE are correct';
+  document.getElementById('pet-tip').textContent = '🔧 Check API URL in overlay.js';
 }
