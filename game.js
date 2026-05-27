@@ -38,6 +38,46 @@ var battleSounds = {
 var SOUNDS_ENABLED = false;
 // ─────────────────────────────────────────────────────────────────────────
 
+// ── CHIPTUNE CELEBRATION SOUNDS (Web Audio API — no files needed) ──────────
+// Small, quiet, happy chiptune bleeps for celebration events.
+var _celebAudioCtx = null;
+function _getCelebCtx() {
+  if (!_celebAudioCtx) {
+    try { _celebAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+  }
+  return _celebAudioCtx;
+}
+
+function playChiptune(type) {
+  var ctx = _getCelebCtx();
+  if (!ctx) return;
+  try {
+    // Note sequences per event type (frequencies in Hz, duration in ms)
+    var sequences = {
+      milestone: [[523,80],[659,80],[784,80],[1047,160]],    // C E G C  — rising triumphant
+      levelup:   [[392,70],[523,70],[659,70],[784,70],[1047,120]], // G C E G C
+      badge:     [[659,80],[784,80],[1047,130]],              // E G C
+      variant:   [[784,70],[1047,70],[1319,70],[1568,140]],   // G C E G  — sparkly high
+    };
+    var notes = sequences[type] || sequences.milestone;
+    var t = ctx.currentTime + 0.01;
+    notes.forEach(function(note) {
+      var osc   = ctx.createOscillator();
+      var gain  = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(note[0], t);
+      gain.gain.setValueAtTime(0.04, t);          // very quiet
+      gain.gain.exponentialRampToValueAtTime(0.001, t + note[1] / 1000);
+      osc.start(t);
+      osc.stop(t + note[1] / 1000 + 0.02);
+      t += note[1] / 1000;
+    });
+  } catch(e) { dbg('Chiptune play error:', e); }
+}
+// ──────────────────────────────────────────────────────────────────────────
+
 var audioCache = {};
 var lastSoundTime = 0;
 var soundCooldown = 300; // Default; updated to GAME_CONSTANTS.SOUND_COOLDOWN_MS after constants are defined
@@ -4468,8 +4508,12 @@ function showBadgeNotification(badge) {
   // Store for potential sharing
   lastUnlockedBadge = badge;
   
+  playChiptune('badge');
+
   var notification = makeEl('div', {class: 'badge-notification'});
+  notification.style.position = 'relative';
   notification.innerHTML = `
+    <button class="celebration-dismiss-btn" onclick="this.closest('.badge-notification').remove()" title="Dismiss" style="top:6px;right:6px;width:24px;height:24px;font-size:12px;">✕</button>
     <div class="badge-notif-icon">${badge.icon}</div>
     <div class="badge-notif-content">
       <div class="badge-notif-title">Badge Earned!</div>
@@ -4489,13 +4533,13 @@ function showBadgeNotification(badge) {
   document.body.appendChild(notification);
   
   // Animate in
-  setTimeout(() => notification.classList.add('show'), 10);
+  setTimeout(function() { notification.classList.add('show'); }, 10);
   
-  // Remove after 7 seconds (longer because of share buttons)
-  setTimeout(() => {
+  // Remove after 12 seconds
+  setTimeout(function() {
     notification.classList.remove('show');
-    setTimeout(() => notification.remove(), 300);
-  }, 7000);
+    setTimeout(function() { if (notification.parentNode) notification.remove(); }, 300);
+  }, 12000);
 }
 
 // ── MINIGAMES ────────────────────────────
@@ -14642,29 +14686,63 @@ function createFloatingSparkles() {
 /**
  * Confetti burst (for adoptions)
  */
+// ── SCREEN SHAKE ─────────────────────────────────────────────────────────
+function screenShake(intensity, duration) {
+  var body = document.body;
+  var start = Date.now();
+  function shake() {
+    if (Date.now() - start >= duration) { body.style.transform = ''; return; }
+    body.style.transform = 'translate(' + ((Math.random()-0.5)*intensity) + 'px,' + ((Math.random()-0.5)*intensity) + 'px)';
+    requestAnimationFrame(shake);
+  }
+  shake();
+}
+
+// ── SCREEN FLASH ─────────────────────────────────────────────────────────
+function screenFlash(color, duration) {
+  var flash = document.createElement('div');
+  flash.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:' + color + ';z-index:99999;pointer-events:none;opacity:0;transition:opacity 0.1s;';
+  document.body.appendChild(flash);
+  setTimeout(function() { flash.style.opacity = '0.5'; }, 10);
+  setTimeout(function() { flash.style.opacity = '0'; }, duration / 2);
+  setTimeout(function() { if (flash.parentNode) flash.remove(); }, duration + 100);
+}
+
 function createConfettiBurst(x, y) {
-  var colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7', '#a29bfe'];
-  var count = 50;
-  
+  var colors = ['#ff6b6b','#4ecdc4','#45b7d1','#f9ca24','#6c5ce7','#a29bfe','#ff66cc','#9966ff'];
+  var count = 70;
   for (var i = 0; i < count; i++) {
-    var confetti = makeEl('div', { class: 'confetti-piece' });
-    confetti.style.left = x + 'px';
-    confetti.style.top = y + 'px';
-    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-    confetti.style.animationDelay = (Math.random() * 0.3) + 's';
-    confetti.style.animationDuration = (Math.random() * 1 + 2) + 's';
-    
-    // Random direction
-    var angle = (Math.random() * 360);
-    var velocity = (Math.random() * 300 + 200);
-    confetti.style.setProperty('--tx', Math.cos(angle) * velocity + 'px');
-    confetti.style.setProperty('--ty', Math.sin(angle) * velocity + 'px');
-    
-    document.body.appendChild(confetti);
-    
-    setTimeout(function(c) {
-      return function() { c.remove(); };
-    }(confetti), 3000);
+    (function() {
+      var piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+      var size = 7 + Math.random() * 7;
+      var angle = Math.random() * Math.PI * 2;
+      var speed = 200 + Math.random() * 300;
+      var vx = Math.cos(angle) * speed;
+      var vy = Math.sin(angle) * speed - 150; // upward bias
+      var gravity = 400;
+      var startX = x + (Math.random() - 0.5) * 60;
+      var startY = y + (Math.random() - 0.5) * 60;
+      var rot = Math.random() * 360;
+      var rotSpeed = (Math.random() - 0.5) * 720;
+      piece.style.cssText = 'position:fixed;width:' + size + 'px;height:' + size + 'px;background:' + colors[Math.floor(Math.random()*colors.length)] + ';border-radius:' + (Math.random() > 0.5 ? '50%' : '2px') + ';pointer-events:none;z-index:100001;left:' + startX + 'px;top:' + startY + 'px;';
+      document.body.appendChild(piece);
+      var startTime = performance.now();
+      var duration = 2000 + Math.random() * 1000;
+      function animate(now) {
+        var t = (now - startTime) / 1000;
+        if (t > duration / 1000) { if (piece.parentNode) piece.remove(); return; }
+        var cx = startX + vx * t;
+        var cy = startY + vy * t + 0.5 * gravity * t * t;
+        var opacity = 1 - t / (duration / 1000);
+        piece.style.left = cx + 'px';
+        piece.style.top  = cy + 'px';
+        piece.style.transform = 'rotate(' + (rot + rotSpeed * t) + 'deg)';
+        piece.style.opacity = opacity;
+        requestAnimationFrame(animate);
+      }
+      requestAnimationFrame(animate);
+    })();
   }
 }
 
@@ -15153,24 +15231,32 @@ async function unlockTwitchVariant(petId, variantKey, rewardInfo) {
 
 // Show fancy variant unlock notification
 function showVariantUnlockNotification(petNickname, variantData) {
+  // Effects
+  screenShake(6, 300);
+  screenFlash('rgba(255,215,0,0.2)', 500);
+  playChiptune('variant');
+  createConfettiBurst(window.innerWidth / 2, window.innerHeight / 2);
+
   var notification = document.createElement('div');
   notification.className = 'variant-unlock-notification';
+  notification.style.position = 'relative';
   notification.innerHTML = 
+    '<button class="celebration-dismiss-btn" onclick="this.closest(\'.variant-unlock-notification\').remove()" title="Dismiss" style="top:8px;right:8px;">✕</button>' +
     '<h2>' + variantData.icon + ' Variant Unlocked!</h2>' +
     '<p><strong>' + escapeHtml(petNickname) + '</strong> is now</p>' +
     '<p style="font-size:1.5rem;color:' + variantData.color + ';font-weight:bold;">' +
     variantData.icon + ' ' + variantData.name + '</p>' +
-    '<p style="font-size:0.9rem;margin-top:10px;">' + variantData.description + '</p>';
+    '<p style="font-size:0.9rem;margin-top:10px;">' + (variantData.description || '') + '</p>';
   
   document.body.appendChild(notification);
   
-  // Remove after 4 seconds
+  // Remove after 8 seconds
   setTimeout(function() {
     notification.style.animation = 'variantUnlockPop 0.3s ease reverse';
     setTimeout(function() {
-      document.body.removeChild(notification);
+      if (notification.parentNode) notification.parentNode.removeChild(notification);
     }, 300);
-  }, 4000);
+  }, 8000);
 }
 
 // Check for pending Twitch reward redemptions
@@ -19708,6 +19794,7 @@ function phase1_celebrateMilestone(milestoneType, value) {
     var overlay = document.createElement('div');
     overlay.className = 'phase1-celebration-overlay';
     overlay.innerHTML = '<div class="phase1-celebration-card">' +
+      '<button class="celebration-dismiss-btn" onclick="this.closest(\'.phase1-celebration-overlay\').remove()" title="Dismiss">✕</button>' +
       '<div class="phase1-celebration-icon">' + celebration.icon + '</div>' +
       '<div class="phase1-celebration-title">' + celebration.title + '</div>' +
       '<div class="phase1-celebration-text">' + celebration.text + '</div>' +
@@ -19715,35 +19802,29 @@ function phase1_celebrateMilestone(milestoneType, value) {
     
     document.body.appendChild(overlay);
     
-    // Confetti effect if available
+    // Effects
+    screenShake(7, 350);
+    screenFlash('rgba(255,215,0,0.25)', 500);
+    playChiptune('milestone');
+
+    // Triple confetti burst
     if (typeof createConfettiBurst === 'function') {
       try {
         createConfettiBurst(window.innerWidth / 2, window.innerHeight / 2);
-      } catch (e) {
-        console.warn('⚠️ Phase 1: Confetti failed:', e);
-      }
+        setTimeout(function() { createConfettiBurst(window.innerWidth * 0.25, window.innerHeight * 0.4); }, 200);
+        setTimeout(function() { createConfettiBurst(window.innerWidth * 0.75, window.innerHeight * 0.4); }, 400);
+      } catch(e) { dbg('Confetti failed:', e); }
     }
     
-    // Remove after animation
-    setTimeout(function() {
-      overlay.remove();
-    }, 4000);
+    // Remove after 8 seconds
+    setTimeout(function() { if (overlay.parentNode) overlay.remove(); }, 8000);
     
-    // Play sound if available
-    if (typeof playSound === 'function') {
-      try {
-        playSound('success');
-      } catch (e) {
-        console.warn('⚠️ Phase 1: Sound failed:', e);
-      }
-    }
-    
-    // Also show toast notification as fallback
+    // Also show toast as fallback
     if (typeof showToast === 'function') {
       showToast(celebration.icon + ' ' + celebration.title, 'success');
     }
     
-    console.log('✅ Phase 1: Celebrated milestone:', milestoneType);
+    dbg('✅ Phase 1: Celebrated milestone:', milestoneType);
   } catch (error) {
     console.error('❌ Phase 1: Error celebrating milestone:', error);
     // Fallback: just show toast
@@ -21631,6 +21712,15 @@ function pass_showClaimSuccess(level) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function pass_showLevelUpNotification(newLevel) {
+  // Effects first
+  screenShake(5, 250);
+  screenFlash('rgba(102,126,234,0.3)', 400);
+  playChiptune('levelup');
+  createConfettiBurst(window.innerWidth / 2, window.innerHeight / 2);
+  setTimeout(function() {
+    if (typeof createStarBurst === 'function') createStarBurst(window.innerWidth / 2, window.innerHeight / 3);
+  }, 300);
+
   // Create celebration modal
   var modal = document.createElement('div');
   modal.className = 'modal-overlay';
@@ -21640,31 +21730,24 @@ function pass_showLevelUpNotification(newLevel) {
   content.style.cssText = 
     'background:linear-gradient(135deg,#667eea,#764ba2);padding:40px;border-radius:20px;' +
     'text-align:center;box-shadow:0 8px 32px rgba(102,126,234,0.6);max-width:400px;' +
-    'animation:bounceIn 0.5s;';
+    'position:relative;animation:bounceIn 0.5s;';
   
   content.innerHTML = 
+    '<button onclick="this.closest(\'.modal-overlay\').remove()" class="celebration-dismiss-btn" title="Dismiss">✕</button>' +
     '<div style="font-size:80px;margin-bottom:20px;animation:bounce 1s infinite;">🎉</div>' +
     '<h2 style="color:white;font-size:32px;margin:0 0 12px 0;">LEVEL UP!</h2>' +
     '<div style="color:rgba(255,255,255,0.9);font-size:24px;margin-bottom:24px;">You reached <strong>Level ' + newLevel + '</strong>!</div>' +
-    '<button onclick="this.closest(\'.modal-overlay\').remove();pass_showModal();" style="background:white;color:#667eea;border:none;padding:14px 32px;border-radius:12px;font-weight:bold;font-size:16px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.transform=\'scale(1.05)\';this.style.boxShadow=\'0 4px 12px rgba(255,255,255,0.3)\';" onmouseout="this.style.transform=\'scale(1)\';this.style.boxShadow=\'none\';">Claim Reward 🎁</button>' +
+    '<button onclick="this.closest(\'.modal-overlay\').remove();pass_showModal();" style="background:white;color:#667eea;border:none;padding:14px 32px;border-radius:12px;font-weight:bold;font-size:16px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.transform=\'scale(1.05)\';" onmouseout="this.style.transform=\'scale(1)\';">Claim Reward 🎁</button>' +
     '<div style="margin-top:16px;"><button onclick="this.closest(\'.modal-overlay\').remove();" style="background:none;border:none;color:rgba(255,255,255,0.7);text-decoration:underline;cursor:pointer;font-size:14px;">Later</button></div>';
   
   modal.appendChild(content);
   document.body.appendChild(modal);
   
-  // Auto-close after 10 seconds
-  setTimeout(function() {
-    if (modal.parentNode) {
-      modal.parentNode.removeChild(modal);
-    }
-  }, 10000);
+  // Auto-close after 12 seconds
+  setTimeout(function() { if (modal.parentNode) modal.parentNode.removeChild(modal); }, 12000);
   
   // Close on backdrop click
-  modal.onclick = function(e) {
-    if (e.target === modal) {
-      modal.parentNode.removeChild(modal);
-    }
-  };
+  modal.onclick = function(e) { if (e.target === modal) modal.parentNode.removeChild(modal); };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
