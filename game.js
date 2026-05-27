@@ -1153,6 +1153,129 @@ function updateAllPoints(pts) {
   if (sidebarPoints) sidebarPoints.textContent = pts.toLocaleString() + ' PP';
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// STREAM OVERLAY API ENDPOINTS
+// Provides pet data for on-stream widgets/overlays
+// Usage: GET /api/overlay/pet?streamer=EMBERTAIL_USERNAME
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function handleOverlayRequest(request) {
+  var url = new URL(request.url);
+  var streamerName = url.searchParams.get('streamer');
+  
+  if (!streamerName) {
+    return new Response(JSON.stringify({ error: 'Missing streamer param' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+    });
+  }
+  
+  try {
+    var { data: player, error: playerError } = await supabaseClient
+      .from('players')
+      .select('id, username, companion_pet_id')
+      .ilike('username', streamerName)
+      .single();
+    
+    if (playerError || !player) {
+      return new Response(JSON.stringify({ error: 'Streamer not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    }
+    
+    if (!player.companion_pet_id) {
+      return new Response(JSON.stringify({ error: 'No companion pet set', streamer: player.username }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    }
+    
+    var { data: pet, error: petError } = await supabaseClient
+      .from('user_pets')
+      .select('id, nickname, level, current_hp, max_hp, hunger, max_hunger, energy, max_energy, happiness, max_happiness, current_variant, last_fed, last_played, pets(name, image_file)')
+      .eq('id', player.companion_pet_id)
+      .single();
+    
+    if (petError || !pet) {
+      return new Response(JSON.stringify({ error: 'Pet not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    }
+    
+    var hungerPct    = Math.round((pet.hunger    / pet.max_hunger)    * 100);
+    var energyPct    = Math.round((pet.energy    / pet.max_energy)    * 100);
+    var happinessPct = Math.round((pet.happiness / pet.max_happiness) * 100);
+    var hpPct        = Math.round((pet.current_hp / pet.max_hp)       * 100);
+    
+    var moodEmoji = happinessPct >= 80 ? '😊' : happinessPct >= 60 ? '🙂' : happinessPct >= 40 ? '😐' : happinessPct >= 20 ? '😟' : '😭';
+
+    var lastFed    = pet.last_fed    ? new Date(pet.last_fed)    : null;
+    var lastPlayed = pet.last_played ? new Date(pet.last_played) : null;
+    var lastActive = null;
+    if (lastFed && lastPlayed) lastActive = lastFed > lastPlayed ? lastFed : lastPlayed;
+    else if (lastFed)    lastActive = lastFed;
+    else if (lastPlayed) lastActive = lastPlayed;
+    
+    var hoursSince = 'Never';
+    if (lastActive) {
+      var hours = Math.floor((Date.now() - lastActive) / 3600000);
+      hoursSince = hours < 1 ? 'Just now' : hours < 24 ? hours + ' hour' + (hours !== 1 ? 's' : '') + ' ago' : Math.floor(hours / 24) + ' days ago';
+    }
+    
+    var tip = hungerPct < 30 ? '🍽️ Hungry! Feed me in the game!' :
+              energyPct < 30 ? '😴 Tired! Let me rest...' :
+              happinessPct < 40 ? '💔 Sad! Play with me in the game!' :
+              '✨ Happy and healthy! Thanks for watching!';
+    
+    var response = {
+      success: true,
+      pet: {
+        id:      pet.id,
+        name:    pet.nickname || (pet.pets && pet.pets.name) || 'Pet',
+        species: (pet.pets && pet.pets.name) || 'Pet',
+        level:   pet.level,
+        image:   (pet.pets && pet.pets.image_file) || null,
+        variant: pet.current_variant || null,
+        stats: {
+          hp:        { current: pet.current_hp, max: pet.max_hp,        percent: hpPct },
+          hunger:    { current: pet.hunger,     max: pet.max_hunger,    percent: hungerPct },
+          energy:    { current: pet.energy,     max: pet.max_energy,    percent: energyPct },
+          happiness: { current: pet.happiness,  max: pet.max_happiness, percent: happinessPct }
+        },
+        mood:       { emoji: moodEmoji, text: getMoodText(happinessPct) },
+        lastActive: hoursSince,
+        tip:        tip
+      }
+    };
+    
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-cache'
+      }
+    });
+    
+  } catch (err) {
+    console.error('Overlay API error:', err);
+    return new Response(JSON.stringify({ error: 'Server error' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+    });
+  }
+}
+
+function getMoodText(percent) {
+  if (percent >= 80) return 'Ecstatic';
+  if (percent >= 60) return 'Happy';
+  if (percent >= 40) return 'Content';
+  if (percent >= 20) return 'Unhappy';
+  return 'Miserable';
+}
+
 // ── LEADERBOARD INITIALIZATION ────────────────────────────
 function initLeaderboardTab() {
   // Set initial state
