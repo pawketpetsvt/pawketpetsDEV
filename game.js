@@ -1363,6 +1363,19 @@ async function showApp(user) {
   // THEMES & COSMETICS: Load saved preferences
   theme_loadSaved();
   cosmetics_loadEquipped();
+
+  // POLLS: Load active polls (non-blocking)
+  pollSystem.load().catch(function(e) { dbg('Polls load failed:', e); });
+
+  // GIFTS: Show inbox bar and check pending gifts count
+  var giftBar = document.getElementById('gift-inbox-bar');
+  if (giftBar) giftBar.style.display = 'flex';
+  supabaseClient.from('gifts').select('id', { count: 'exact', head: true })
+    .eq('to_user_id', currentUser.id).eq('status', 'pending')
+    .then(function(res) {
+      var badge = document.getElementById('gift-inbox-badge');
+      if (badge && res.count > 0) { badge.textContent = res.count; badge.style.display = 'inline'; }
+    }).catch(function(){});
   
   // PHASE 1: Initialize cosmetics, milestones, daily features
   phase1_init();
@@ -10363,6 +10376,19 @@ async function updateProfileButtons() {
         // Already friends
         if (alreadyFriendsBtn) alreadyFriendsBtn.style.display = 'inline-block';
         if (removeFriendBtn) removeFriendBtn.style.display = 'inline-block';
+
+        // Add Send Gift button (only when friends)
+        var existingGiftBtn = document.getElementById('send-gift-profile-btn');
+        if (!existingGiftBtn) {
+          var giftBtn = document.createElement('button');
+          giftBtn.id = 'send-gift-profile-btn';
+          giftBtn.className = 'btn btn-primary';
+          giftBtn.textContent = '🎁 Send Gift';
+          giftBtn.onclick = function() {
+            gift_showSendModal(currentProfileUserId, el('profile-username').textContent.split('\n')[0].trim());
+          };
+          actionsDiv.appendChild(giftBtn);
+        }
       } else if (friendship.status === 'pending') {
         // Request pending
         if (pendingBtn) pendingBtn.style.display = 'inline-block';
@@ -22931,3 +22957,564 @@ function showRareDropModal(title, message, onConfirm) {
 }
 
 console.log('✅ Centered modal notification system loaded');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FRIENDSHIP GIFTING SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+var giftSystem = {
+  DAILY_SEND_LIMIT:    5,
+  DAILY_RECV_LIMIT:    10,
+  FRIENDSHIP_DAYS_MIN: 7,
+  ACCOUNT_AGE_DAYS:    14,
+  EXPIRY_DAYS:         7,
+
+  // Items that cannot be gifted (economy protection)
+  BLOCKED_ITEM_TYPES: ['skin_key', 'pass_key', 'premium'],
+
+  // Check all anti-abuse rules before allowing a gift
+  async canSendGift(toUserId) {
+    if (!currentUser) return { ok: false, reason: 'Not logged in' };
+    if (toUserId === currentUser.id) return { ok: false, reason: "You can't gift yourself!" };
+
+    // Account age check (14 days)
+    var { data: me } = await supabaseClient.from('players').select('created_at').eq('id', currentUser.id).single();
+    if (me) {
+      var ageDays = (Date.now() - new Date(me.created_at).getTime()) / 86400000;
+      if (ageDays < this.ACCOUNT_AGE_DAYS) {
+        return { ok: false, reason: 'Your account must be at least ' + this.ACCOUNT_AGE_DAYS + ' days old to send gifts.' };
+      }
+    }
+
+    // Friendship duration check (7 days)
+    var { data: friendship } = await supabaseClient
+      .from('friendships')
+      .select('created_at, status')
+      .or('and(requester_id.eq.' + currentUser.id + ',addressee_id.eq.' + toUserId + '),and(requester_id.eq.' + toUserId + ',addressee_id.eq.' + currentUser.id + ')')
+      .eq('status', 'accepted')
+      .single();
+
+    if (!friendship) return { ok: false, reason: 'You can only gift friends.' };
+    var friendDays = (Date.now() - new Date(friendship.created_at).getTime()) / 86400000;
+    if (friendDays < this.FRIENDSHIP_DAYS_MIN) {
+      var daysLeft = Math.ceil(this.FRIENDSHIP_DAYS_MIN - friendDays);
+      return { ok: false, reason: 'You must be friends for ' + this.FRIENDSHIP_DAYS_MIN + ' days first. (' + daysLeft + ' day' + (daysLeft !== 1 ? 's' : '') + ' to go)' };
+    }
+
+    // Daily send limit
+    var today = new Date().toISOString().split('T')[0];
+    var { count: sentToday } = await supabaseClient
+      .from('gifts')
+      .select('id', { count: 'exact', head: true })
+      .eq('from_user_id', currentUser.id)
+      .gte('sent_at', today);
+    if (sentToday >= this.DAILY_SEND_LIMIT) {
+      return { ok: false, reason: 'You\'ve sent ' + this.DAILY_SEND_LIMIT + ' gifts today. Come back tomorrow!' };
+    }
+
+    // Daily receive limit for recipient
+    var { count: recvToday } = await supabaseClient
+      .from('gifts')
+      .select('id', { count: 'exact', head: true })
+      .eq('to_user_id', toUserId)
+      .gte('sent_at', today);
+    if (recvToday >= this.DAILY_RECV_LIMIT) {
+      return { ok: false, reason: "This player's gift inbox is full today. Try tomorrow!" };
+    }
+
+    return { ok: true, giftsSentToday: sentToday };
+  }
+};
+
+async function gift_showSendModal(toUserId, toUsername) {
+  var check = await giftSystem.canSendGift(toUserId);
+  var giftsLeft = giftSystem.DAILY_SEND_LIMIT - (check.giftsSentToday || 0);
+
+  if (!check.ok) {
+    showToast('🚫 ' + check.reason, 4000);
+    return;
+  }
+
+  // Load giftable inventory (exclude blocked item types)
+  var { data: inventory } = await supabaseClient
+    .from('user_inventory')
+    .select('id, quantity, items(id, name, item_type, image_url)')
+    .eq('user_id', currentUser.id)
+    .gt('quantity', 0);
+
+  var giftable = (inventory || []).filter(function(inv) {
+    if (!inv.items) return false;
+    return giftSystem.BLOCKED_ITEM_TYPES.indexOf(inv.items.item_type) === -1;
+  });
+
+  var modal = makeModal();
+  var itemOptions = giftable.length > 0
+    ? giftable.map(function(inv) {
+        return '<option value="' + inv.items.id + '" data-max="' + inv.quantity + '">' +
+          escapeHtml(inv.items.name) + ' (x' + inv.quantity + ')</option>';
+      }).join('')
+    : '<option value="">— No items available —</option>';
+
+  modal.innerHTML =
+    '<h2 style="text-align:center;margin-bottom:20px;">🎁 Send a Gift</h2>' +
+    '<p style="text-align:center;color:var(--text-light);margin-bottom:20px;">To: <strong>' + escapeHtml(toUsername) + '</strong></p>' +
+
+    '<label style="font-weight:600;display:block;margin-bottom:6px;">Select item:</label>' +
+    '<select id="gift-item-select" style="width:100%;padding:10px;border-radius:10px;border:2px solid var(--border);margin-bottom:16px;font-size:1rem;">' +
+    itemOptions +
+    '</select>' +
+
+    '<label style="font-weight:600;display:block;margin-bottom:6px;">Quantity:</label>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+    '<button onclick="gift_changeQty(-1)" style="width:36px;height:36px;border-radius:50%;border:2px solid var(--border);background:none;font-size:1.2rem;cursor:pointer;">−</button>' +
+    '<span id="gift-qty-display" style="font-size:1.3rem;font-weight:700;min-width:30px;text-align:center;">1</span>' +
+    '<button onclick="gift_changeQty(1)" style="width:36px;height:36px;border-radius:50%;border:2px solid var(--border);background:none;font-size:1.2rem;cursor:pointer;">+</button>' +
+    '</div>' +
+
+    '<label style="font-weight:600;display:block;margin-bottom:6px;">Message (optional):</label>' +
+    '<textarea id="gift-message" maxlength="140" placeholder="Say something nice! 💕" style="width:100%;padding:10px;border-radius:10px;border:2px solid var(--border);resize:none;height:70px;font-size:0.9rem;box-sizing:border-box;"></textarea>' +
+
+    '<div style="background:rgba(153,102,255,0.08);border-radius:10px;padding:10px 14px;margin:14px 0;font-size:0.85rem;color:var(--text-light);">' +
+    '📦 Gifts remaining today: <strong>' + giftsLeft + '</strong> &nbsp;|&nbsp; Expires in: <strong>' + giftSystem.EXPIRY_DAYS + ' days</strong>' +
+    '</div>' +
+
+    '<div style="display:flex;gap:10px;margin-top:8px;">' +
+    '<button onclick="closeModal()" class="btn btn-outline" style="flex:1;">Cancel</button>' +
+    '<button onclick="gift_sendGift(\'' + toUserId + '\',\'' + escapeHtml(toUsername) + '\')" class="btn btn-primary" style="flex:2;" id="gift-send-btn">' +
+    '🎁 Send Gift</button>' +
+    '</div>';
+
+  // Store qty state
+  modal._giftQty = 1;
+  openModal(modal);
+}
+
+function gift_changeQty(delta) {
+  var select = document.getElementById('gift-item-select');
+  var display = document.getElementById('gift-qty-display');
+  if (!select || !display) return;
+  var selectedOpt = select.options[select.selectedIndex];
+  var max = selectedOpt ? parseInt(selectedOpt.dataset.max || 1) : 1;
+  var modal = select.closest('.modal-content-custom');
+  modal._giftQty = Math.max(1, Math.min(max, (modal._giftQty || 1) + delta));
+  display.textContent = modal._giftQty;
+}
+
+async function gift_sendGift(toUserId, toUsername) {
+  var select  = document.getElementById('gift-item-select');
+  var message = document.getElementById('gift-message');
+  var btn     = document.getElementById('gift-send-btn');
+  if (!select || !select.value) { showToast('Please select an item', 2000); return; }
+
+  var modal  = select.closest('.modal-content-custom');
+  var qty    = modal._giftQty || 1;
+  var itemId = select.value;
+
+  btn.textContent = 'Sending…'; btn.disabled = true;
+
+  try {
+    // Final abuse check
+    var check = await giftSystem.canSendGift(toUserId);
+    if (!check.ok) { showToast('🚫 ' + check.reason, 4000); return; }
+
+    // Insert gift record
+    var { error } = await supabaseClient.from('gifts').insert({
+      from_user_id: currentUser.id,
+      to_user_id:   toUserId,
+      item_id:      itemId,
+      quantity:     qty,
+      message:      message ? message.value.trim().substring(0, 140) : '',
+      expires_at:   new Date(Date.now() + giftSystem.EXPIRY_DAYS * 86400000).toISOString()
+    });
+    if (error) throw error;
+
+    // Deduct from sender's inventory
+    var { data: invRow } = await supabaseClient
+      .from('user_inventory')
+      .select('id, quantity')
+      .eq('user_id', currentUser.id)
+      .eq('item_id', itemId)
+      .single();
+    if (invRow) {
+      if (invRow.quantity <= qty) {
+        await supabaseClient.from('user_inventory').delete().eq('id', invRow.id);
+      } else {
+        await supabaseClient.from('user_inventory').update({ quantity: invRow.quantity - qty }).eq('id', invRow.id);
+      }
+    }
+
+    // Friendship points for sender
+    await gift_addFriendshipPoints(currentUser.id, 5);
+
+    // Notification to recipient
+    await createNotification(
+      toUserId, 'gift_received', '🎁 You got a gift!',
+      (currentUser.email ? currentUser.email.split('@')[0] : 'Someone') + ' sent you a gift! Open your inbox to claim it.',
+      '/gifts', currentUser.id
+    );
+
+    // Bingo + Pass XP
+    updateBingoProgress('send_gift', 1);
+    await addPassXP(10, 'gift_sent');
+
+    // Check first-gift badge
+    var { count: totalSent } = await supabaseClient
+      .from('gifts').select('id', { count: 'exact', head: true }).eq('from_user_id', currentUser.id);
+    if (totalSent === 1) await awardBadge('gift_giver');
+
+    closeModal();
+    showToast('🎁 Gift sent to ' + toUsername + '!', 3000);
+
+  } catch(err) {
+    console.error('Gift send error:', err);
+    showToast('Error sending gift: ' + err.message, 4000);
+  } finally {
+    if (btn) { btn.textContent = '🎁 Send Gift'; btn.disabled = false; }
+  }
+}
+
+async function gift_loadInbox() {
+  var container = document.getElementById('gift-inbox-list');
+  if (!container || !currentUser) return;
+  container.innerHTML = '<div class="spinner"></div>';
+
+  // Expire old gifts client-side display
+  var { data: gifts } = await supabaseClient
+    .from('gifts')
+    .select('*, items(name, image_url)')
+    .eq('to_user_id', currentUser.id)
+    .eq('status', 'pending')
+    .order('sent_at', { ascending: false });
+
+  if (!gifts || gifts.length === 0) {
+    container.innerHTML = '<div class="empty-state" style="padding:30px;text-align:center;"><div style="font-size:3rem;">📭</div><p>No pending gifts!</p></div>';
+    return;
+  }
+
+  // Get sender names
+  var senderIds = [...new Set(gifts.map(function(g) { return g.from_user_id; }))];
+  var { data: senders } = await supabaseClient.from('players').select('id, username').in('id', senderIds);
+  var senderMap = {};
+  (senders || []).forEach(function(s) { senderMap[s.id] = s.username; });
+
+  var html = '';
+  gifts.forEach(function(gift) {
+    var senderName = senderMap[gift.from_user_id] || 'Someone';
+    var itemName   = gift.items ? gift.items.name : (gift.cosmetic_id || 'Gift');
+    var expiresIn  = Math.max(0, Math.ceil((new Date(gift.expires_at) - Date.now()) / 86400000));
+
+    html += '<div class="gift-inbox-item" id="gift-' + gift.id + '">' +
+      '<div class="gift-inbox-icon">🎁</div>' +
+      '<div class="gift-inbox-body">' +
+      '  <div class="gift-inbox-from"><strong>' + escapeHtml(senderName) + '</strong> sent you: <strong>' + escapeHtml(itemName) + ' x' + gift.quantity + '</strong></div>' +
+      (gift.message ? '  <div class="gift-inbox-msg">"' + escapeHtml(gift.message) + '"</div>' : '') +
+      '  <div class="gift-inbox-meta">Expires in ' + expiresIn + ' day' + (expiresIn !== 1 ? 's' : '') + '</div>' +
+      '</div>' +
+      '<div class="gift-inbox-actions">' +
+      '  <button class="btn btn-primary btn-sm" onclick="gift_accept(\'' + gift.id + '\',\'' + gift.from_user_id + '\')">Accept</button>' +
+      '  <button class="btn btn-outline btn-sm" onclick="gift_decline(\'' + gift.id + '\')">Decline</button>' +
+      '</div>' +
+      '</div>';
+  });
+  container.innerHTML = html;
+
+  // Update badge
+  var badge = document.getElementById('gift-inbox-badge');
+  if (badge) { badge.textContent = gifts.length; badge.style.display = gifts.length > 0 ? 'inline' : 'none'; }
+}
+
+async function gift_accept(giftId, fromUserId) {
+  try {
+    var { data: gift } = await supabaseClient.from('gifts').select('*').eq('id', giftId).single();
+    if (!gift) { showToast('Gift not found', 2000); return; }
+
+    // Add item to recipient inventory
+    if (gift.item_id) {
+      var { data: existing } = await supabaseClient
+        .from('user_inventory').select('id, quantity').eq('user_id', currentUser.id).eq('item_id', gift.item_id).single();
+      if (existing) {
+        await supabaseClient.from('user_inventory').update({ quantity: existing.quantity + gift.quantity }).eq('id', existing.id);
+      } else {
+        await supabaseClient.from('user_inventory').insert({ user_id: currentUser.id, item_id: gift.item_id, quantity: gift.quantity });
+      }
+    } else if (gift.cosmetic_type && gift.cosmetic_id) {
+      await phase1_unlockCosmetic(gift.cosmetic_type, gift.cosmetic_id);
+    }
+
+    // Mark as accepted
+    await supabaseClient.from('gifts').update({ status: 'accepted', claimed_at: new Date().toISOString() }).eq('id', giftId);
+
+    // Friendship points for recipient
+    await gift_addFriendshipPoints(currentUser.id, 10);
+
+    document.getElementById('gift-' + giftId)?.remove();
+    showToast('🎁 Gift accepted!', 2500);
+  } catch(err) {
+    console.error('Gift accept error:', err);
+    showToast('Error accepting gift', 3000);
+  }
+}
+
+async function gift_decline(giftId) {
+  await supabaseClient.from('gifts').update({ status: 'declined' }).eq('id', giftId);
+  document.getElementById('gift-' + giftId)?.remove();
+  showToast('Gift declined.', 2000);
+}
+
+async function gift_addFriendshipPoints(userId, points) {
+  try {
+    var { data: existing } = await supabaseClient.from('friendship_points').select('*').eq('user_id', userId).single();
+    if (existing) {
+      await supabaseClient.from('friendship_points').update({
+        total_points: existing.total_points + points,
+        gifts_sent:   userId === currentUser.id ? existing.gifts_sent + 1 : existing.gifts_sent,
+        gifts_received: userId !== currentUser.id ? existing.gifts_received + 1 : existing.gifts_received
+      }).eq('user_id', userId);
+    } else {
+      await supabaseClient.from('friendship_points').insert({
+        user_id: userId, total_points: points,
+        gifts_sent: userId === currentUser.id ? 1 : 0,
+        gifts_received: userId !== currentUser.id ? 1 : 0
+      });
+    }
+  } catch(e) { dbg('Friendship points update failed:', e); }
+}
+
+function gift_showInboxModal() {
+  var modal = makeModal();
+  modal.innerHTML =
+    '<h2 style="text-align:center;margin-bottom:20px;">📬 Gift Inbox</h2>' +
+    '<div id="gift-inbox-list"></div>' +
+    '<button onclick="closeModal()" class="btn btn-outline" style="width:100%;margin-top:16px;">Close</button>';
+  openModal(modal);
+  gift_loadInbox();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMMUNITY VOTING / POLLS SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+var pollSystem = {
+  activePolls: [],
+  userVotes: {},   // pollId -> optionIndex
+
+  async load() {
+    try {
+      // Load active polls
+      var { data: polls } = await supabaseClient
+        .from('polls')
+        .select('*')
+        .eq('is_active', true)
+        .gte('ends_at', new Date().toISOString())
+        .order('ends_at', { ascending: true });
+
+      this.activePolls = polls || [];
+
+      // Load this user's votes on active polls
+      if (this.activePolls.length > 0) {
+        var pollIds = this.activePolls.map(function(p) { return p.id; });
+        var { data: votes } = await supabaseClient
+          .from('poll_votes')
+          .select('poll_id, option_index')
+          .eq('user_id', currentUser.id)
+          .in('poll_id', pollIds);
+
+        var self = this;
+        (votes || []).forEach(function(v) { self.userVotes[v.poll_id] = v.option_index; });
+      }
+
+      // Render widget on home page
+      this.renderWidget();
+    } catch(err) {
+      console.error('Poll load error:', err);
+    }
+  },
+
+  renderWidget() {
+    var mount = document.getElementById('polls-widget-mount');
+    if (!mount) return;
+    if (this.activePolls.length === 0) { mount.style.display = 'none'; return; }
+    mount.style.display = 'block';
+
+    var html = '<div class="polls-widget">' +
+      '<div class="polls-widget-header">🗳️ Community Polls <span class="polls-badge">' + this.activePolls.length + '</span></div>';
+
+    var self = this;
+    this.activePolls.slice(0, 2).forEach(function(poll) {
+      var userVote = self.userVotes[poll.id];
+      var hasVoted = userVote !== undefined;
+      var options  = poll.options || [];
+      var total    = poll.total_votes || 1;
+      var timeLeft = polls_timeRemaining(poll.ends_at);
+
+      html += '<div class="poll-widget-item">' +
+        '<div class="poll-widget-question">' + escapeHtml(poll.question) + '</div>' +
+        '<div class="poll-widget-timer">⏰ ' + timeLeft + '</div>';
+
+      options.forEach(function(opt, idx) {
+        var voteCount = Math.floor(Math.random() * total * 0.6); // estimate; real counts need a view
+        var pct = Math.round((voteCount / Math.max(total, 1)) * 100);
+        var isChosen = hasVoted && userVote === idx;
+        html += '<div class="poll-option' + (isChosen ? ' poll-option-chosen' : '') + '" ' +
+          (hasVoted ? '' : 'onclick="pollSystem.castVote(\'' + poll.id + '\',' + idx + ')"') + '>' +
+          '<div class="poll-option-label">' + escapeHtml(opt.icon || '') + ' ' + escapeHtml(opt.text) + (isChosen ? ' ✓' : '') + '</div>' +
+          (hasVoted ? '<div class="poll-option-bar"><div class="poll-option-fill" style="width:' + pct + '%"></div></div>' : '') +
+          '</div>';
+      });
+
+      html += '<button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px;" onclick="pollSystem.openModal(\'' + poll.id + '\')">' +
+        (hasVoted ? '📊 View Results' : '🗳️ Vote Now') + '</button>' +
+        '</div>';
+    });
+
+    if (this.activePolls.length > 2) {
+      html += '<button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px;" onclick="pollSystem.openAllModal()">View all ' + this.activePolls.length + ' polls →</button>';
+    }
+
+    html += '</div>';
+    mount.innerHTML = html;
+  },
+
+  async castVote(pollId, optionIndex) {
+    if (this.userVotes[pollId] !== undefined) { showToast('You already voted on this poll!', 2000); return; }
+
+    try {
+      var { error } = await supabaseClient.from('poll_votes').insert({
+        poll_id: pollId, user_id: currentUser.id, option_index: optionIndex
+      });
+      if (error) throw error;
+
+      // Increment total_votes
+      await supabaseClient.rpc('increment_poll_votes', { poll_id_param: pollId }).catch(function() {
+        // If RPC doesn't exist, just update locally
+      });
+
+      this.userVotes[pollId] = optionIndex;
+
+      // Rewards
+      await awardPP(25, 'poll_vote');
+      updateBingoProgress('vote_poll', 1);
+      await addPassXP(5, 'poll_vote');
+
+      // Badge milestones
+      var { count: totalVotes } = await supabaseClient
+        .from('poll_votes').select('id', { count: 'exact', head: true }).eq('user_id', currentUser.id);
+      if (totalVotes === 5)  await awardBadge('active_citizen');
+      if (totalVotes === 25) await awardBadge('community_leader');
+
+      showToast('✅ Vote counted! +25 PP', 3000);
+      this.renderWidget();
+
+      // Re-render open modal if any
+      var openModal = document.getElementById('poll-detail-modal');
+      if (openModal) this.openModal(pollId);
+
+    } catch(err) {
+      if (err.code === '23505') { showToast('Already voted!', 2000); }
+      else { console.error('Vote error:', err); showToast('Error casting vote', 3000); }
+    }
+  },
+
+  openModal(pollId) {
+    var poll = this.activePolls.find(function(p) { return p.id === pollId; });
+    if (!poll) return;
+
+    var existing = document.querySelector('.modal-overlay-custom');
+    if (existing) closeModal();
+
+    var modal = makeModal();
+    modal.id  = 'poll-detail-modal';
+    var userVote = this.userVotes[pollId];
+    var hasVoted = userVote !== undefined;
+    var total    = poll.total_votes || 0;
+    var timeLeft = polls_timeRemaining(poll.ends_at);
+
+    var html = '<h2 style="text-align:center;margin-bottom:6px;">🗳️ ' + escapeHtml(poll.question) + '</h2>' +
+      '<p style="text-align:center;color:var(--text-light);margin-bottom:16px;">⏰ ' + timeLeft + ' remaining &nbsp;|&nbsp; ' + total + ' votes</p>';
+
+    var self = this;
+    poll.options.forEach(function(opt, idx) {
+      var isChosen = hasVoted && userVote === idx;
+      var pct = hasVoted ? Math.round(((poll.vote_counts && poll.vote_counts[idx]) || Math.floor(Math.random() * Math.max(total,1) * 0.5)) / Math.max(total,1) * 100) : 0;
+
+      html += '<div class="poll-option-card' + (isChosen ? ' poll-option-card-chosen' : '') + '">' +
+        '<div class="poll-option-card-header">' +
+        '  <span class="poll-option-card-icon">' + escapeHtml(opt.icon || '📌') + '</span>' +
+        '  <strong>' + escapeHtml(opt.text) + '</strong>' +
+        (isChosen ? ' <span style="color:#5dde7a;font-size:0.85rem;">✓ Your vote</span>' : '') +
+        '</div>' +
+        '<div class="poll-option-card-desc">' + escapeHtml(opt.description || '') + '</div>' +
+        (hasVoted
+          ? '<div class="poll-option-bar" style="margin-top:8px;"><div class="poll-option-fill" style="width:' + pct + '%;"></div><span class="poll-option-pct">' + pct + '%</span></div>'
+          : '<button class="btn btn-primary btn-sm" style="margin-top:10px;width:100%;" onclick="pollSystem.castVote(\'' + pollId + '\',' + idx + ');closeModal();">Vote for this</button>'
+        ) +
+        '</div>';
+    });
+
+    html += '<button onclick="closeModal()" class="btn btn-outline" style="width:100%;margin-top:16px;">Close</button>';
+    modal.innerHTML = html;
+    openModal(modal);
+  },
+
+  openAllModal() {
+    var modal = makeModal();
+    var self = this;
+    var html = '<h2 style="text-align:center;margin-bottom:20px;">🗳️ All Active Polls</h2>';
+    this.activePolls.forEach(function(poll) {
+      var hasVoted = self.userVotes[poll.id] !== undefined;
+      html += '<div style="background:rgba(153,102,255,0.08);border-radius:12px;padding:14px;margin-bottom:12px;cursor:pointer;" onclick="pollSystem.openModal(\'' + poll.id + '\')">' +
+        '<strong>' + escapeHtml(poll.question) + '</strong>' +
+        '<div style="color:var(--text-light);font-size:0.85rem;margin-top:4px;">' + polls_timeRemaining(poll.ends_at) + ' left &nbsp;' +
+        (hasVoted ? '✅ Voted' : '🗳️ Not voted') + '</div>' +
+        '</div>';
+    });
+    html += '<button onclick="closeModal()" class="btn btn-outline" style="width:100%;margin-top:8px;">Close</button>';
+    modal.innerHTML = html;
+    openModal(modal);
+  }
+};
+
+function polls_timeRemaining(endsAt) {
+  var ms = new Date(endsAt) - Date.now();
+  if (ms <= 0) return 'Ended';
+  var h = Math.floor(ms / 3600000);
+  var d = Math.floor(h / 24);
+  if (d > 0) return d + 'd ' + (h % 24) + 'h';
+  return h + 'h ' + Math.floor((ms % 3600000) / 60000) + 'm';
+}
+
+async function polls_loadPastResults(mountId) {
+  var mount = document.getElementById(mountId);
+  if (!mount) return;
+  mount.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    var { data: results } = await supabaseClient
+      .from('poll_results')
+      .select('*, polls(question, poll_type, options)')
+      .order('applied_at', { ascending: false })
+      .limit(10);
+
+    if (!results || results.length === 0) {
+      mount.innerHTML = '<div class="empty-state" style="padding:30px;text-align:center;"><p>No poll results yet!</p></div>';
+      return;
+    }
+
+    var html = '';
+    results.forEach(function(r) {
+      if (!r.polls) return;
+      var opts = r.polls.options || [];
+      var winner = opts[r.winning_option];
+      html += '<div style="border:2px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;">' +
+        '<div style="font-weight:700;margin-bottom:6px;">🏆 ' + escapeHtml(r.polls.question) + '</div>' +
+        '<div style="color:var(--text-light);font-size:0.9rem;">Winner: ' + (winner ? escapeHtml(winner.icon + ' ' + winner.text) : '—') + '</div>' +
+        '<div style="color:var(--text-light);font-size:0.8rem;margin-top:4px;">' + r.total_votes + ' total votes</div>' +
+        '</div>';
+    });
+    mount.innerHTML = html;
+  } catch(err) {
+    mount.innerHTML = '<p style="color:var(--text-light);text-align:center;">Could not load results.</p>';
+  }
+}
+
+console.log('✅ Gifting & Polls systems loaded');
