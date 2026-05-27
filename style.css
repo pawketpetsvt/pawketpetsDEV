@@ -16378,3 +16378,33 @@ body.night-mode .item-icon-img {
 }
 
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VARIANT PARTICLE SYSTEM
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.variant-particle {
+  position: absolute;
+  pointer-events: none;
+  z-index: 100;
+  user-select: none;
+  will-change: transform, opacity;
+}
+
+@keyframes varParticleFloat {
+  0%   { opacity: 0;   transform: translateY(0)     scale(0.4) rotate(0deg); }
+  15%  { opacity: 0.9; }
+  75%  { opacity: 0.7; }
+  100% { opacity: 0;   transform: translateY(-90px) scale(1.2) rotate(360deg); }
+}
+
+/* Ensure card doesn't clip particles (already set per-variant but belt+braces) */
+.my-pet-card[class*="pet-variant-"] {
+  overflow: visible !important;
+}
+
+/* Companion buddy: position relative so particles anchor correctly */
+#companion-buddy {
+  position: relative;
+}
+

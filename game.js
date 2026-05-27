@@ -2853,6 +2853,8 @@ function makeMyPetCard(pet) {
     card.classList.add(varCls);
     avatar.classList.add(varCls);
     avatarWrap.classList.add(varCls);
+    // Spawn particles (slight delay so card is in DOM)
+    setTimeout(function() { createVariantParticles(card, activeVariant, 12); }, 300);
   }
   var moodBadge = makeEl('div', {class:'mood-badge'});
   moodBadge.innerHTML = moodEmoji;
@@ -20592,6 +20594,8 @@ function skinkey_applyVariantToAllDisplays(userPetId, variantId) {
   if (card) {
     applyToEl(card.querySelector('.pet-avatar'));
     applyToEl(card.querySelector('.pet-avatar-wrap'));
+    // Spawn particles on the card
+    createVariantParticles(card, variantId, 12);
   }
 
   // Update companion if this is the active companion
@@ -20600,20 +20604,74 @@ function skinkey_applyVariantToAllDisplays(userPetId, variantId) {
   }
 }
 
+// ── Variant particle system ──────────────────────────────────────────────────
+// Creates floating emoji particles on a card element.
+// count defaults to 12 for pet cards, pass 5 for companion buddy.
+var VARIANT_PARTICLES = {
+  ghost:    ['👻','💀','🕯️','🌙','✨'],
+  shadow:   ['🌑','🖤','💜','🌙','✨'],
+  golden:   ['✨','⭐','💫','🌟','👑'],
+  shiny:    ['🌟','⭐','✨','💫','🌈'],
+  cosmic:   ['⭐','🌠','✨','💫','🌌'],
+  fire:     ['🔥','🎇','✨','💥','🌋'],
+  ice:      ['❄️','💠','🔹','✨','🌨️'],
+  electric: ['⚡','💥','✨','💫','🔋'],
+  nature:   ['🍃','🌿','🌸','🍂','🌻'],
+  crystal:  ['💎','✨','🔮','💠','⭐'],
+  rainbow:  ['🌈','✨','🌟','💫','⭐']
+};
+
+function createVariantParticles(el, variantId, count) {
+  if (!el || !variantId) return;
+  count = count || 12;
+
+  // Clear existing particles first
+  el.querySelectorAll('.variant-particle').forEach(function(p) { p.remove(); });
+
+  var emojis = VARIANT_PARTICLES[variantId] || ['✨'];
+
+  for (var i = 0; i < count; i++) {
+    var p = document.createElement('div');
+    p.className = 'variant-particle particle-' + variantId;
+    p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    p.style.cssText = [
+      'position:absolute',
+      'pointer-events:none',
+      'z-index:100',
+      'font-size:' + (14 + Math.random() * 10) + 'px',
+      'left:' + Math.random() * 90 + '%',
+      'top:' + Math.random() * 90 + '%',
+      'animation:varParticleFloat ' + (2 + Math.random() * 2.5) + 's ease-out ' + (Math.random() * 3) + 's infinite',
+      'opacity:0'
+    ].join(';');
+    el.appendChild(p);
+  }
+}
 function skinkey_updateCompanionVariant(variantId) {
-  var companion = document.querySelector('.companion-container .pet-sprite');
+  // Actual companion element is #companion-sprite with class .companion-sprite
+  var companion = document.getElementById('companion-sprite');
   if (!companion) return;
+
+  // Strip all variant classes
   Object.keys(BASIC_VARIANTS).forEach(function(vid) {
     companion.classList.remove(BASIC_VARIANTS[vid].cssClass);
   });
   SPECIAL_VARIANTS.forEach(function(vid) {
     companion.classList.remove('pet-variant-' + vid);
   });
+
+  // Apply new variant class
   if (variantId) {
-    if (BASIC_VARIANTS[variantId]) {
-      companion.classList.add(BASIC_VARIANTS[variantId].cssClass);
-    } else {
-      companion.classList.add('pet-variant-' + variantId);
+    var cls = BASIC_VARIANTS[variantId] ? BASIC_VARIANTS[variantId].cssClass : 'pet-variant-' + variantId;
+    companion.classList.add(cls);
+    // Spawn a handful of particles on the companion buddy
+    var buddyEl = document.getElementById('companion-buddy');
+    if (buddyEl) createVariantParticles(buddyEl, variantId, 5);
+  } else {
+    // Remove companion particles when variant cleared
+    var buddyEl = document.getElementById('companion-buddy');
+    if (buddyEl) {
+      buddyEl.querySelectorAll('.variant-particle').forEach(function(p) { p.remove(); });
     }
   }
 }
