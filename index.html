@@ -2004,6 +2004,12 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
           <div id="theme-selector-mount"></div>
         </div>
 
+        <!-- Admin Panel — only visible to admins via JS -->
+        <div id="admin-panel-section" style="display:none;margin-top:30px;padding-top:24px;border-top:2px solid var(--border);">
+          <h3 style="color:#ff4500;margin-bottom:6px;">⚙️ Admin Tools</h3>
+          <button class="btn btn-primary" onclick="showAdminPollModal()" style="background:linear-gradient(135deg,#ff4500,#ff6b35);">🗳️ Manage Polls</button>
+        </div>
+
         <!-- Referral System -->
         <div style="margin-top:40px;padding-top:30px;border-top:2px solid var(--border);">
           <h3 style="text-align:center;color:var(--purple);margin-bottom:15px;">💰 Invite Friends</h3>

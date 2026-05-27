@@ -273,7 +273,13 @@ var TWITCH_CLIENT_ID = 'moqd3war5e7fleif8yte1d8n6kl25u';
 var TWITCH_REDIRECT_URI = 'https://pawketpetsvt.github.io/';
 var STREAMER_IDS = {
   embertail: '91821604',
-  pyxshuul:  '1459912293'
+  pyxshuul:  '1459912293',
+  aria:      '1445288832',
+  blushimia: '659500662',
+  cowbee:    '203845195',
+  kelta:     '121490227',
+  jess:      '88727356',
+  gnarly:    '531222973'
 };
 
 // ── GLOBALS ──────────────────────────────
@@ -1485,6 +1491,12 @@ async function showApp(user) {
 
   // POLLS: Load active polls (non-blocking)
   pollSystem.load().catch(function(e) { dbg('Polls load failed:', e); });
+
+  // ADMIN: Show admin tools section if applicable
+  isAdmin().then(function(admin) {
+    var adminSection = document.getElementById('admin-panel-section');
+    if (adminSection) adminSection.style.display = admin ? 'block' : 'none';
+  });
 
   // GIFTS: Show inbox bar and check pending gifts count
   var giftBar = document.getElementById('gift-inbox-bar');
@@ -5567,14 +5579,14 @@ async function initTwitchTab() {
 
 // Team members config — add new members here as they join
 var TEAM_MEMBERS = [
-  { name: 'Embertail', login: 'embertail', twitchUrl: 'https://twitch.tv/Embertail', petName: 'Ember' },
-  { name: 'Pyxshuul',  login: 'pyxshuul',  twitchUrl: 'https://twitch.tv/Pyxshuul',  petName: 'Pyxie' },
-  { name: 'Aria',      login: 'ariadoestwitch', twitchUrl: 'https://twitch.tv/ariadoestwitch', petName: 'Aria' },
-  { name: 'Blushimia', login: 'realblushimia',  twitchUrl: 'https://twitch.tv/realblushimia',  petName: 'Blushimia' },
-  { name: 'Steve',    login: 'cowbeevt',       twitchUrl: 'https://twitch.tv/cowbeevt',       petName: 'Steve' },
-  { name: 'Kleat',     login: 'keltathepomeranian', twitchUrl: 'https://twitch.tv/keltathepomeranian', petName: 'Kleat' },
-  { name: 'Jess',      login: 'teatimejess',    twitchUrl: 'https://twitch.tv/teatimejess',    petName: 'Jess' },
-  { name: 'Gnarly',    login: 'gnarly_neon_smilodon', twitchUrl: 'https://twitch.tv/gnarly_neon_smilodon', petName: 'Gnarly' }
+  { name: 'Embertail', login: 'embertail', twitchUrl: 'https://twitch.tv/Embertail', petName: 'Ember',    twitchId: '91821604' },
+  { name: 'Pyxshuul',  login: 'pyxshuul',  twitchUrl: 'https://twitch.tv/Pyxshuul',  petName: 'Pyxie',   twitchId: '1459912293' },
+  { name: 'Aria',      login: 'ariadoestwitch', twitchUrl: 'https://twitch.tv/ariadoestwitch', petName: 'Aria',      twitchId: '1445288832' },
+  { name: 'Blushimia', login: 'realblushimia',  twitchUrl: 'https://twitch.tv/realblushimia',  petName: 'Blushimia', twitchId: '659500662' },
+  { name: 'Steve',     login: 'cowbeevt',       twitchUrl: 'https://twitch.tv/cowbeevt',       petName: 'Steve',     twitchId: '203845195' },
+  { name: 'Kleat',     login: 'keltathepomeranian', twitchUrl: 'https://twitch.tv/keltathepomeranian', petName: 'Kleat', twitchId: '121490227' },
+  { name: 'Jess',      login: 'teatimejess',    twitchUrl: 'https://twitch.tv/teatimejess',    petName: 'Jess',     twitchId: '88727356' },
+  { name: 'Gnarly',    login: 'gnarly_neon_smilodon', twitchUrl: 'https://twitch.tv/gnarly_neon_smilodon', petName: 'Gnarly', twitchId: '531222973' }
 ];
 
 async function loadTeamShowcase() {
@@ -17485,28 +17497,38 @@ async function loadEquipmentShop() {
       return cardHtml;
     }
     
-    // Create two-column layout
-    html += '<div class="equipment-shop-columns">';
-    
-    // Left column: Weapons
-    html += '<div class="equipment-column">';
-    html += '<h3 class="equipment-column-title">⚔️ Weapons</h3>';
-    html += '<div class="equipment-grid-column">';
-    weapons.forEach(function(item) {
-      html += renderEquipmentCard(item);
-    });
-    html += '</div></div>';
-    
-    // Right column: Armor
-    html += '<div class="equipment-column">';
-    html += '<h3 class="equipment-column-title">🛡️ Armor</h3>';
-    html += '<div class="equipment-grid-column">';
-    armor.forEach(function(item) {
-      html += renderEquipmentCard(item);
-    });
-    html += '</div></div>';
-    
-    html += '</div>';
+    // Create filter-aware layout
+    var currentFilter = typeof currentEquipmentFilter !== 'undefined' ? currentEquipmentFilter : 'all';
+    var showWeapons = (currentFilter === 'all' || currentFilter === 'weapon');
+    var showArmor   = (currentFilter === 'all' || currentFilter === 'armor');
+
+    if (currentFilter === 'all') {
+      // Two columns: weapons left, armor right
+      html += '<div class="equipment-shop-columns">';
+      html += '<div class="equipment-column">';
+      html += '<h3 class="equipment-column-title">⚔️ Weapons</h3>';
+      html += '<div class="equipment-grid-column">';
+      if (weapons.length === 0) { html += '<div class="empty-equipment">No weapons available this week</div>'; }
+      else { weapons.forEach(function(item) { html += renderEquipmentCard(item); }); }
+      html += '</div></div>';
+      html += '<div class="equipment-column">';
+      html += '<h3 class="equipment-column-title">🛡️ Armor</h3>';
+      html += '<div class="equipment-grid-column">';
+      if (armor.length === 0) { html += '<div class="empty-equipment">No armor available this week</div>'; }
+      else { armor.forEach(function(item) { html += renderEquipmentCard(item); }); }
+      html += '</div></div>';
+      html += '</div>';
+    } else {
+      // Single column — full width, whichever type is selected
+      var filteredItems = showWeapons ? weapons : armor;
+      var colTitle = showWeapons ? '⚔️ Weapons' : '🛡️ Armor';
+      html += '<div class="equipment-single-column">';
+      html += '<h3 class="equipment-column-title">' + colTitle + '</h3>';
+      html += '<div class="equipment-grid-single">';
+      if (filteredItems.length === 0) { html += '<div class="empty-equipment">No items available this week</div>'; }
+      else { filteredItems.forEach(function(item) { html += renderEquipmentCard(item); }); }
+      html += '</div></div>';
+    }
     
     container.innerHTML = html;
     
@@ -22998,7 +23020,15 @@ var pollSystem = {
   async castVote(pollId, optionIndex) {
     if (this.userVotes[pollId] !== undefined) { showToast('You already voted on this poll!', 2000); return; }
 
+    // Rate limit — prevent double-click spam
+    if (!canPerformAction('poll_vote_' + pollId, 5000)) { showToast('Please wait before voting again!', 2000); return; }
+
     try {
+      // Double-check poll is still active
+      var { data: poll } = await supabaseClient.from('polls').select('is_active, ends_at').eq('id', pollId).single();
+      if (poll && (!poll.is_active || new Date(poll.ends_at) < new Date())) {
+        showToast('This poll has ended!', 2000); return;
+      }
       var { error } = await supabaseClient.from('poll_votes').insert({
         poll_id: pollId, user_id: currentUser.id, option_index: optionIndex
       });
@@ -23140,3 +23170,170 @@ async function polls_loadPastResults(mountId) {
 }
 
 console.log('✅ Gifting & Polls systems loaded');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ADMIN PANEL — Poll Management (Embertail only)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function isAdmin() {
+  if (!currentUser) return false;
+  var ADMIN_IDS = ['c8310873-c1f9-4d6e-a71a-1dad03974f5b'];
+  return ADMIN_IDS.indexOf(currentUser.id) !== -1;
+}
+
+async function showAdminPollModal() {
+  if (!await isAdmin()) { showToast('Admin access required', 3000); return; }
+
+  var { data: polls } = await supabaseClient
+    .from('polls').select('*').order('created_at', { ascending: false });
+
+  var modal = makeModal();
+  var pollListHtml = '';
+  (polls || []).forEach(function(poll) {
+    pollListHtml +=
+      '<div style="border:2px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;">' +
+      '<div style="font-weight:bold;margin-bottom:6px;">' + escapeHtml(poll.question) + '</div>' +
+      '<div style="font-size:0.8rem;color:var(--text-light);margin-bottom:8px;">' +
+        'Status: ' + (poll.is_active ? '🟢 Active' : '🔴 Ended') + ' | ' +
+        'Ends: ' + new Date(poll.ends_at).toLocaleDateString() + ' | ' +
+        'Votes: ' + (poll.total_votes || 0) +
+      '</div>' +
+      '<div style="display:flex;gap:6px;">' +
+        '<button class="btn btn-sm btn-outline" onclick="adminViewPollResults(\'' + poll.id + '\')">📊 Results</button>' +
+        (poll.is_active ? '<button class="btn btn-sm btn-outline" onclick="adminEndPoll(\'' + poll.id + '\')">⏹️ End</button>' : '') +
+        '<button class="btn btn-sm btn-outline" style="color:#ff6b6b;" onclick="adminDeletePoll(\'' + poll.id + '\')">🗑️ Delete</button>' +
+      '</div></div>';
+  });
+
+  modal.innerHTML =
+    '<h2 style="text-align:center;margin-bottom:16px;">🗳️ Poll Management</h2>' +
+    '<button class="btn btn-primary" style="width:100%;margin-bottom:16px;" onclick="adminShowCreatePollForm()">+ Create New Poll</button>' +
+    '<div>' + pollListHtml + '</div>' +
+    '<button onclick="closeModal()" class="btn btn-outline" style="width:100%;margin-top:12px;">Close</button>';
+  openModal(modal);
+}
+
+function adminShowCreatePollForm() {
+  closeModal();
+  var modal = makeModal();
+  modal.innerHTML =
+    '<h2 style="text-align:center;margin-bottom:20px;">📝 Create Poll</h2>' +
+    '<label style="font-weight:600;display:block;margin-bottom:6px;">Question</label>' +
+    '<input id="admin-poll-q" type="text" placeholder="What should we do next?" style="width:100%;padding:10px;border-radius:10px;border:2px solid var(--border);margin-bottom:14px;box-sizing:border-box;">' +
+    '<label style="font-weight:600;display:block;margin-bottom:6px;">Type</label>' +
+    '<select id="admin-poll-type" style="width:100%;padding:10px;border-radius:10px;border:2px solid var(--border);margin-bottom:14px;">' +
+      '<option value="community">Community Decision</option>' +
+      '<option value="event">Event Selection</option>' +
+      '<option value="feature">Feature Request</option>' +
+      '<option value="weather">Weather Vote</option>' +
+    '</select>' +
+    '<label style="font-weight:600;display:block;margin-bottom:6px;">Duration</label>' +
+    '<select id="admin-poll-dur" style="width:100%;padding:10px;border-radius:10px;border:2px solid var(--border);margin-bottom:14px;">' +
+      '<option value="1">1 day</option><option value="3" selected>3 days</option>' +
+      '<option value="7">7 days</option><option value="14">14 days</option>' +
+    '</select>' +
+    '<label style="font-weight:600;display:block;margin-bottom:6px;">Options (min 2)</label>' +
+    '<div id="admin-opts">' +
+      '<div class="admin-opt-row" style="display:flex;gap:6px;margin-bottom:6px;"><input type="text" placeholder="📌" class="opt-icon" style="width:52px;padding:8px;border-radius:8px;border:2px solid var(--border);">' +
+        '<input type="text" placeholder="Option 1 text" class="opt-text" style="flex:1;padding:8px;border-radius:8px;border:2px solid var(--border);">' +
+        '<input type="text" placeholder="Description" class="opt-desc" style="flex:2;padding:8px;border-radius:8px;border:2px solid var(--border);"></div>' +
+      '<div class="admin-opt-row" style="display:flex;gap:6px;margin-bottom:6px;"><input type="text" placeholder="📌" class="opt-icon" style="width:52px;padding:8px;border-radius:8px;border:2px solid var(--border);">' +
+        '<input type="text" placeholder="Option 2 text" class="opt-text" style="flex:1;padding:8px;border-radius:8px;border:2px solid var(--border);">' +
+        '<input type="text" placeholder="Description" class="opt-desc" style="flex:2;padding:8px;border-radius:8px;border:2px solid var(--border);"></div>' +
+    '</div>' +
+    '<button onclick="adminAddPollOption()" class="btn btn-outline btn-sm" style="margin-bottom:14px;">+ Add Option</button>' +
+    '<div style="display:flex;gap:8px;">' +
+      '<button onclick="adminCreatePoll()" class="btn btn-primary" style="flex:2;">Create Poll</button>' +
+      '<button onclick="closeModal()" class="btn btn-outline" style="flex:1;">Cancel</button>' +
+    '</div>';
+  openModal(modal);
+}
+
+function adminAddPollOption() {
+  var container = document.getElementById('admin-opts');
+  if (!container) return;
+  if (container.children.length >= 5) { showToast('Maximum 5 options', 2000); return; }
+  var n = container.children.length + 1;
+  var row = document.createElement('div');
+  row.className = 'admin-opt-row';
+  row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;';
+  row.innerHTML = '<input type="text" placeholder="📌" class="opt-icon" style="width:52px;padding:8px;border-radius:8px;border:2px solid var(--border);">' +
+    '<input type="text" placeholder="Option ' + n + ' text" class="opt-text" style="flex:1;padding:8px;border-radius:8px;border:2px solid var(--border);">' +
+    '<input type="text" placeholder="Description" class="opt-desc" style="flex:2;padding:8px;border-radius:8px;border:2px solid var(--border);">' +
+    '<button onclick="this.parentElement.remove()" style="background:#ff6b6b;color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;">✕</button>';
+  container.appendChild(row);
+}
+
+async function adminCreatePoll() {
+  var question = document.getElementById('admin-poll-q').value.trim();
+  var pollType  = document.getElementById('admin-poll-type').value;
+  var duration  = parseInt(document.getElementById('admin-poll-dur').value);
+  if (!question) { showToast('Enter a question', 2000); return; }
+
+  var rows = document.querySelectorAll('#admin-opts .admin-opt-row');
+  var options = [];
+  rows.forEach(function(row) {
+    var icon = row.querySelector('.opt-icon').value.trim() || '📌';
+    var text = row.querySelector('.opt-text').value.trim();
+    var desc = row.querySelector('.opt-desc').value.trim();
+    if (text) options.push({ icon: icon, text: text, description: desc });
+  });
+  if (options.length < 2) { showToast('At least 2 options required', 2000); return; }
+
+  var { error } = await supabaseClient.from('polls').insert({
+    poll_type: pollType,
+    question:  question,
+    options:   options,
+    starts_at: new Date().toISOString(),
+    ends_at:   new Date(Date.now() + duration * 86400000).toISOString()
+  });
+
+  if (error) { showToast('Error: ' + error.message, 4000); return; }
+  showToast('✅ Poll created!', 2500);
+  closeModal();
+  pollSystem.load();
+}
+
+async function adminViewPollResults(pollId) {
+  var { data: poll } = await supabaseClient.from('polls').select('*').eq('id', pollId).single();
+  var { data: votes } = await supabaseClient.from('poll_votes').select('option_index').eq('poll_id', pollId);
+  var total = votes ? votes.length : 0;
+  var counts = [0,0,0,0,0];
+  (votes || []).forEach(function(v) { counts[v.option_index] = (counts[v.option_index] || 0) + 1; });
+
+  var modal = makeModal();
+  var html = '<h2 style="text-align:center;margin-bottom:8px;">📊 Results</h2>' +
+    '<p style="text-align:center;margin-bottom:16px;"><strong>' + escapeHtml(poll.question) + '</strong><br><span style="color:var(--text-light);font-size:0.85rem;">' + total + ' total votes</span></p>';
+  (poll.options || []).forEach(function(opt, i) {
+    var count = counts[i] || 0;
+    var pct = total > 0 ? Math.round(count / total * 100) : 0;
+    html += '<div style="margin-bottom:12px;">' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:4px;">' +
+        '<span>' + escapeHtml(opt.icon || '') + ' ' + escapeHtml(opt.text) + '</span>' +
+        '<span style="color:var(--text-light);">' + count + ' (' + pct + '%)</span>' +
+      '</div>' +
+      '<div style="background:rgba(153,102,255,0.15);border-radius:8px;height:18px;overflow:hidden;">' +
+        '<div style="width:' + pct + '%;height:100%;background:linear-gradient(90deg,#9966ff,#ff66cc);"></div>' +
+      '</div></div>';
+  });
+  html += '<button onclick="closeModal()" class="btn btn-outline" style="width:100%;margin-top:14px;">Close</button>';
+  modal.innerHTML = html;
+  openModal(modal);
+}
+
+async function adminEndPoll(pollId) {
+  if (!confirm('End this poll? No more votes will be accepted.')) return;
+  var { error } = await supabaseClient.from('polls').update({ is_active: false, ends_at: new Date().toISOString() }).eq('id', pollId);
+  if (error) { showToast('Error: ' + error.message, 4000); return; }
+  showToast('Poll ended', 2000);
+  showAdminPollModal();
+}
+
+async function adminDeletePoll(pollId) {
+  if (!confirm('Delete this poll permanently?')) return;
+  await supabaseClient.from('poll_votes').delete().eq('poll_id', pollId);
+  var { error } = await supabaseClient.from('polls').delete().eq('id', pollId);
+  if (error) { showToast('Error: ' + error.message, 4000); return; }
+  showToast('Poll deleted', 2000);
+  showAdminPollModal();
+}
