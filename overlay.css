@@ -50,8 +50,16 @@ body {
 }
 
 .collapsed-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 28px;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
 }
 
 .collapsed-info {
@@ -88,6 +96,7 @@ body {
    ============================================ */
 .overlay-container.expanded {
   width: 360px;
+  min-height: 380px;
   background: rgba(0, 0, 0, 0.85);
   backdrop-filter: blur(12px);
   border-radius: 16px;
@@ -314,27 +323,22 @@ body {
   border-left: 2px solid #9966ff;
 }
 
-/* Footer */
+/* Footer - Single line promo */
 .overlay-footer {
   background: rgba(0, 0, 0, 0.4);
-  padding: 8px 16px;
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.4);
+  padding: 10px 16px;
+  text-align: center;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.footer-separator {
-  opacity: 0.5;
 }
 
 .promo-link {
   color: #ffcc00 !important;
   text-decoration: none !important;
   font-weight: 500;
+  font-size: 11px;
   transition: all 0.2s ease;
+  display: block;
+  text-align: center;
 }
 
 .promo-link:hover {
@@ -353,22 +357,4 @@ body {
   .quip-bubble::before {
     border-top-color: rgba(30, 30, 46, 0.95);
   }
-}
-/* Collapsed avatar image styling */
-.collapsed-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
-}
-
-/* When it has an image (background-image set) */
-.collapsed-avatar[style*="background-image"] {
-  font-size: 0;
 }
