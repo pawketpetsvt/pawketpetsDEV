@@ -21168,257 +21168,390 @@ async function screenshot_generate(petId) {
   if (snapBtn) { snapBtn.textContent = '⏳'; snapBtn.disabled = true; }
 
   try {
-    // ── STEP 1: Basic pet data (no joins) ──
-    var { data: pet, error: petErr } = await supabaseClient
-      .from('user_pets')
-      .select('*')
-      .eq('id', petId)
-      .single();
+    // ── Parallel data fetching for speed ──
+    var petRes = await supabaseClient.from('user_pets').select('*').eq('id', petId).single();
+    if (petRes.error || !petRes.data) { showToast('Pet not found', 3000); return; }
+    var pet = petRes.data;
 
-    if (petErr || !pet) {
-      console.error('Pet fetch error:', petErr);
-      showToast('Could not load pet data', 3000);
-      return;
-    }
+    var [ownerRes, speciesRes, equipRes, passRes] = await Promise.all([
+      supabaseClient.from('players').select('username, active_player_title_id').eq('id', pet.user_id).single(),
+      supabaseClient.from('pets').select('name, image_file, special_skill').eq('id', pet.pet_id).single(),
+      supabaseClient.from('player_equipment').select('equipped_slot, equipment(name, rarity)').eq('user_id', pet.user_id).eq('pet_id', petId).eq('is_equipped', true),
+      supabaseClient.from('user_pass_progress').select('level').eq('user_id', pet.user_id).single()
+    ]);
 
-    // ── STEP 2: Owner username ──
-    var { data: ownerRow } = await supabaseClient
-      .from('players').select('username').eq('id', pet.user_id).single();
-
-    // ── STEP 3: Species / image file ──
-    var { data: species } = await supabaseClient
-      .from('pets').select('name, image_file').eq('id', pet.pet_id).single();
-
-    // ── STEP 4: Active title (separate query, no join) ──
-    var activeTitle = null;
+    // Active pet title
+    var petTitle = null;
     if (pet.active_pet_title_id) {
-      var { data: titleRow } = await supabaseClient
-        .from('pet_titles').select('*').eq('id', pet.active_pet_title_id).single();
-      activeTitle = titleRow || null;
+      var { data: t } = await supabaseClient.from('pet_titles').select('display_name,icon,rarity').eq('id', pet.active_pet_title_id).single();
+      petTitle = t;
     }
 
-    // ── STEP 5: Scrapbook memory ──
+    // Most recent scrapbook memory
     var memory = null;
-    var { data: memories } = await supabaseClient
-      .from('pet_scrapbook')
-      .select('memory_text')
-      .eq('pet_id', petId)
-      .order('created_at', { ascending: false })
-      .limit(1);
-    if (memories && memories.length > 0) memory = memories[0].memory_text;
+    var { data: mems } = await supabaseClient.from('pet_scrapbook').select('memory_text').eq('pet_id', petId).order('created_at', { ascending: false }).limit(1);
+    if (mems && mems.length) memory = mems[0].memory_text;
 
-    // ── Build values with fallbacks ──
-    var petType = species ? species.name : (pet.pet_type || 'Pet');
+    // ── Resolve values ──
+    var owner   = ownerRes.data || {};
+    var species = speciesRes.data || {};
+    var petName = pet.nickname || species.name || 'Pet';
+    var petType = species.name || pet.pet_type || 'Pet';
+    var petLevel = pet.level || 1;
 
-    // Get active title text and rarity color
-    var titleText = '';
-    var titleColor = '#9966ff';
-    if (activeTitle) {
-      titleText = (activeTitle.icon || '') + ' ' + (activeTitle.display_name || '');
-      var rarityColors = { common:'#8e8e8e', uncommon:'#5cb85c', rare:'#5bc0de', epic:'#9c27b0', legendary:'#ff9800' };
-      titleColor = rarityColors[activeTitle.rarity] || '#9966ff';
-    }
+    // Evolution stage
+    var stage = petLevel >= 20 ? 'Adult' : petLevel >= 10 ? 'Teen' : 'Baby';
+    var stageEmoji = petLevel >= 20 ? '🦋' : petLevel >= 10 ? '🌿' : '🥚';
 
-    // Variant info
-    var variantKey = pet.current_variant || pet.variant || null;
-    var variantDef = variantKey && petVariants ? petVariants[variantKey] : null;
+    // Mood from hunger/energy/happiness
+    var moodScore = ((pet.hunger || 0) + (pet.energy || 0) + (pet.happiness || 0)) / ((pet.max_hunger||100) + (pet.max_energy||100) + (pet.max_happiness||100));
+    var mood = moodScore > 0.75 ? { label: 'Thriving', icon: '😄' } :
+               moodScore > 0.5  ? { label: 'Happy',    icon: '😊' } :
+               moodScore > 0.25 ? { label: 'Okay',     icon: '😐' } :
+                                  { label: 'Needs Care',icon: '😢' };
+
+    // Variant
+    var variantKey  = pet.current_variant || null;
+    var variantDef  = variantKey ? (petVariants[variantKey] || (BASIC_VARIANTS && BASIC_VARIANTS[variantKey])) : null;
     var variantColor = variantDef ? variantDef.color : null;
-    var variantLabel = variantDef ? variantDef.icon + ' ' + variantDef.name : null;
 
-    // Pet type emoji map
-    var typeEmojis = { fire:'🔥', water:'💧', grass:'🌿', electric:'⚡', ice:'❄️', normal:'⭐', default:'🐾' };
-    var typeEmoji = typeEmojis[pet.pet_type] || typeEmojis.default;
+    // Card gradient palette
+    var gradA = variantColor || '#667eea';
+    var gradB = variantColor ? screenshot_darken(variantColor, 0.4) : '#764ba2';
+    var gradC = variantColor ? screenshot_lighten(variantColor, 0.3) : '#9966ff';
 
-    // Card colors by variant (fallback to default purple gradient)
-    var gradTop    = variantColor ? variantColor : '#667eea';
-    var gradBottom = variantColor ? (variantColor + 'aa') : '#764ba2';
+    // Equipment
+    var equips = equipRes.data || [];
+    var weapon = equips.find(function(e) { return e.equipped_slot === 'weapon' && e.equipment; });
+    var armor  = equips.find(function(e) { return e.equipped_slot === 'armor'  && e.equipment; });
 
-    // Pet image
-    var petImageMap = { Ember:'ember.png', Pyxie:'pyxie.png', Steve:'cowbee.png', Kleat:'kelta.png', Blushimia:'blushimia.png', Aria:'aria.png', Jess:'jess.png', Gnarly:'gnarly.png' };
-    var imgFile = (species && species.image_file) || petImageMap[petType] || (petType ? petType.toLowerCase() + '.png' : 'placeholder.png');
-    var imgSrc = 'images/pets/' + imgFile;
+    // Pass level
+    var passLevel = (passRes.data && passRes.data.level) || (passProgress && passProgress.level) || 1;
 
-    // ── Build canvas ──
+    // Battle stats
+    var battlesWon  = pet.battles_won  || 0;
+    var totalBattle = pet.total_battles || 0;
+    var winRate     = totalBattle > 0 ? Math.round(battlesWon / totalBattle * 100) : 0;
+
+    // Pet title text + color
+    var rarityColors = { common:'#8e8e8e', uncommon:'#5cb85c', rare:'#5bc0de', epic:'#9c27b0', legendary:'#ff9800' };
+    var titleText  = petTitle ? ((petTitle.icon || '') + ' ' + (petTitle.display_name || '')).trim() : '';
+    var titleColor = petTitle ? (rarityColors[petTitle.rarity] || '#9966ff') : '#9966ff';
+
+    // Type emoji
+    var typeEmojis = { fire:'🔥', water:'💧', grass:'🌿', electric:'⚡', ice:'❄️', normal:'⭐' };
+    var typeEmoji  = typeEmojis[pet.pet_type] || '🐾';
+
+    // HP percent
+    var hpPct = Math.min(1, (pet.current_hp || pet.base_hp || 30) / Math.max(1, (pet.max_hp || pet.base_hp || 30)));
+
+    // ── Canvas setup ──
+    var W = 600, H = 820;
     var canvas = document.createElement('canvas');
-    canvas.width = 600;
-    canvas.height = 820;
+    canvas.width = W; canvas.height = H;
     var ctx = canvas.getContext('2d');
 
-    // ── Background gradient ──
-    var bg = ctx.createLinearGradient(0, 0, 600, 820);
-    bg.addColorStop(0, gradTop);
-    bg.addColorStop(1, gradBottom);
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, 600, 820);
+    // ── Background: rich gradient ──
+    var bgGrad = ctx.createLinearGradient(0, 0, W, H);
+    bgGrad.addColorStop(0, gradA);
+    bgGrad.addColorStop(0.5, gradB);
+    bgGrad.addColorStop(1, gradC);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, W, H);
 
-    // ── Decorative corner dots ──
-    ['#ffffff22', '#ffffff11'].forEach(function(c, i) {
-      ctx.fillStyle = c;
-      ctx.beginPath();
-      ctx.arc(60 + i * 10, 60 + i * 10, 80 + i * 20, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(540 - i * 10, 760 - i * 10, 80 + i * 20, 0, Math.PI * 2);
-      ctx.fill();
+    // ── Sparkle/star pattern overlay ──
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    var starPositions = [[60,60],[180,35],[420,55],[540,80],[30,200],[570,180],[90,400],[510,380],[150,650],[450,630],[280,790],[80,760],[520,750]];
+    starPositions.forEach(function(p) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '18px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('✦', p[0], p[1]);
     });
+    ctx.globalAlpha = 1;
+    ctx.restore();
 
     // ── White card panel ──
-    ctx.fillStyle = 'rgba(255,255,255,0.97)';
-    ctx.fillRect(30, 30, 540, 760);
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    ctx.fillRect(24, 24, W - 48, H - 48);
 
-    // ── Colored header strip ──
-    ctx.fillStyle = gradTop + 'dd';
-    ctx.fillRect(30, 30, 540, 140);
+    // ── Header gradient strip ──
+    var hdrGrad = ctx.createLinearGradient(24, 24, W - 24, 160);
+    hdrGrad.addColorStop(0, gradA + 'ee');
+    hdrGrad.addColorStop(1, gradB + 'cc');
+    ctx.fillStyle = hdrGrad;
+    ctx.fillRect(24, 24, W - 48, 160);
 
-    // ── Pet image ──
-    await new Promise(function(resolve) {
-      var img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = function() {
-        ctx.shadowColor = 'rgba(0,0,0,0.25)';
-        ctx.shadowBlur = 20;
-        ctx.drawImage(img, 200, 55, 200, 200);
-        ctx.shadowBlur = 0;
-        resolve();
-      };
-      img.onerror = function() {
-        ctx.font = '110px serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(typeEmoji, 300, 220);
-        resolve();
-      };
-      img.src = imgSrc;
-    });
+    // ── Pet image with circular clip ──
+    var imgLoaded = false;
+    var imgPaths = [];
+    if (species.image_file) imgPaths.push('images/pets/' + species.image_file);
+    var nameMap = { Ember:'ember.png', Pyxie:'pyxie.png', Steve:'cowbee.png', Kleat:'kelta.png', Blushimia:'blushimia.png', Aria:'aria.png', Jess:'jess.png', Gnarly:'gnarly.png' };
+    if (nameMap[petType]) imgPaths.push('images/pets/' + nameMap[petType]);
+    imgPaths.push('images/pets/' + petType.toLowerCase() + '.png');
+    imgPaths.push('images/pets/' + petType.toLowerCase() + '.gif');
 
-    // ── Variant badge (top-right of image) ──
-    if (variantLabel) {
-      ctx.fillStyle = variantColor;
-      ctx.fillRect(380, 65, 160, 38);
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 18px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(variantLabel, 460, 89);
+    for (var pi = 0; pi < imgPaths.length && !imgLoaded; pi++) {
+      imgLoaded = await new Promise(function(resolve) {
+        var img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = function() {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(W/2, 120, 72, 0, Math.PI * 2);
+          ctx.closePath();
+          // Subtle glow ring
+          ctx.shadowColor = variantColor || '#9966ff';
+          ctx.shadowBlur = 20;
+          ctx.clip();
+          ctx.drawImage(img, W/2 - 72, 48, 144, 144);
+          ctx.restore();
+          ctx.shadowBlur = 0;
+          resolve(true);
+        };
+        img.onerror = function() { resolve(false); };
+        img.src = imgPaths[pi];
+      });
     }
 
-    // ── Pet nickname ──
-    ctx.fillStyle = '#1a1a2e';
-    ctx.font = 'bold 42px Arial';
+    if (!imgLoaded) {
+      // Colored silhouette fallback with initial
+      var initGrad = ctx.createRadialGradient(W/2, 120, 0, W/2, 120, 72);
+      initGrad.addColorStop(0, gradC);
+      initGrad.addColorStop(1, gradA);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(W/2, 120, 72, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fillStyle = initGrad;
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.font = 'bold 56px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(petName.charAt(0).toUpperCase(), W/2, 142);
+    }
+
+    // ── Ring around portrait ──
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(W/2, 120, 73, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // ── Variant badge (top-right) ──
+    if (variantDef) {
+      ctx.fillStyle = variantColor;
+      ctx.fillRect(420, 32, 150, 34);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 15px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(variantDef.icon + ' ' + variantDef.name, 495, 54);
+    }
+
+    // ── Stage badge (top-left) ──
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(28, 32, 100, 30);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '13px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(pet.nickname || petType, 300, 300);
+    ctx.fillText(stageEmoji + ' ' + stage, 78, 52);
+
+    // ── Pet name ──
+    ctx.fillStyle = '#1a1a2e';
+    ctx.font = 'bold 34px Arial';
+    ctx.textAlign = 'center';
+    var displayName = petName.length > 20 ? petName.substring(0, 17) + '…' : petName;
+    ctx.fillText(displayName, W/2, 220);
 
     // ── Active title ──
     if (titleText) {
       ctx.fillStyle = titleColor;
-      ctx.font = 'bold 20px Arial';
-      ctx.fillText(titleText, 300, 332);
+      ctx.font = 'bold 16px Arial';
+      ctx.fillText(titleText, W/2, 244);
     }
 
-    // ── Species + level pill ──
+    // ── Species pill ──
     ctx.fillStyle = '#f0ecff';
-    ctx.fillRect(180, 348, 240, 36);
+    ctx.fillRect(190, 256, 220, 30);
     ctx.fillStyle = '#5a3fa0';
-    ctx.font = '18px Arial';
-    ctx.fillText(typeEmoji + ' ' + petType + '  •  Lv.' + (pet.level || 1), 300, 371);
+    ctx.font = '14px Arial';
+    ctx.fillText(typeEmoji + ' ' + petType + '  •  Lv. ' + petLevel, W/2, 276);
+
+    // ── Mood ──
+    ctx.fillStyle = '#888';
+    ctx.font = '13px Arial';
+    ctx.fillText(mood.icon + ' ' + mood.label + '  |  🎮 Pass Lv.' + passLevel, W/2, 300);
 
     // ── Divider ──
-    ctx.strokeStyle = '#e8e0ff';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(60, 400); ctx.lineTo(540, 400);
-    ctx.stroke();
+    ctx.strokeStyle = '#e0d5ff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(40, 316); ctx.lineTo(W - 40, 316); ctx.stroke();
 
-    // ── Stats grid (2×2) ──
+    // ── Stats section label ──
+    ctx.fillStyle = gradA;
+    ctx.font = 'bold 13px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('BATTLE STATS', 40, 340);
+
+    // ── Stats grid ──
     var stats = [
-      { label: 'HP',  value: (pet.current_hp || pet.base_hp || 30) + ' / ' + (pet.max_hp || pet.base_hp || 30), icon: '❤️', x: 120, y: 455 },
-      { label: 'ATK', value: pet.base_attack || 5,   icon: '⚔️', x: 380, y: 455 },
-      { label: 'DEF', value: pet.base_defense || 3,  icon: '🛡️', x: 120, y: 515 },
-      { label: 'SPD', value: pet.base_speed || 4,    icon: '💨', x: 380, y: 515 }
+      { label:'HP',  val:(pet.current_hp||pet.base_hp||30)+'/'+( pet.max_hp||pet.base_hp||30), icon:'❤️', x:80,  y:390 },
+      { label:'ATK', val:pet.base_attack||5,  icon:'⚔️', x:220, y:390 },
+      { label:'DEF', val:pet.base_defense||3, icon:'🛡️', x:360, y:390 },
+      { label:'SPD', val:pet.base_speed||4,   icon:'💨', x:500, y:390 }
     ];
     stats.forEach(function(s) {
-      ctx.fillStyle = '#f7f4ff';
-      ctx.fillRect(s.x - 90, s.y - 28, 180, 44);
+      ctx.fillStyle = '#f4f0ff';
+      ctx.fillRect(s.x - 56, s.y - 30, 112, 50);
       ctx.fillStyle = '#333';
-      ctx.font = 'bold 18px Arial';
+      ctx.font = 'bold 14px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText(s.icon + ' ' + s.label + ': ' + s.value, s.x, s.y);
+      ctx.fillText(s.icon, s.x, s.y - 10);
+      ctx.font = '12px Arial';
+      ctx.fillStyle = '#666';
+      ctx.fillText(s.label, s.x, s.y + 4);
+      ctx.font = 'bold 15px Arial';
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillText(String(s.val), s.x, s.y + 20);
     });
+
+    // ── HP progress bar ──
+    ctx.fillStyle = '#eee';
+    ctx.fillRect(40, 420, W - 80, 12);
+    var hpBarColor = hpPct > 0.6 ? '#4ade80' : hpPct > 0.3 ? '#fbbf24' : '#ff6b6b';
+    ctx.fillStyle = hpBarColor;
+    ctx.fillRect(40, 420, (W - 80) * hpPct, 12);
+    ctx.fillStyle = '#888';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'right';
+    ctx.fillText(Math.round(hpPct * 100) + '% HP', W - 40, 418);
+
+    // ── Battle record ──
+    ctx.fillStyle = '#555';
+    ctx.font = '13px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('⚔️ ' + battlesWon + 'W  /  ' + totalBattle + ' Battles  •  ' + winRate + '% Win Rate', 40, 456);
+
+    // ── Equipment row ──
+    ctx.fillStyle = gradA;
+    ctx.font = 'bold 13px Arial';
+    ctx.fillText('EQUIPMENT', 40, 480);
+    ctx.fillStyle = '#444';
+    ctx.font = '13px Arial';
+    var weaponText = weapon && weapon.equipment ? '⚔️ ' + weapon.equipment.name : '⚔️ None';
+    var armorText  = armor  && armor.equipment  ? '🛡️ ' + armor.equipment.name  : '🛡️ None';
+    ctx.fillText(weaponText + '   ' + armorText, 40, 498);
+
+    // ── Divider ──
+    ctx.strokeStyle = '#e0d5ff';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(40, 514); ctx.lineTo(W - 40, 514); ctx.stroke();
 
     // ── Scrapbook memory ──
     if (memory) {
       ctx.fillStyle = '#fdf6ff';
-      ctx.fillRect(60, 545, 480, 60);
+      ctx.fillRect(40, 522, W - 80, 52);
       ctx.strokeStyle = '#d4b8ff';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(60, 545, 480, 60);
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(40, 522, W - 80, 52);
       ctx.fillStyle = '#7a5ca0';
-      ctx.font = 'italic 15px Arial';
+      ctx.font = 'italic 13px Arial';
       ctx.textAlign = 'center';
-      // Trim long memories
-      var memText = '💭 ' + (memory.length > 80 ? memory.substring(0, 77) + '...' : memory);
-      ctx.fillText(memText, 300, 580);
+      var memText = memory.length > 72 ? memory.substring(0, 69) + '…' : memory;
+      ctx.fillText('💭 ' + memText, W/2, 553);
     }
 
-    // ── Backstory snippet ──
-    var backstory = (petBackstories && petBackstories[petType]) || '';
+    // ── Backstory ──
+    var backstory = petBackstories && petBackstories[petType] ? petBackstories[petType] : '';
     if (backstory) {
-      ctx.fillStyle = '#666';
-      ctx.font = 'italic 14px Arial';
+      var bsY = memory ? 596 : 534;
+      ctx.fillStyle = '#888';
+      ctx.font = 'italic 12px Arial';
       ctx.textAlign = 'center';
-      var bText = backstory.length > 70 ? backstory.substring(0, 67) + '...' : backstory;
-      ctx.fillText(bText, 300, 630);
+      var bsText = backstory.length > 80 ? backstory.substring(0, 77) + '…' : backstory;
+      ctx.fillText(bsText, W/2, bsY);
     }
 
-    // ── Divider ──
-    ctx.strokeStyle = '#e8e0ff';
+    // ── Divider before footer ──
+    ctx.strokeStyle = '#e0d5ff';
     ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(60, 650); ctx.lineTo(540, 650);
-    ctx.stroke();
+    var footerY = 660;
+    ctx.beginPath(); ctx.moveTo(40, footerY); ctx.lineTo(W - 40, footerY); ctx.stroke();
 
     // ── Owner + date ──
     ctx.fillStyle = '#aaa';
-    ctx.font = '15px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText('👤 ' + (ownerRow ? ownerRow.username : 'Trainer'), 70, 678);
-    ctx.textAlign = 'right';
-    ctx.fillText('📅 ' + new Date().toLocaleDateString(), 530, 678);
-
-    // ── Branding ──
-    ctx.fillStyle = gradTop;
-    ctx.font = 'bold 22px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('🐾 PawketPetsVT', 300, 725);
-    ctx.fillStyle = '#bbb';
     ctx.font = '13px Arial';
-    ctx.fillText('pawketpetsvt.com', 300, 746);
+    ctx.textAlign = 'left';
+    ctx.fillText('👤 ' + (owner.username || 'Trainer'), 40, footerY + 22);
+    ctx.textAlign = 'right';
+    ctx.fillText('📅 ' + new Date().toLocaleDateString(), W - 40, footerY + 22);
 
-    // ── Generate blob and show modal ──
+    // ── Branding footer ──
+    var ftGrad = ctx.createLinearGradient(24, footerY + 36, W - 24, H - 24);
+    ftGrad.addColorStop(0, gradA + 'dd');
+    ftGrad.addColorStop(1, gradB + 'dd');
+    ctx.fillStyle = ftGrad;
+    ctx.fillRect(24, footerY + 36, W - 48, H - (footerY + 36) - 24);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 18px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('🐾 PawketPetsVT', W/2, footerY + 64);
+    ctx.font = '11px Arial';
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.fillText('pawketpetsvt.com', W/2, footerY + 82);
+
+    // ── Build share text with variant ──
+    var variantLabel = variantDef ? variantDef.name + ' ' : '';
+    var shareTagline = 'I just raised my ' + variantLabel + petName + ' to Level ' + petLevel + '! 🐾 #PawketPets #VTuber';
+
+    // ── Output ──
     canvas.toBlob(function(blob) {
       var url = URL.createObjectURL(blob);
-      var petName = (pet.nickname || petType || 'pet').replace(/[^a-zA-Z0-9]/g, '_');
-      screenshot_showModal(url, petName, pet);
+      var fileSlug = petName.replace(/[^a-zA-Z0-9]/g, '_');
+      screenshot_showModal(url, fileSlug, pet, shareTagline);
     }, 'image/png');
 
   } catch (err) {
     console.error('Snapshot error:', err);
-    showToast('Failed to generate snapshot', 3000);
+    showToast('Failed to generate snapshot: ' + err.message, 3000);
   } finally {
     if (snapBtn) { snapBtn.textContent = '📸'; snapBtn.disabled = false; }
   }
 }
 
-function screenshot_showModal(imageUrl, fileName, pet) {
-  // Remove any existing snapshot modal
+// ── Color helpers for screenshot gradients ──
+function screenshot_darken(hex, amt) {
+  try {
+    var n = parseInt(hex.replace('#',''), 16);
+    var r = Math.max(0, (n >> 16) - Math.round(255 * amt));
+    var g = Math.max(0, ((n >> 8) & 0xff) - Math.round(255 * amt));
+    var b = Math.max(0, (n & 0xff) - Math.round(255 * amt));
+    return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+  } catch(e) { return hex; }
+}
+function screenshot_lighten(hex, amt) {
+  try {
+    var n = parseInt(hex.replace('#',''), 16);
+    var r = Math.min(255, (n >> 16) + Math.round(255 * amt));
+    var g = Math.min(255, ((n >> 8) & 0xff) + Math.round(255 * amt));
+    var b = Math.min(255, (n & 0xff) + Math.round(255 * amt));
+    return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+  } catch(e) { return hex; }
+}
+
+
+function screenshot_showModal(imageUrl, fileName, pet, shareTagline) {
   var existing = document.querySelector('.snapshot-modal-overlay');
   if (existing) existing.remove();
 
   var petName = pet.nickname || pet.pet_type || 'pet';
-  var shareText = encodeURIComponent('Check out my pet ' + petName + ' on PawketPetsVT! 🐾 #PawketPets #VTuber');
-  var shareUrl  = encodeURIComponent('https://pawketpetsvt.com');
-
+  var tagline = shareTagline || ('Check out my pet ' + petName + ' on PawketPetsVT! 🐾 #PawketPets #VTuber');
+  var shareText   = encodeURIComponent(tagline);
+  var shareUrl    = encodeURIComponent('https://pawketpetsvt.com');
   var twitterUrl  = 'https://twitter.com/intent/tweet?text=' + shareText + '&url=' + shareUrl;
-  var blueskyText = encodeURIComponent('Check out my pet ' + petName + ' on PawketPetsVT! 🐾 https://pawketpetsvt.com #PawketPets');
-  var blueskyUrl  = 'https://bsky.app/intent/compose?text=' + blueskyText;
+  var blueskyUrl  = 'https://bsky.app/intent/compose?text=' + encodeURIComponent(tagline + ' https://pawketpetsvt.com');
 
   var overlay = document.createElement('div');
   overlay.className = 'snapshot-modal-overlay modal-overlay-custom';
