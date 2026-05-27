@@ -34,6 +34,10 @@ var battleSounds = {
   defeat: '/sounds/defeat.mp3'
 };
 
+// ─── Set to true when sound files are added to /sounds/ ───────────────────
+var SOUNDS_ENABLED = false;
+// ─────────────────────────────────────────────────────────────────────────
+
 var audioCache = {};
 var lastSoundTime = 0;
 var soundCooldown = 300; // Default; updated to GAME_CONSTANTS.SOUND_COOLDOWN_MS after constants are defined
@@ -46,6 +50,7 @@ var soundCooldown = 300; // Default; updated to GAME_CONSTANTS.SOUND_COOLDOWN_MS
 var prioritySounds = ['playerNormal', 'enemyNormal', 'playerCrit'];
 
 function preloadPrioritySounds() {
+  if (!SOUNDS_ENABLED) return; // No sound files yet
   prioritySounds.forEach(function(key) {
     if (battleSounds[key] && !audioCache[key]) {
       var audio = new Audio(battleSounds[key]);
@@ -62,6 +67,7 @@ function preloadPrioritySounds() {
 }
 
 function loadSoundOnDemand(soundKey) {
+  if (!SOUNDS_ENABLED) return null;
   if (!battleSounds[soundKey]) return null;
   if (audioCache[soundKey]) return audioCache[soundKey];
   
@@ -142,6 +148,7 @@ function cleanupAllTimers() {
 }
 
 function playBattleSound(soundKey, volume, forceBoss) {
+  if (!SOUNDS_ENABLED) return;
   // Rate limiting - prevent sound spam
   var now = Date.now();
   if (!forceBoss && now - lastSoundTime < soundCooldown) {
@@ -936,7 +943,9 @@ function initEventStatusWidget() {
 }
 
 // Sync soundCooldown now that GAME_CONSTANTS is defined
-soundCooldown = GAME_CONSTANTS.SOUND_COOLDOWN_MS;
+if (typeof GAME_CONSTANTS !== 'undefined' && GAME_CONSTANTS.SOUND_COOLDOWN_MS) {
+  soundCooldown = GAME_CONSTANTS.SOUND_COOLDOWN_MS;
+}
 
 // ══════════════════════════════════════════════════════════════════════════
 // STUB FUNCTIONS - Prevent "not defined" console errors
@@ -1209,6 +1218,17 @@ async function showApp(user) {
   el('auth-gate').style.display = 'none';
   el('app-content').style.display = 'block';
   el('nav-logout').style.display = 'inline-block';
+
+  // Restore sidebars and navbar chrome now that user is logged in
+  var leftSidebar  = document.querySelector('.left-sidebar');
+  var rightSidebar = document.querySelector('.right-sidebar');
+  var navCenter    = document.querySelector('.navbar-center');
+  var navRight     = document.querySelector('.navbar-right');
+  if (leftSidebar)  leftSidebar.style.display    = '';
+  if (rightSidebar) rightSidebar.style.display   = '';
+  if (navCenter)    navCenter.style.visibility   = '';
+  if (navRight)     navRight.style.visibility    = '';
+  document.body.classList.remove('logged-out');
   el('nav-profile').style.display = 'inline-block';
   
   // Show Pass and Bingo buttons
@@ -1385,6 +1405,8 @@ async function showApp(user) {
   
   // CLEANUP: Remove expired localStorage items
   cleanupExpiredLocalStorage();
+  // Also clean up every hour for long sessions
+  setInterval(cleanupExpiredLocalStorage, 3600000);
 }
 
 function showAuth() {
@@ -1396,6 +1418,17 @@ function showAuth() {
   el('nav-user').textContent = '';
   el('nav-points').textContent = '';
   tabsLoaded = {};
+
+  // Hide sidebars and navbar chrome — show only the login box
+  var leftSidebar  = document.querySelector('.left-sidebar');
+  var rightSidebar = document.querySelector('.right-sidebar');
+  var navCenter    = document.querySelector('.navbar-center');
+  var navRight     = document.querySelector('.navbar-right');
+  if (leftSidebar)  leftSidebar.style.display    = 'none';
+  if (rightSidebar) rightSidebar.style.display   = 'none';
+  if (navCenter)    navCenter.style.visibility   = 'hidden';
+  if (navRight)     navRight.style.visibility    = 'hidden';
+  document.body.classList.add('logged-out');
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -3310,6 +3343,7 @@ async function feedFree(petId) {
 
 // FEED WITH SPECIFIC FOOD ITEM - Called when clicking a food item
 async function feedWithItem(petId, itemId, itemName) {
+  if (!canPerformAction('feed_' + petId, 500)) return;
   var pet = petState[petId];
   if (!pet) return;
   
@@ -3620,6 +3654,7 @@ async function playFree(petId) {
 
 // PLAY WITH TOY ITEM
 async function playWithToy(petId, toyId, toyName) {
+  if (!canPerformAction('play_' + petId, 500)) return;
   var pet = petState[petId];
   if (!pet || pet.energy < 5) {
     showFlash(petId, 'Not enough energy!', '#ff6eb4');
@@ -3674,7 +3709,8 @@ function updateBar(petId,stat,val,max) {
   var v=el(stat+'-val-'+petId); if(v)v.textContent=val+'/'+max;
 }
 function updateXpBar(petId,xp,level) {
-  var next=level*120; var pct=Math.min(xp/next*100,100);
+  var next=level*(typeof GAME_CONSTANTS!=='undefined'?GAME_CONSTANTS.XP_PER_LEVEL:120);
+  var pct=Math.min(xp/next*100,100);
   var b=el('xp-bar-'+petId); if(b)b.style.width=pct+'%';
   var v=el('xp-val-'+petId); if(v)v.textContent=xp+'/'+next;
 }
@@ -4473,11 +4509,6 @@ async function awardPP(amount, reason) {
   currentPoints = data;
   updateAllPoints(data);
   await checkTop10Badge();
-}
-
-async function checkTop10Badge() {
-  if (!currentUser) return;
-  // ... rest of function
 }
 
 async function checkTop10Badge() {
@@ -5895,7 +5926,7 @@ var leaderboardCache = {
   levels: null
 };
 
-function switchLeaderboard(type) {
+function switchLeaderboard(type, clickEvent) {
   currentLeaderboard = type;
   
   // Update tab styles
@@ -5903,7 +5934,9 @@ function switchLeaderboard(type) {
   tabs.forEach(function(tab) {
     tab.classList.remove('active');
   });
-  event.target.classList.add('active');
+  if (clickEvent && clickEvent.target) {
+    clickEvent.target.classList.add('active');
+  }
   
   // Show correct list
   document.querySelectorAll('.leaderboard-list').forEach(function(list) {
@@ -6426,10 +6459,7 @@ async function loadMyProfile() {
     // Render cosmetics equip panel and apply current cosmetics
     cosmetics_renderFullPanel('cosmetics-mount');
     cosmetics_applyToProfile();
-    } catch (badgeErr) {
-      console.error('[loadMyProfile] Error loading badges:', badgeErr);
-    }
-    
+
   } catch (err) {
     console.error('Error loading profile:', err);
     el('myprofile-username-preview').textContent = 'Error loading profile';
@@ -11326,7 +11356,7 @@ function renderJournalPage() {
     html += '  <div class="journal-entry-value">' + (discoveries.hated ? prefs.hated_item : '<span class="journal-entry-unknown">???</span>') + '</div>';
     html += '</div>';
     
-    html += '<div class="journal-entry">';\
+    html += '<div class="journal-entry">';
     html += '  <div class="journal-entry-label">🎨 Hobby:</div>';
     html += '  <div class="journal-entry-value">' + (discoveries.hobby ? prefs.hobby : '<span class="journal-entry-unknown">???</span>') + '</div>';
     html += '</div>';
@@ -12343,11 +12373,6 @@ async function awardShareBonus() {
 // ══════════════════════════════════════════════════════════════════════════
 
 // Generate referral code for user
-function generateReferralCode(username) {
-  // Simple base64 encode of username with timestamp
-  var code = btoa(username + ':' + Date.now()).replace(/[^a-zA-Z0-9]/g, '').substring(0, 12);
-  return code;
-}
 
 // Show referral modal
 async function showReferralModal() {
@@ -12938,7 +12963,7 @@ async function startDungeonBattle(playerStats, enemyStats) {
   playBattleTurn();
 }
 
-function endBattlePlayback() {
+function endDungeonBattlePlayback() {
   el('battle-skip-btn').style.display = 'none';
   el('battle-continue-btn').style.display = 'inline-block';
   
@@ -13298,7 +13323,7 @@ async function initReferralSystem(userId) {
   
   if (referralCode) {
     console.log('🎁 User arrived via referral code:', referralCode);
-    await processReferral(userId, referralCode);
+    await processReferralOnSignup(userId, referralCode);
     
     // Clean URL (remove ref parameter)
     window.history.replaceState({}, document.title, window.location.pathname);
@@ -13392,7 +13417,7 @@ async function loadReferralData(userId) {
 /**
  * Process referral when new user signs up via ref link
  */
-async function processReferral(newUserId, referralCode) {
+async function processReferralOnSignup(newUserId, referralCode) {
   try {
     console.log('🎁 Processing referral for code:', referralCode);
     
@@ -14516,17 +14541,6 @@ async function loadRecentPosts() {
 /**
  * Get time ago string
  */
-function getTimeAgo(timestamp) {
-  var now = new Date();
-  var time = new Date(timestamp);
-  var diff = Math.floor((now - time) / 1000);
-  
-  if (diff < 60) return 'just now';
-  if (diff < 3600) return Math.floor(diff / 60) + ' minutes ago';
-  if (diff < 86400) return Math.floor(diff / 3600) + ' hours ago';
-  if (diff < 2592000) return Math.floor(diff / 86400) + ' days ago';
-  return Math.floor(diff / 2592000) + ' months ago';
-}
 
 /**
  * Escape HTML to prevent XSS
@@ -20337,64 +20351,6 @@ var founderBadges = {
   }
 };
 
-async function founder_checkAndGrant() {
-  if (!currentUser) return;
-  
-  try {
-    // Check if already has founder status
-    var { data: player } = await supabaseClient
-      .from('players')
-      .select('founder_status, created_at')
-      .eq('id', currentUser.id)
-      .single();
-    
-    if (!player) return;
-    if (player.founder_status) {
-      console.log('✅ Player already has founder status:', player.founder_status);
-      return;
-    }
-    
-    // Check account age
-    var accountDate = new Date(player.created_at);
-    var tier = null;
-    
-    if (accountDate < new Date(founderBadges.tiers.alpha.cutoffDate)) {
-      tier = 'alpha';
-    } else if (accountDate < new Date(founderBadges.tiers.beta.cutoffDate)) {
-      tier = 'beta';
-    } else if (accountDate < new Date(founderBadges.tiers.early.cutoffDate)) {
-      tier = 'early';
-    }
-    
-    if (!tier) {
-      console.log('Player does not qualify for founder status');
-      return;
-    }
-    
-    // Grant founder status
-    var founderData = founderBadges.tiers[tier];
-    
-    await supabaseClient
-      .from('players')
-      .update({
-        founder_status: tier,
-        founder_granted_at: new Date().toISOString()
-      })
-      .eq('id', currentUser.id);
-    
-    // Grant cosmetics
-    await grantCosmetic(founderData.badge, 'badge');
-    await grantCosmetic(founderData.frame, 'frame');
-    
-    // Show celebration
-    showFounderCelebration(tier, founderData);
-    
-    console.log('🎉 Founder status granted:', tier);
-    
-  } catch (err) {
-    console.error('Error checking founder status:', err);
-  }
-}
 
 function showFounderCelebration(tier, founderData) {
   var modal = document.createElement('div');
@@ -20437,63 +20393,6 @@ var rareCollectibles = {
   }
 };
 
-async function rare_checkDrop(source, sourceId) {
-  if (!currentUser) return;
-  
-  try {
-    // Get available rare cosmetics for this source
-    var { data: availableRares } = await supabaseClient
-      .from('rare_cosmetics')
-      .select('*')
-      .eq('drop_source', source);
-    
-    if (!availableRares || availableRares.length === 0) return;
-    
-    // Check each rare for drop
-    for (var rare of availableRares) {
-      var roll = Math.random();
-      
-      if (roll < rare.drop_rate) {
-        // Check if player already has it
-        var { data: existing } = await supabaseClient
-          .from('player_rare_cosmetics')
-          .select('id')
-          .eq('player_id', currentUser.id)
-          .eq('cosmetic_id', rare.id)
-          .single();
-        
-        if (existing) continue; // Already owned
-        
-        // Grant rare!
-        await supabaseClient
-          .from('player_rare_cosmetics')
-          .insert({
-            player_id: currentUser.id,
-            cosmetic_id: rare.id,
-            obtained_from: sourceId
-          });
-        
-        // Increment obtained count
-        await supabaseClient
-          .from('rare_cosmetics')
-          .update({ obtained_count: rare.obtained_count + 1 })
-          .eq('id', rare.id);
-        
-        // Grant cosmetic
-        await grantCosmetic(rare.id, rare.type);
-        
-        // Show celebration
-        showRareDropCelebration(rare);
-        
-        console.log('🎉 Rare drop:', rare.name);
-        break; // Only one drop per source
-      }
-    }
-    
-  } catch (err) {
-    console.error('Error checking rare drops:', err);
-  }
-}
 
 function showRareDropCelebration(rare) {
   var rarityData = rareCollectibles.rarities[rare.rarity] || rareCollectibles.rarities.rare;
@@ -21479,745 +21378,6 @@ async function pass_grantXP(amount, source) {
   }
 }
 
-function pass_showLevelUpNotification(newLevel) {
-  showMilestone(
-    '🎉 PawketPass Level Up!',
-    'You reached Level ' + newLevel + '!',
-    'pass_levelup',
-    newLevel
-  );
-}
-
-function pass_updateDisplay() {
-  var passBtn = document.getElementById('navbar-pass-btn');
-  if (passBtn && pawketPass.playerProgress) {
-    passBtn.textContent = '🎫 Pass (Lvl ' + pawketPass.playerProgress.pass_level + ')';
-  }
-}
-
-async function pass_showModal() {
-  if (!pawketPass.currentSeason || !pawketPass.playerProgress) {
-    alert('PawketPass not available');
-    return;
-  }
-  
-  var modal = document.createElement('div');
-  modal.className = 'modal-overlay pass-modal-overlay';
-  
-  var progress = pawketPass.playerProgress;
-  var xpPercent = (progress.pass_xp / 100) * 100;
-  
-  var html = '<div class="modal-content pass-modal">';
-  html += '  <div class="modal-header">';
-  html += '    <h2>🎫 ' + pawketPass.currentSeason.name + '</h2>';
-  html += '    <button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">✕</button>';
-  html += '  </div>';
-  
-  html += '  <div class="pass-progress-display">';
-  html += '    <div class="pass-level">Level ' + progress.pass_level + ' / 50</div>';
-  html += '    <div class="pass-xp-bar">';
-  html += '      <div class="pass-xp-fill" style="width: ' + xpPercent + '%"></div>';
-  html += '    </div>';
-  html += '    <div class="pass-xp-text">' + progress.pass_xp + ' / 100 XP</div>';
-  html += '  </div>';
-  
-  html += '  <div class="pass-rewards-grid">';
-  
-  for (var i = 0; i < pawketPass.rewards.length; i++) {
-    var reward = pawketPass.rewards[i];
-    var isUnlocked = reward.level <= progress.pass_level;
-    var isClaimed = false; // TODO: Check claims
-    
-    var rewardClass = 'pass-reward-item';
-    if (isUnlocked) rewardClass += ' unlocked';
-    if (reward.is_premium) rewardClass += ' premium';
-    
-    html += '<div class="' + rewardClass + '">';
-    html += '  <div class="reward-level">Level ' + reward.level + '</div>';
-    html += '  <div class="reward-icon">' + pass_getRewardIcon(reward.reward_type) + '</div>';
-    html += '  <div class="reward-name">';
-    if (reward.reward_type === 'pp') {
-      html += reward.reward_amount + ' PP';
-    } else if (reward.reward_type === 'skin_key') {
-      html += reward.reward_amount + ' Skin Key' + (reward.reward_amount > 1 ? 's' : '');
-    }
-    html += '  </div>';
-    if (isUnlocked && !isClaimed) {
-      html += '  <button class="btn-claim" onclick="pass_claimReward(' + reward.level + ')">Claim</button>';
-    } else if (isClaimed) {
-      html += '  <div class="reward-claimed">✓ Claimed</div>';
-    } else {
-      html += '  <div class="reward-locked">🔒 Locked</div>';
-    }
-    html += '</div>';
-  }
-  
-  html += '  </div>';
-  html += '</div>';
-  
-  modal.innerHTML = html;
-  document.body.appendChild(modal);
-}
-
-function pass_getRewardIcon(type) {
-  switch(type) {
-    case 'pp': return '💰';
-    case 'skin_key': return '🔑';
-    case 'item': return '🎁';
-    case 'cosmetic': return '✨';
-    case 'title': return '🏷️';
-    default: return '❓';
-  }
-}
-
-async function pass_claimReward(level) {
-  if (!currentUser || !pawketPass.currentSeason) return;
-  
-  try {
-    var reward = pawketPass.rewards.find(function(r) { return r.level === level; });
-    if (!reward) return;
-    
-    // Grant reward
-    if (reward.reward_type === 'pp') {
-      await updatePoints(reward.reward_amount);
-    } else if (reward.reward_type === 'skin_key') {
-      await skinkey_grantKeys(reward.reward_amount, 'Pass Level ' + level);
-    }
-    
-    // Mark as claimed
-    await supabaseClient
-      .from('player_pass_claims')
-      .insert({
-        player_id: currentUser.id,
-        season_id: pawketPass.currentSeason.id,
-        level: level
-      });
-    
-    alert('Reward claimed! +' + reward.reward_amount + ' ' + reward.reward_type);
-    
-    // Refresh modal
-    document.querySelector('.pass-modal-overlay').remove();
-    pass_showModal();
-    
-  } catch (err) {
-    console.error('Error claiming reward:', err);
-    alert('Failed to claim reward');
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 8. INTEGRATION - Hook into existing systems
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Initialize on load (add to existing phase1_init or similar)
-async function newFeatures_init() {
-  console.log('🚀 Initializing new features...');
-  
-  // Founder badges
-  await founder_checkAndGrant();
-  
-  // Today features
-  await today_init();
-  
-  // Login calendar
-  loginCalendar.currentStreak = playerStats.login_streak || 0;
-  await calendar_init();
-  
-  // Daily welcome modal
-  await dailyWelcome_check();
-  
-  // PawketPass
-  await pass_init();
-  pass_updateDisplay();
-  
-  console.log('✅ New features initialized!');
-}
-
-// NOTE: endBattle wrapper commented out - function doesn't exist in game
-// Pass XP from battles is already granted via existing battle completion hooks
-/*
-// Grant Pass XP after battles
-var original_endBattle = endBattle;
-endBattle = function() {
-  original_endBattle.apply(this, arguments);
-  pass_grantXP(10, 'battle');
-};
-*/
-
-// NOTE: feedPet and playWithPet wrappers commented out - functions don't exist
-// Pass XP is already granted via existing game hooks
-/*
-// Grant Pass XP after feeding
-var original_feedPet = feedPet;
-feedPet = async function() {
-  var result = await original_feedPet.apply(this, arguments);
-  pass_grantXP(5, 'feed');
-  return result;
-};
-
-// Grant Pass XP after playing
-var original_playWithPet = playWithPet;
-playWithPet = async function() {
-  var result = await original_playWithPet.apply(this, arguments);
-  pass_grantXP(5, 'play');
-  return result;
-};
-*/
-
-// NOTE: awardBattleRewards wrapper commented out - function doesn't exist in game
-/*
-// Check for rare drops after battles
-var original_awardBattleRewards = awardBattleRewards;
-*/
-
-// ═══════════════════════════════════════════════════════════════════════════
-// NEW FEATURES - WRAPPER PATTERN INTEGRATION
-// Extends existing systems without replacing them
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Helper: Get current streak from YOUR existing data
-function getPlayerStreak() {
-  if (window.playerData && playerData.login_streak) {
-    return playerData.login_streak;
-  }
-  if (typeof calculateDayStreak === 'function') {
-    return calculateDayStreak();
-  }
-  return 0;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 1. FOUNDER BADGES SYSTEM
-// ═══════════════════════════════════════════════════════════════════════════
-
-var founderBadges = {
-  tiers: {
-    alpha: { name: 'Alpha Founder', cutoffDate: '2024-06-01' },
-    beta: { name: 'Beta Founder', cutoffDate: '2024-08-01' },
-    early: { name: 'Early Supporter', cutoffDate: '2024-09-01' }
-  }
-};
-
-async function founder_checkAndGrant() {
-  if (!currentUser) return;
-  
-  try {
-    var { data: player } = await supabaseClient
-      .from('players')
-      .select('founder_status, created_at')
-      .eq('id', currentUser.id)
-      .single();
-    
-    if (!player || player.founder_status) return;
-    
-    var accountDate = new Date(player.created_at);
-    var tier = null;
-    
-    if (accountDate < new Date(founderBadges.tiers.alpha.cutoffDate)) tier = 'alpha';
-    else if (accountDate < new Date(founderBadges.tiers.beta.cutoffDate)) tier = 'beta';
-    else if (accountDate < new Date(founderBadges.tiers.early.cutoffDate)) tier = 'early';
-    
-    if (!tier) return;
-    
-    await supabaseClient.from('players').update({
-      founder_status: tier,
-      founder_granted_at: new Date().toISOString()
-    }).eq('id', currentUser.id);
-    
-    showCenteredModal(
-      '👑 Founder Status Granted!',
-      founderBadges.tiers[tier].name + '\n\nThank you for being an early supporter!\n\nThis status can never be obtained again!',
-      '👑'
-    );
-    
-    console.log('🎉 Founder status granted:', tier);
-  } catch (err) {
-    console.error('Founder check error:', err);
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 2. RARE COLLECTIBLES SYSTEM
-// ═══════════════════════════════════════════════════════════════════════════
-
-async function rare_checkDrop(source, sourceId) {
-  if (!currentUser) return;
-  
-  try {
-    var { data: availableRares } = await supabaseClient
-      .from('rare_cosmetics')
-      .select('*')
-      .eq('drop_source', source);
-    
-    if (!availableRares || availableRares.length === 0) return;
-    
-    for (var rare of availableRares) {
-      if (Math.random() < rare.drop_rate) {
-        var { data: existing } = await supabaseClient
-          .from('player_rare_cosmetics')
-          .select('id')
-          .eq('player_id', currentUser.id)
-          .eq('cosmetic_id', rare.id)
-          .single();
-        
-        if (existing) continue;
-        
-        await supabaseClient.from('player_rare_cosmetics').insert({
-          player_id: currentUser.id,
-          cosmetic_id: rare.id,
-          obtained_from: sourceId
-        });
-        
-        await supabaseClient.from('rare_cosmetics')
-          .update({ obtained_count: rare.obtained_count + 1 })
-          .eq('id', rare.id);
-        
-        var rarityColors = { rare: '#3b82f6', epic: '#a855f7', legendary: '#f59e0b', mythic: '#ec4899' };
-        var color = rarityColors[rare.rarity] || '#3b82f6';
-        
-        showRareDropModal(
-          rare.rarity.toUpperCase() + ' DROP!',
-          rare.name + '\n' + rare.description + '\n\nRarity: ' + rare.rarity + '\nDrop Rate: ' + (rare.drop_rate * 100).toFixed(2) + '%\nObtained By: ' + (rare.obtained_count + 1) + ' players'
-        );
-        
-        console.log('🎉 Rare drop:', rare.name);
-        break;
-      }
-    }
-  } catch (err) {
-    console.error('Rare drop error:', err);
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 3. TODAY IN PAWKETPETS SYSTEM
-// ═══════════════════════════════════════════════════════════════════════════
-
-var todayFeatures = {
-  current: null,
-  weatherTypes: [
-    { id: 'sunny', emoji: '☀️', name: 'Sunny' },
-    { id: 'rainy', emoji: '🌧️', name: 'Rainy' },
-    { id: 'foggy', emoji: '🌫️', name: 'Foggy' },
-    { id: 'snowy', emoji: '❄️', name: 'Snowy' },
-    { id: 'stormy', emoji: '⛈️', name: 'Stormy' }
-  ],
-  bonusTypes: [
-    { id: 'double_xp', name: '2x Battle XP' },
-    { id: 'double_pp', name: '2x PawketPoints' },
-    { id: 'bonus_drops', name: '+25% Rare Drops' }
-  ],
-  headlines: [
-    '🔬 Scientists discover new pet variant!',
-    '🎭 Local pet wins talent show!',
-    '🌟 Mysterious lights seen in sky...',
-    '📰 PawketPets reaches 1,000 players!',
-    '🎉 Community goal smashed!',
-    '🔮 Fortune teller predicts lucky day!',
-    '🎪 Traveling merchant spotted!',
-    '🏆 New leaderboard champion!'
-  ]
-};
-
-async function today_init() {
-  var todayDate = new Date().toISOString().split('T')[0];
-  
-  try {
-    var { data: existing } = await supabaseClient
-      .from('daily_features')
-      .select('*')
-      .eq('date', todayDate)
-      .single();
-    
-    if (existing) {
-      todayFeatures.current = existing;
-    } else {
-      var weather = todayFeatures.weatherTypes[Math.floor(Math.random() * todayFeatures.weatherTypes.length)];
-      var bonus = todayFeatures.bonusTypes[Math.floor(Math.random() * todayFeatures.bonusTypes.length)];
-      var headline = todayFeatures.headlines[Math.floor(Math.random() * todayFeatures.headlines.length)];
-      
-      var { data: created } = await supabaseClient.from('daily_features').insert({
-        date: todayDate,
-        weather: weather.id,
-        bonus_type: bonus.id,
-        featured_type: ['fire', 'water', 'grass', 'electric'][Math.floor(Math.random() * 4)],
-        news_headline: headline
-      }).select().single();
-      
-      todayFeatures.current = created;
-    }
-    
-    today_displayBanner();
-  } catch (err) {
-    console.error('Today features error:', err);
-  }
-}
-
-function today_displayBanner() {
-  var homeSection = document.getElementById('section-home');
-  if (!homeSection || !todayFeatures.current) return;
-  
-  var features = todayFeatures.current;
-  var weather = todayFeatures.weatherTypes.find(function(w) { return w.id === features.weather; });
-  var bonus = todayFeatures.bonusTypes.find(function(b) { return b.id === features.bonus_type; });
-  
-  var banner = document.createElement('div');
-  banner.className = 'today-banner';
-  banner.style.cssText = 'background:linear-gradient(135deg,#667eea,#764ba2);border-radius:12px;padding:16px;margin-bottom:16px;cursor:pointer;color:white;box-shadow:0 4px 12px rgba(102,126,234,0.3);';
-  banner.innerHTML = 
-    '<div onclick="var d=this.nextElementSibling;var a=this.querySelector(\'.arrow\');d.style.display=d.style.display===\'none\'?\'block\':\'none\';a.textContent=d.style.display===\'none\'?\'▼\':\'▲\';" style="display:flex;justify-content:space-between;align-items:center;">' +
-    '<span style="font-weight:500;">🌟 Today: ' + (weather ? weather.emoji + ' ' + weather.name : '') + ' • ' +
-    (bonus ? '⚡ ' + bonus.name : '') + ' • ✨ ' + features.featured_type + ' Day</span>' +
-    '<span class="arrow" style="font-size:12px;">▼</span>' +
-    '</div>' +
-    '<div style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.2);">' +
-    '<div style="padding:8px 0;">Weather: ' + (weather ? weather.emoji + ' ' + weather.name : '') + '</div>' +
-    '<div style="padding:8px 0;">Bonus: ' + (bonus ? bonus.name : '') + '</div>' +
-    '<div style="padding:8px 0;">Featured: ' + features.featured_type + '-type pets earn +50% XP</div>' +
-    '<div style="padding:12px;margin-top:12px;background:rgba(0,0,0,0.2);border-radius:8px;border-left:3px solid #fbbf24;color:#fbbf24;font-size:13px;">📰 ' + features.news_headline + '</div>' +
-    '</div>';
-  
-  if (homeSection.firstChild) {
-    homeSection.insertBefore(banner, homeSection.firstChild);
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 4. LOGIN CALENDAR VISUAL
-// ═══════════════════════════════════════════════════════════════════════════
-
-async function calendar_init() {
-  try {
-    var { data: rewards } = await supabaseClient
-      .from('login_calendar_rewards')
-      .select('*')
-      .order('day');
-    
-    window.calendarRewards = rewards || [];
-    calendar_displayWidget();
-  } catch (err) {
-    console.error('Calendar error:', err);
-  }
-}
-
-function calendar_displayWidget() {
-  var homeSection = document.getElementById('section-home');
-  if (!homeSection) return;
-  
-  var streak = getPlayerStreak();
-  var nextDay = Math.min(streak + 1, 30);
-  var nextReward = window.calendarRewards ? window.calendarRewards.find(function(r) { return r.day === nextDay; }) : null;
-  
-  var widget = document.createElement('div');
-  widget.className = 'calendar-widget';
-  widget.style.cssText = 'background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.2);border-radius:12px;padding:16px;margin-bottom:20px;cursor:pointer;transition:all 0.3s ease;';
-  widget.onmouseover = function() { this.style.background = 'rgba(255,255,255,0.15)'; this.style.borderColor = 'rgba(255,255,255,0.3)'; };
-  widget.onmouseout = function() { this.style.background = 'rgba(255,255,255,0.1)'; this.style.borderColor = 'rgba(255,255,255,0.2)'; };
-  widget.onclick = function() { calendar_showFull(); };
-  
-  var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
-  html += '<span style="font-weight:bold;font-size:16px;color:#fbbf24;">📅 Day ' + streak + ' Streak</span>';
-  if (nextReward) {
-    html += '<span style="color:#cbd5e1;font-size:14px;">Next: ' + nextReward.pp_reward + ' PP';
-    if (nextReward.skin_keys > 0) html += ' + ' + nextReward.skin_keys + ' 🔑';
-    html += '</span>';
-  }
-  html += '</div>';
-  
-  html += '<div style="display:flex;gap:8px;justify-content:center;">';
-  for (var i = 1; i <= 7; i++) {
-    var style = 'width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;transition:all 0.3s ease;';
-    if (i <= streak) {
-      style += 'background:#4ade80;color:white;box-shadow:0 0 10px rgba(74,222,128,0.5);';
-      html += '<span style="' + style + '">✓</span>';
-    } else if (i === streak + 1) {
-      style += 'background:#fbbf24;color:#1e1e2e;box-shadow:0 0 15px rgba(251,191,36,0.6);animation:pulse 2s infinite;';
-      html += '<span style="' + style + '">' + i + '</span>';
-    } else {
-      style += 'background:rgba(255,255,255,0.2);color:#94a3b8;';
-      html += '<span style="' + style + '">' + i + '</span>';
-    }
-  }
-  html += '</div>';
-  
-  widget.innerHTML = html;
-  
-  var todayBanner = homeSection.querySelector('.today-banner');
-  if (todayBanner) {
-    todayBanner.parentNode.insertBefore(widget, todayBanner.nextSibling);
-  } else if (homeSection.firstChild) {
-    homeSection.insertBefore(widget, homeSection.firstChild);
-  }
-}
-
-function calendar_showFull() {
-  var streak = getPlayerStreak();
-  var html = '<h2 style="text-align:center;margin-bottom:20px;">📅 30-Day Login Calendar</h2>';
-  html += '<div style="text-align:center;margin:20px 0;padding:15px;background:rgba(251,191,36,0.1);border-radius:12px;color:#fbbf24;">Current Streak: <strong style="font-size:24px;">' + streak + ' days</strong></div>';
-  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:15px;max-height:400px;overflow-y:auto;padding:10px;">';
-  
-  for (var i = 1; i <= 30; i++) {
-    var reward = window.calendarRewards ? window.calendarRewards.find(function(r) { return r.day === i; }) : null;
-    var style = 'padding:15px;text-align:center;border-radius:12px;transition:all 0.3s ease;border:2px solid;';
-    if (i <= streak) {
-      style += 'background:rgba(74,222,128,0.1);border-color:#4ade80;';
-    } else if (i === streak + 1) {
-      style += 'background:rgba(251,191,36,0.15);border-color:#fbbf24;box-shadow:0 0 20px rgba(251,191,36,0.3);';
-    } else {
-      style += 'background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);';
-    }
-    
-    if (reward && reward.is_milestone) {
-      style += 'background:linear-gradient(135deg,rgba(245,158,11,0.1),rgba(251,191,36,0.1));border-color:#f59e0b;';
-    }
-    
-    html += '<div style="' + style + '">';
-    html += '<div style="font-weight:bold;font-size:14px;color:#cbd5e1;margin-bottom:10px;">Day ' + i + '</div>';
-    if (reward) {
-      html += '<div style="font-size:16px;font-weight:bold;color:#fbbf24;margin:8px 0;">' + reward.pp_reward + ' PP</div>';
-      if (reward.skin_keys > 0) {
-        html += '<div style="font-size:14px;color:#60a5fa;margin:4px 0;">' + reward.skin_keys + ' 🔑</div>';
-      }
-      if (reward.is_milestone) {
-        html += '<div style="font-size:12px;color:#f59e0b;margin-top:8px;padding:4px 8px;background:rgba(245,158,11,0.2);border-radius:6px;">⭐ ' + reward.milestone_title + '</div>';
-      }
-    }
-    if (i <= streak) {
-      html += '<div style="color:#4ade80;font-size:12px;margin-top:10px;padding:4px 8px;background:rgba(74,222,128,0.2);border-radius:6px;">✓ Claimed</div>';
-    } else if (i === streak + 1) {
-      html += '<div style="color:#fbbf24;font-size:12px;font-weight:bold;margin-top:10px;">← Today</div>';
-    }
-    html += '</div>';
-  }
-  
-  html += '</div>';
-  
-  // Always use showModal or showCenteredModal with actual content
-  if (typeof showModal === 'function') {
-    showModal('Login Calendar', html);
-  } else {
-    // Create custom modal with calendar content
-    var modal = document.createElement('div');
-    modal.className = 'modal-overlay centered-modal-overlay';
-    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;';
-    
-    var container = document.createElement('div');
-    container.style.cssText = 'background:#1e1e2e;border-radius:16px;max-width:900px;width:95%;max-height:85vh;overflow-y:auto;padding:20px;';
-    container.innerHTML = html + '<div style="text-align:center;margin-top:20px;"><button onclick="this.closest(\'.modal-overlay\').remove()" style="background:#667eea;color:white;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-weight:bold;">Close</button></div>';
-    
-    modal.appendChild(container);
-    document.body.appendChild(modal);
-    
-    modal.onclick = function(e) {
-      if (e.target === modal) modal.remove();
-    };
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 5. DAILY WELCOME MODAL
-// ═══════════════════════════════════════════════════════════════════════════
-
-function dailyWelcome_check() {
-  var lastWelcome = localStorage.getItem('lastDailyWelcome');
-  var today = new Date().toDateString();
-  
-  if (lastWelcome !== today) {
-    dailyWelcome_show();
-    localStorage.setItem('lastDailyWelcome', today);
-  }
-}
-
-function dailyWelcome_show() {
-  var streak = getPlayerStreak();
-  var features = todayFeatures.current;
-  
-  var html = '<div style="text-align:center;padding:30px;">';
-  html += '<div style="font-size:60px;margin-bottom:10px;animation:bounce 2s infinite;">🎉</div>';
-  html += '<h2 style="font-size:32px;color:#fbbf24;margin:10px 0;">WELCOME BACK!</h2>';
-  html += '<div style="font-size:18px;color:#cbd5e1;margin-bottom:25px;">Day ' + streak + ' Streak</div>';
-  
-  if (features) {
-    var weather = todayFeatures.weatherTypes.find(function(w) { return w.id === features.weather; });
-    var bonus = todayFeatures.bonusTypes.find(function(b) { return b.id === features.bonus_type; });
-    
-    html += '<div style="background:rgba(102,126,234,0.1);padding:20px;border-radius:12px;margin-bottom:20px;border-left:4px solid #667eea;">';
-    html += '<h3 style="color:#667eea;margin-bottom:15px;font-size:18px;">🌟 TODAY IN PAWKETPETS</h3>';
-    html += '<div style="padding:8px 0;color:#e2e8f0;font-size:15px;">Weather: ' + (weather ? weather.emoji + ' ' + weather.name : '') + '</div>';
-    html += '<div style="padding:8px 0;color:#e2e8f0;font-size:15px;">Bonus: ' + (bonus ? bonus.name : '') + '</div>';
-    html += '<div style="padding:8px 0;color:#e2e8f0;font-size:15px;">Featured: ✨ ' + features.featured_type + '-type pets +50% XP</div>';
-    html += '</div>';
-  }
-  
-  html += '<div style="background:rgba(251,191,36,0.1);padding:20px;border-radius:12px;border-left:4px solid #fbbf24;">';
-  html += '<h3 style="color:#fbbf24;margin-bottom:15px;font-size:18px;">📅 YOUR PROGRESS</h3>';
-  html += '<div style="display:flex;gap:10px;justify-content:center;margin:15px 0;">';
-  for (var i = 1; i <= 7; i++) {
-    var style = 'width:45px;height:45px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:bold;';
-    if (i <= streak) {
-      style += 'background:#4ade80;color:white;';
-      html += '<span style="' + style + '">✓</span>';
-    } else if (i === streak + 1) {
-      style += 'background:#fbbf24;color:#1e1e2e;animation:pulse 2s infinite;';
-      html += '<span style="' + style + '">' + i + '</span>';
-    } else {
-      style += 'background:rgba(255,255,255,0.2);color:#94a3b8;';
-      html += '<span style="' + style + '">' + i + '</span>';
-    }
-  }
-  html += '</div>';
-  
-  var nextDay = Math.min(streak + 1, 30);
-  var nextReward = window.calendarRewards ? window.calendarRewards.find(function(r) { return r.day === nextDay; }) : null;
-  if (nextReward) {
-    html += '<div style="text-align:center;margin-top:15px;padding:12px;background:rgba(0,0,0,0.3);border-radius:8px;color:#cbd5e1;font-size:15px;">🎁 Tomorrow: Day ' + nextDay + ' - ' + nextReward.pp_reward + ' PP';
-    if (nextReward.skin_keys > 0) html += ' + ' + nextReward.skin_keys + ' 🔑';
-    if (nextReward.is_milestone) html += ' + ' + nextReward.milestone_title;
-    html += '</div>';
-  }
-  
-  html += '</div></div>';
-  
-  // Use existing showModal if available, fallback to showCenteredModal
-  if (typeof showModal === 'function') {
-    showModal('Welcome Back!', html);
-  } else {
-    showCelebrationModal('Welcome Back!', 'Day ' + streak + ' Streak!');
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 7. INTEGRATION HELPERS
-// ═══════════════════════════════════════════════════════════════════════════
-
-async function newFeatures_checkBattleRewards(battleId) {
-  await rare_checkDrop('battle', battleId);
-}
-
-async function newFeatures_checkDungeonRewards(dungeonId) {
-  await rare_checkDrop('dungeon', dungeonId);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 8. MAIN INITIALIZATION (called from phase1_init)
-// ═══════════════════════════════════════════════════════════════════════════
-
-async function newFeatures_init() {
-  console.log('🚀 Initializing new features (wrapper pattern)...');
-  
-  try {
-    await founder_checkAndGrant();
-    await today_init();
-    await calendar_init();
-    dailyWelcome_check();
-    
-    console.log('✅ New features initialized successfully!');
-  } catch (err) {
-    console.error('❌ New features initialization error:', err);
-  }
-}
-
-console.log('✅ New features wrapper code loaded');
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PAWKETPASS UI SYSTEM - Complete Visual Interface
-// Wraps existing Pass functions to add UI layer
-// Uses YOUR existing: PASS_REWARDS, addPassXP(), claimPassReward()
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Global Pass UI state
-var passUI = {
-  isModalOpen: false,
-  unclaimedLevels: []
-};
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 1. WRAPPER - Enhance existing addPassXP to update UI
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Store original function
-var originalAddPassXP = addPassXP;
-
-// Wrap with UI updates
-addPassXP = async function(amount, source) {
-  var oldLevel = passProgress ? passProgress.level : 1;
-  
-  // Call YOUR original function
-  var result = await originalAddPassXP(amount, source);
-  
-  // Update UI after XP gain
-  pass_updateNavbar();
-  
-  // Check if leveled up
-  if (passProgress && passProgress.level > oldLevel) {
-    pass_showLevelUpNotification(passProgress.level);
-  }
-  
-  // Update modal if open
-  if (passUI.isModalOpen) {
-    pass_renderRewards();
-  }
-  
-  return result;
-};
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 2. WRAPPER - Enhance existing claimPassReward to update UI
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Store original function
-var originalClaimPassReward = claimPassReward;
-
-// Wrap with UI updates
-claimPassReward = async function(level) {
-  // Call YOUR original function
-  var result = await originalClaimPassReward(level);
-  
-  // Update UI after claim
-  pass_updateNavbar();
-  
-  // Update modal if open
-  if (passUI.isModalOpen) {
-    pass_renderRewards();
-  }
-  
-  // Show claim success
-  pass_showClaimSuccess(level);
-  
-  return result;
-};
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 3. UPDATE NAVBAR BUTTON
-// ═══════════════════════════════════════════════════════════════════════════
-
-function pass_updateNavbar() {
-  var passBtn = document.getElementById('pass-button');
-  if (!passBtn) return;
-  
-  if (passProgress && passProgress.level) {
-    passBtn.style.display = 'block';
-    passBtn.textContent = '🎫 Pass (Lvl ' + passProgress.level + ')';
-    
-    // Check for unclaimed rewards - use claimedRewards (consistent name), with null safety
-    passUI.unclaimedLevels = [];
-    var claimed = passProgress.claimedRewards || passProgress.claimed_rewards || [];
-    for (var i = 1; i <= passProgress.level; i++) {
-      if (!claimed.includes(i)) {
-        passUI.unclaimedLevels.push(i);
-      }
-    }
-    
-    // Add badge if unclaimed
-    if (passUI.unclaimedLevels.length > 0) {
-      passBtn.innerHTML = '🎫 Pass (Lvl ' + passProgress.level + ') <span style="background:#f59e0b;color:white;border-radius:50%;padding:2px 6px;font-size:11px;margin-left:4px;">' + passUI.unclaimedLevels.length + '</span>';
-    }
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 4. SHOW PASS MODAL
-// ═══════════════════════════════════════════════════════════════════════════
 
 function pass_showModal() {
   if (!passProgress) {

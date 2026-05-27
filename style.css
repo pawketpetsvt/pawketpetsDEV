@@ -16002,3 +16002,27 @@ body.night-mode .poll-widget-question,
 body.night-mode .poll-option-card header,
 body.night-mode .poll-option-label   { color: #e8d5ff; }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LOGGED-OUT STATE — Login box centers without sidebars
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Logged-out state — login box centers without sidebars
+   Uses body.logged-out class toggled by showAuth/showApp             */
+body.logged-out .center-content {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Night mode toggle switches in dark mode */
+body.night-mode .toggle-switch .toggle-slider {
+  background-color: #4a4a5e;
+  border: 1px solid rgba(153, 102, 255, 0.3);
+}
+body.night-mode .toggle-switch input:checked + .toggle-slider {
+  background: linear-gradient(135deg, #9966ff, #b589ff);
+}
+body.night-mode .toggle-slider::before {
+  background-color: #e8d5ff;
+}
+
