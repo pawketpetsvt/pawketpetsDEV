@@ -7212,222 +7212,185 @@ body.boss-ui-glitch header {
 .title-card[style*="border-color: #5bc0de"] {
   box-shadow: 0 0 15px rgba(91, 192, 222, 0.3);
 }
+/* ═══════════════════════════════════════════════════════════════════════════
+   PET VARIANTS — Complete Redesign
+   Targets .my-pet-card (actual card), .pet-avatar, .pet-avatar-wrap
+   One clean block replaces all three old variant sections.
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ═══════════════════════════════════════════════════════════════════════
-   PET VARIANT VISUAL EFFECTS
-   ═══════════════════════════════════════════════════════════════════════ */
-
-/* Variant badge on pet cards */
-.pet-variant-badge {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  font-weight: bold;
-  color: white;
-  margin-left: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+/* Floating icon shared base (override per-variant below) */
+.my-pet-card[class*="pet-variant-"]::before {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  font-size: 1.6rem;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+  pointer-events: none;
+  z-index: 10;
+  animation: varIconFloat 3s ease-in-out infinite;
+}
+@keyframes varIconFloat {
+  0%,100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-5px) rotate(5deg); }
 }
 
-/* Shiny variant - rainbow hue shift */
-.pet-card.pet-variant-shiny,
-.pet-image-wrap.pet-variant-shiny img {
-  animation: shiny-pulse 3s ease-in-out infinite;
+/* ── GHOST ── */
+.my-pet-card.pet-variant-ghost,
+.pet-avatar-wrap.pet-variant-ghost {
+  background: linear-gradient(135deg,rgba(200,200,220,0.15),rgba(180,180,200,0.08)) !important;
+  border: 2px solid rgba(200,200,255,0.45) !important;
+  box-shadow: 0 0 20px rgba(200,200,255,0.2) !important;
+  animation: ghostCardFloat 4s ease-in-out infinite;
+}
+.my-pet-card.pet-variant-ghost::before { content: '👻'; animation: ghostWobble 3s ease-in-out infinite; }
+.pet-avatar.pet-variant-ghost,
+.pet-avatar-wrap.pet-variant-ghost .pet-avatar {
+  filter: brightness(1.05) contrast(0.93) blur(0.3px);
+  opacity: 0.88;
+}
+@keyframes ghostCardFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+@keyframes ghostWobble    { 0%,100%{transform:translateY(0) rotate(0deg)} 25%{transform:translateY(-2px) rotate(-4deg)} 75%{transform:translateY(2px) rotate(4deg)} }
+
+/* ── SHADOW ── */
+.my-pet-card.pet-variant-shadow,
+.pet-avatar-wrap.pet-variant-shadow {
+  background: linear-gradient(135deg,rgba(20,20,40,0.28),rgba(10,10,30,0.15)) !important;
+  border: 2px solid rgba(100,80,120,0.6) !important;
+  box-shadow: 0 0 18px rgba(0,0,0,0.5) !important;
+}
+.my-pet-card.pet-variant-shadow::before { content: '🌙'; animation: shadowPulse 3s ease-in-out infinite; }
+.pet-avatar.pet-variant-shadow { filter: brightness(0.83) contrast(1.1) saturate(0.9); }
+@keyframes shadowPulse { 0%,100%{text-shadow:0 0 2px rgba(100,80,120,0.5)} 50%{text-shadow:0 0 9px rgba(100,80,120,0.85)} }
+
+/* ── FIRE ── */
+.my-pet-card.pet-variant-fire,
+.pet-avatar-wrap.pet-variant-fire {
+  background: linear-gradient(135deg,rgba(255,100,50,0.09),rgba(255,150,50,0.05)) !important;
+  border: 2px solid rgba(255,100,50,0.45) !important;
+  box-shadow: 0 0 16px rgba(255,100,50,0.22) !important;
+}
+.my-pet-card.pet-variant-fire::before { content: '🔥'; animation: fireFlickerIcon 2s ease-in-out infinite; }
+.pet-avatar.pet-variant-fire { filter: brightness(1.08) saturate(1.15) hue-rotate(-5deg); }
+@keyframes fireFlickerIcon { 0%,100%{transform:translateY(0) scale(1);opacity:.9} 50%{transform:translateY(-3px) scale(1.12);opacity:1} }
+
+/* ── ICE ── */
+.my-pet-card.pet-variant-ice,
+.pet-avatar-wrap.pet-variant-ice {
+  background: linear-gradient(135deg,rgba(100,200,255,0.1),rgba(150,220,255,0.05)) !important;
+  border: 2px solid rgba(100,200,255,0.5) !important;
+  box-shadow: 0 0 16px rgba(100,200,255,0.28) !important;
+}
+.my-pet-card.pet-variant-ice::before { content: '❄️'; animation: iceIconSpin 4s linear infinite; }
+.pet-avatar.pet-variant-ice { filter: brightness(1.1) saturate(0.88) hue-rotate(180deg); }
+@keyframes iceIconSpin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+
+/* ── GOLDEN ── */
+.my-pet-card.pet-variant-golden,
+.pet-avatar-wrap.pet-variant-golden {
+  background: linear-gradient(135deg,rgba(255,215,0,0.1),rgba(255,200,50,0.07)) !important;
+  border: 2px solid rgba(255,215,0,0.55) !important;
+  box-shadow: 0 0 18px rgba(255,215,0,0.32) !important;
+  animation: goldenCardPulse 2.5s ease-in-out infinite;
+}
+.my-pet-card.pet-variant-golden::before { content: '👑'; animation: goldenIconGlow 2.5s ease-in-out infinite; }
+.pet-avatar.pet-variant-golden { filter: sepia(0.28) saturate(1.3) brightness(1.06); }
+@keyframes goldenCardPulse  { 0%,100%{box-shadow:0 0 18px rgba(255,215,0,0.32)} 50%{box-shadow:0 0 28px rgba(255,215,0,0.55)} }
+@keyframes goldenIconGlow   { 0%,100%{text-shadow:0 0 2px #FFD700} 50%{text-shadow:0 0 10px #FFD700,0 0 20px rgba(255,215,0,0.5)} }
+
+/* ── SHINY ── */
+.my-pet-card.pet-variant-shiny,
+.pet-avatar-wrap.pet-variant-shiny {
+  background: linear-gradient(135deg,rgba(255,200,220,0.1),rgba(200,220,255,0.07)) !important;
+  border: 2px solid rgba(255,100,150,0.42) !important;
+  animation: shinyCardBreathe 4s ease-in-out infinite;
+}
+.my-pet-card.pet-variant-shiny::before { content: '✨'; animation: sparkleIcon 2s ease-in-out infinite; }
+.pet-avatar.pet-variant-shiny { animation: gentleRainbow 7s ease-in-out infinite; }
+@keyframes shinyCardBreathe { 0%,100%{opacity:.95} 50%{opacity:1} }
+@keyframes sparkleIcon      { 0%,100%{transform:scale(1) rotate(0deg)} 50%{transform:scale(1.2) rotate(20deg)} }
+@keyframes gentleRainbow    { 0%{filter:hue-rotate(0deg) saturate(1.05)} 33%{filter:hue-rotate(15deg) saturate(1.1)} 66%{filter:hue-rotate(30deg) saturate(1.05)} 100%{filter:hue-rotate(0deg) saturate(1.05)} }
+
+/* ── COSMIC ── */
+.my-pet-card.pet-variant-cosmic,
+.pet-avatar-wrap.pet-variant-cosmic {
+  background: radial-gradient(ellipse at 30% 40%,rgba(100,50,150,0.15),rgba(50,20,80,0.07)) !important;
+  border: 2px solid rgba(150,100,200,0.45) !important;
+  box-shadow: 0 0 22px rgba(100,50,150,0.22) !important;
+}
+.my-pet-card.pet-variant-cosmic::before { content: '🌌'; animation: cosmicDrift 5s ease-in-out infinite; }
+.pet-avatar.pet-variant-cosmic { filter: brightness(1.06) saturate(1.12); animation: cosmicImgPulse 4s ease-in-out infinite; }
+@keyframes cosmicDrift    { 0%,100%{transform:translate(0,0) rotate(0deg)} 25%{transform:translate(-2px,-1px) rotate(-2deg)} 75%{transform:translate(2px,1px) rotate(2deg)} }
+@keyframes cosmicImgPulse { 0%,100%{filter:brightness(1.06) saturate(1.12)} 50%{filter:brightness(1.12) saturate(1.22)} }
+
+/* ── RAINBOW ── */
+.my-pet-card.pet-variant-rainbow,
+.pet-avatar-wrap.pet-variant-rainbow {
+  background: linear-gradient(135deg,rgba(255,200,200,0.09),rgba(200,200,255,0.07)) !important;
+  border: 2px solid rgba(255,150,200,0.4) !important;
+  animation: rainbowCardBreathe 5s ease-in-out infinite;
+}
+.my-pet-card.pet-variant-rainbow::before { content: '🌈'; animation: rainbowIconFloat 4s ease-in-out infinite; }
+.pet-avatar.pet-variant-rainbow { animation: calmRainbow 8s linear infinite; }
+@keyframes rainbowCardBreathe { 0%,100%{opacity:.95;transform:scale(1)} 50%{opacity:1;transform:scale(1.008)} }
+@keyframes rainbowIconFloat   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+@keyframes calmRainbow        { 0%{filter:hue-rotate(0deg) saturate(1.05)} 25%{filter:hue-rotate(30deg) saturate(1.08)} 50%{filter:hue-rotate(60deg) saturate(1.05)} 75%{filter:hue-rotate(30deg) saturate(1.08)} 100%{filter:hue-rotate(0deg) saturate(1.05)} }
+
+/* ── CRYSTAL ── */
+.my-pet-card.pet-variant-crystal,
+.pet-avatar-wrap.pet-variant-crystal {
+  background: linear-gradient(135deg,rgba(200,200,255,0.09),rgba(255,200,255,0.05)) !important;
+  border: 2px solid rgba(150,150,255,0.45) !important;
+  box-shadow: 0 0 16px rgba(150,150,255,0.22) !important;
+}
+.my-pet-card.pet-variant-crystal::before { content: '💎'; animation: crystalIconShine 3s ease-in-out infinite; }
+.pet-avatar.pet-variant-crystal { filter: brightness(1.1) saturate(1.18); animation: crystalImgSparkle 3s ease-in-out infinite; }
+@keyframes crystalIconShine  { 0%,100%{text-shadow:0 0 2px rgba(150,150,255,.5)} 50%{text-shadow:0 0 9px rgba(150,150,255,.9)} }
+@keyframes crystalImgSparkle { 0%,100%{filter:brightness(1.1) saturate(1.18)} 50%{filter:brightness(1.18) saturate(1.26)} }
+
+/* ── ELECTRIC ── */
+.my-pet-card.pet-variant-electric,
+.pet-avatar-wrap.pet-variant-electric {
+  background: linear-gradient(135deg,rgba(255,255,100,0.08),rgba(200,200,100,0.05)) !important;
+  border: 2px solid rgba(255,215,0,0.45) !important;
+  box-shadow: 0 0 14px rgba(255,215,0,0.22) !important;
+}
+.my-pet-card.pet-variant-electric::before { content: '⚡'; animation: electricIconZap 1.8s ease-in-out infinite; }
+.pet-avatar.pet-variant-electric { filter: brightness(1.08) saturate(1.12); animation: electricImgFlicker 1.8s ease-in-out infinite; }
+@keyframes electricIconZap    { 0%,100%{transform:translateY(0);opacity:.8} 25%{transform:translateY(-2px);opacity:1} 75%{transform:translateY(1px);opacity:.9} }
+@keyframes electricImgFlicker { 0%,100%{filter:brightness(1.08) saturate(1.12)} 50%{filter:brightness(1.16) saturate(1.2)} }
+
+/* ── NATURE ── */
+.my-pet-card.pet-variant-nature,
+.pet-avatar-wrap.pet-variant-nature {
+  background: linear-gradient(135deg,rgba(100,200,100,0.09),rgba(150,220,150,0.05)) !important;
+  border: 2px solid rgba(100,200,100,0.42) !important;
+  box-shadow: 0 0 14px rgba(56,161,105,0.2) !important;
+}
+.my-pet-card.pet-variant-nature::before { content: '🌿'; animation: natureIconSway 4s ease-in-out infinite; }
+.pet-avatar.pet-variant-nature { filter: brightness(1.05) saturate(1.12) hue-rotate(10deg); }
+@keyframes natureIconSway { 0%,100%{transform:translateY(0) rotate(0deg)} 25%{transform:translateY(-2px) rotate(-5deg)} 75%{transform:translateY(2px) rotate(5deg)} }
+
+/* Keep text/buttons readable on all variant cards */
+.my-pet-card[class*="pet-variant-"] .pet-nickname,
+.my-pet-card[class*="pet-variant-"] .pet-level,
+.my-pet-card[class*="pet-variant-"] .stat-label,
+.my-pet-card[class*="pet-variant-"] .stat-value {
+  text-shadow: 0 1px 2px rgba(0,0,0,0.18);
 }
 
-@keyframes shiny-pulse {
-  0%, 100% { filter: hue-rotate(0deg) brightness(1.2) saturate(1.3); }
-  33% { filter: hue-rotate(120deg) brightness(1.3) saturate(1.4); }
-  66% { filter: hue-rotate(240deg) brightness(1.3) saturate(1.4); }
-}
+/* Companion sprite variants */
+.companion-sprite.pet-variant-ghost    { filter:brightness(1.05) blur(0.4px); animation:ghostCardFloat 3s ease-in-out infinite; }
+.companion-sprite.pet-variant-shadow   { filter:brightness(0.83) drop-shadow(0 0 5px rgba(0,0,0,.5)); }
+.companion-sprite.pet-variant-fire     { filter:brightness(1.08) saturate(1.15); }
+.companion-sprite.pet-variant-ice      { filter:brightness(1.1) hue-rotate(180deg); }
+.companion-sprite.pet-variant-golden   { filter:sepia(0.28) saturate(1.3); animation:goldenCardPulse 2.5s ease-in-out infinite; }
+.companion-sprite.pet-variant-shiny    { animation:gentleRainbow 7s ease-in-out infinite; }
+.companion-sprite.pet-variant-cosmic   { filter:brightness(1.06) saturate(1.12); animation:cosmicImgPulse 4s ease-in-out infinite; }
+.companion-sprite.pet-variant-rainbow  { animation:calmRainbow 8s linear infinite; }
+.companion-sprite.pet-variant-crystal  { filter:brightness(1.1) saturate(1.18); animation:crystalImgSparkle 3s ease-in-out infinite; }
+.companion-sprite.pet-variant-electric { filter:brightness(1.08) saturate(1.12); animation:electricImgFlicker 1.8s ease-in-out infinite; }
+.companion-sprite.pet-variant-nature   { filter:brightness(1.05) saturate(1.12) hue-rotate(10deg); }
 
-.pet-card.pet-variant-shiny {
-  box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
-  border: 2.5px solid transparent;
-  background: linear-gradient(white, white) padding-box,
-              linear-gradient(135deg, #ff00ff, #00ffff, #ffff00, #ff00ff) border-box;
-}
-
-/* Golden variant - gold glow */
-.pet-card.pet-variant-golden,
-.pet-image-wrap.pet-variant-golden img {
-  filter: sepia(0.6) hue-rotate(15deg) saturate(2.5) brightness(1.15);
-}
-
-.pet-card.pet-variant-golden {
-  box-shadow: 0 0 25px rgba(255, 215, 0, 0.5);
-  border-color: #FFD700;
-  animation: golden-glow 2s ease-in-out infinite;
-}
-
-@keyframes golden-glow {
-  0%, 100% { box-shadow: 0 0 25px rgba(255, 215, 0, 0.5); }
-  50% { box-shadow: 0 0 35px rgba(255, 215, 0, 0.8); }
-}
-
-/* Shadow variant - dark purple/black */
-.pet-card.pet-variant-shadow,
-.pet-image-wrap.pet-variant-shadow img {
-  filter: brightness(0.7) saturate(0.8) hue-rotate(260deg);
-}
-
-.pet-card.pet-variant-shadow {
-  box-shadow: 0 0 20px rgba(139, 0, 139, 0.6);
-  border-color: #4B0082;
-  background: linear-gradient(135deg, rgba(139, 0, 139, 0.05), rgba(75, 0, 130, 0.05));
-}
-
-/* Rainbow variant - full spectrum animation */
-.pet-card.pet-variant-rainbow,
-.pet-image-wrap.pet-variant-rainbow img {
-  animation: rainbow-shift 4s linear infinite;
-}
-
-@keyframes rainbow-shift {
-  0% { filter: hue-rotate(0deg) saturate(1.5) brightness(1.2); }
-  100% { filter: hue-rotate(360deg) saturate(1.5) brightness(1.2); }
-}
-
-.pet-card.pet-variant-rainbow {
-  border: 3px solid transparent;
-  background: linear-gradient(white, white) padding-box,
-              linear-gradient(90deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3, #ff0000) border-box;
-  background-size: 200% 200%;
-  animation: rainbow-border 3s linear infinite;
-}
-
-@keyframes rainbow-border {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 200% 50%; }
-}
-
-/* Corrupted variant - red/black corruption */
-.pet-card.pet-variant-corrupted,
-.pet-image-wrap.pet-variant-corrupted img {
-  filter: hue-rotate(290deg) saturate(1.5) brightness(0.9) contrast(1.2);
-}
-
-.pet-card.pet-variant-corrupted {
-  box-shadow: 0 0 20px rgba(139, 0, 0, 0.5);
-  border-color: #8B0000;
-  animation: corrupt-pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes corrupt-pulse {
-  0%, 100% { box-shadow: 0 0 20px rgba(139, 0, 0, 0.5); }
-  50% { box-shadow: 0 0 30px rgba(139, 0, 0, 0.8); }
-}
-
-/* Glitched variant - digital distortion */
-.pet-card.pet-variant-glitched,
-.pet-image-wrap.pet-variant-glitched img {
-  animation: glitch-distort 1s steps(4) infinite;
-}
-
-@keyframes glitch-distort {
-  0% { filter: hue-rotate(0deg); transform: translateX(0); }
-  20% { filter: hue-rotate(90deg); transform: translateX(-2px); }
-  40% { filter: hue-rotate(180deg); transform: translateX(2px); }
-  60% { filter: hue-rotate(270deg); transform: translateX(-1px); }
-  80% { filter: hue-rotate(360deg); transform: translateX(1px); }
-  100% { filter: hue-rotate(0deg); transform: translateX(0); }
-}
-
-.pet-card.pet-variant-glitched {
-  box-shadow: 0 0 15px rgba(0, 255, 0, 0.4);
-  border-color: #00FF00;
-}
-
-/* Frost variant - icy blue */
-.pet-card.pet-variant-frost,
-.pet-image-wrap.pet-variant-frost img {
-  filter: hue-rotate(180deg) saturate(1.2) brightness(1.15);
-}
-
-.pet-card.pet-variant-frost {
-  box-shadow: 0 0 20px rgba(135, 206, 250, 0.5);
-  border-color: #87CEEB;
-  background: linear-gradient(135deg, rgba(135, 206, 250, 0.05), rgba(176, 224, 230, 0.05));
-}
-
-/* Flame variant - fiery red/orange */
-.pet-card.pet-variant-flame,
-.pet-image-wrap.pet-variant-flame img {
-  filter: hue-rotate(-15deg) saturate(1.5) brightness(1.1);
-}
-
-.pet-card.pet-variant-flame {
-  box-shadow: 0 0 20px rgba(255, 69, 0, 0.5);
-  border-color: #FF4500;
-  animation: flame-flicker 1s ease-in-out infinite;
-}
-
-@keyframes flame-flicker {
-  0%, 100% { box-shadow: 0 0 20px rgba(255, 69, 0, 0.5); }
-  50% { box-shadow: 0 0 30px rgba(255, 140, 0, 0.7); }
-}
-
-/* Cosmic variant - space/galaxy effect */
-.pet-card.pet-variant-cosmic,
-.pet-image-wrap.pet-variant-cosmic img {
-  filter: saturate(1.3) brightness(1.1);
-}
-
-.pet-card.pet-variant-cosmic {
-  box-shadow: 0 0 25px rgba(138, 43, 226, 0.6);
-  border: 3px solid transparent;
-  background: linear-gradient(white, white) padding-box,
-              linear-gradient(135deg, #000033, #663399, #9933ff, #000033) border-box;
-  animation: cosmic-pulse 3s ease-in-out infinite;
-}
-
-@keyframes cosmic-pulse {
-  0%, 100% { box-shadow: 0 0 25px rgba(138, 43, 226, 0.6); }
-  50% { box-shadow: 0 0 40px rgba(138, 43, 226, 0.9); }
-}
-
-/* Crystal variant - diamond shimmer */
-.pet-card.pet-variant-crystal,
-.pet-image-wrap.pet-variant-crystal img {
-  filter: brightness(1.3) contrast(1.15) saturate(1.3);
-}
-
-.pet-card.pet-variant-crystal {
-  box-shadow: 0 0 20px rgba(0, 191, 255, 0.5);
-  border-color: #00BFFF;
-  animation: crystal-shimmer 2s ease-in-out infinite;
-}
-
-@keyframes crystal-shimmer {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.15); }
-}
-
-/* Profile page top pets display */
-.profile-top-pets {
-  display: flex;
-  gap: 15px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin: 20px 0;
-}
-
-.profile-pet-card {
-  background: var(--white);
-  border: 2.5px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 15px;
-  text-align: center;
-  min-width: 150px;
-  box-shadow: 0 4px 12px var(--shadow);
-  transition: transform 0.2s;
-}
-
-.profile-pet-card:hover {
-  transform: translateY(-3px);
-}
 
 .profile-pet-image {
   width: 80px;
@@ -10045,95 +10008,6 @@ body.night-mode .btn-outline:hover {
   #companion-buddy {
     display: none !important;
   }
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   PET VARIANT CSS EFFECTS - Pure CSS styling (no AI-generated art)
-   Custom sprites can be added later by replacing background images
-   ══════════════════════════════════════════════════════════════════════════ */
-
-/* Shadow Variant - Dark mysterious effect */
-.pet-variant-shadow .pet-card-body {
-  background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
-}
-
-.pet-variant-shadow .pet-image,
-.pet-variant-shadow .pet-card-icon img {
-  filter: brightness(0.6) contrast(1.3);
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.8);
-}
-
-/* Fire Variant - Warm glowing effect */
-.pet-variant-fire .pet-card-body {
-  background: linear-gradient(135deg, #ff6600 0%, #ff0000 100%);
-  box-shadow: 0 0 20px rgba(255, 68, 0, 0.6);
-}
-
-.pet-variant-fire .pet-image,
-.pet-variant-fire .pet-card-icon img {
-  filter: hue-rotate(-10deg) saturate(1.5) brightness(1.2);
-  animation: fireGlow 2s ease-in-out infinite;
-}
-
-@keyframes fireGlow {
-  0%, 100% { filter: hue-rotate(-10deg) saturate(1.5) brightness(1.2); }
-  50% { filter: hue-rotate(-10deg) saturate(1.8) brightness(1.4); }
-}
-
-/* Ice Variant - Cool frosty effect */
-.pet-variant-ice .pet-card-body {
-  background: linear-gradient(135deg, #cce7ff 0%, #88ddff 100%);
-  box-shadow: 0 0 20px rgba(136, 221, 255, 0.6);
-}
-
-.pet-variant-ice .pet-image,
-.pet-variant-ice .pet-card-icon img {
-  filter: hue-rotate(180deg) saturate(1.2) brightness(1.3);
-  animation: iceShimmer 3s ease-in-out infinite;
-}
-
-@keyframes iceShimmer {
-  0%, 100% { filter: hue-rotate(180deg) saturate(1.2) brightness(1.3); }
-  50% { filter: hue-rotate(180deg) saturate(1.5) brightness(1.5); }
-}
-
-/* Spirit Variant - Ghostly ethereal effect */
-.pet-variant-spirit .pet-card-body {
-  background: linear-gradient(135deg, #e6d5ff 0%, #ccaaff 100%);
-  box-shadow: 0 0 20px rgba(204, 170, 255, 0.6);
-}
-
-.pet-variant-spirit .pet-image,
-.pet-variant-spirit .pet-card-icon img {
-  filter: brightness(1.3) contrast(0.8);
-  opacity: 0.85;
-  animation: spiritFloat 4s ease-in-out infinite;
-}
-
-@keyframes spiritFloat {
-  0%, 100% { transform: translateY(0); opacity: 0.85; }
-  50% { transform: translateY(-5px); opacity: 0.95; }
-}
-
-/* Crystal Variant - Prismatic shimmering effect */
-.pet-variant-crystal .pet-card-body {
-  background: linear-gradient(135deg, #e0ffff 0%, #00ffff 100%);
-  box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
-}
-
-.pet-variant-crystal .pet-image,
-.pet-variant-crystal .pet-card-icon img {
-  filter: saturate(1.5) brightness(1.2);
-  animation: crystalPrism 5s linear infinite;
-}
-
-@keyframes crystalPrism {
-  0% { filter: saturate(1.5) brightness(1.2) hue-rotate(0deg); }
-  25% { filter: saturate(1.5) brightness(1.2) hue-rotate(90deg); }
-  50% { filter: saturate(1.5) brightness(1.2) hue-rotate(180deg); }
-  75% { filter: saturate(1.5) brightness(1.2) hue-rotate(270deg); }
-  100% { filter: saturate(1.5) brightness(1.2) hue-rotate(360deg); }
 }
 
 /* Variant unlock notification styling */
@@ -16527,147 +16401,4 @@ body.night-mode .item-icon-img {
   filter: drop-shadow(1px 2px 4px rgba(0,0,0,0.35));
 }
 
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   PET VARIANT EFFECTS — Extended selectors
-   Covers .my-pet-card (actual card class) + .pet-avatar + .pet-avatar-wrap
-   The existing rules target .pet-card which is never rendered;
-   these mirror every effect on the correct elements.
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* ── GOLDEN ── */
-.my-pet-card.pet-variant-golden,
-.pet-avatar.pet-variant-golden,
-.pet-avatar-wrap.pet-variant-golden {
-  filter: sepia(0.6) hue-rotate(15deg) saturate(2.5) brightness(1.15);
-}
-.my-pet-card.pet-variant-golden {
-  box-shadow: 0 0 25px rgba(255,215,0,0.55);
-  border-color: #FFD700 !important;
-  animation: golden-glow 2s ease-in-out infinite;
-}
-
-/* ── SHINY ── */
-.my-pet-card.pet-variant-shiny,
-.pet-avatar.pet-variant-shiny,
-.pet-avatar-wrap.pet-variant-shiny {
-  animation: shiny-pulse 3s ease-in-out infinite;
-}
-.my-pet-card.pet-variant-shiny {
-  box-shadow: 0 0 20px rgba(255,255,255,0.4);
-  border: 2.5px solid transparent !important;
-  background: linear-gradient(white, white) padding-box,
-              linear-gradient(135deg, #ff00ff, #00ffff, #ffff00, #ff00ff) border-box !important;
-}
-
-/* ── COSMIC ── */
-.my-pet-card.pet-variant-cosmic,
-.pet-avatar.pet-variant-cosmic,
-.pet-avatar-wrap.pet-variant-cosmic {
-  filter: saturate(1.3) brightness(1.1);
-}
-.my-pet-card.pet-variant-cosmic {
-  box-shadow: 0 0 25px rgba(138,43,226,0.6);
-  border: 2.5px solid transparent !important;
-  background: linear-gradient(white,white) padding-box,
-              linear-gradient(135deg,#667eea,#764ba2,#667eea) border-box !important;
-}
-
-/* ── SHADOW ── */
-.my-pet-card.pet-variant-shadow,
-.pet-avatar.pet-variant-shadow,
-.pet-avatar-wrap.pet-variant-shadow {
-  filter: brightness(0.7) saturate(0.8) hue-rotate(260deg);
-}
-.my-pet-card.pet-variant-shadow {
-  box-shadow: 0 0 20px rgba(139,0,139,0.6);
-  border-color: #4B0082 !important;
-}
-
-/* ── FIRE ── */
-.my-pet-card.pet-variant-fire,
-.pet-avatar.pet-variant-fire,
-.pet-avatar-wrap.pet-variant-fire {
-  filter: hue-rotate(-15deg) saturate(1.5) brightness(1.1);
-}
-.my-pet-card.pet-variant-fire {
-  box-shadow: 0 0 20px rgba(255,69,0,0.55);
-  border-color: #FF4500 !important;
-  animation: flame-flicker 1s ease-in-out infinite;
-}
-
-/* ── ICE ── */
-.my-pet-card.pet-variant-ice,
-.pet-avatar.pet-variant-ice,
-.pet-avatar-wrap.pet-variant-ice {
-  filter: hue-rotate(180deg) saturate(1.2) brightness(1.15);
-}
-.my-pet-card.pet-variant-ice {
-  box-shadow: 0 0 20px rgba(0,212,255,0.5);
-  border-color: #00D2FF !important;
-}
-
-/* ── ELECTRIC ── */
-.my-pet-card.pet-variant-electric,
-.pet-avatar.pet-variant-electric,
-.pet-avatar-wrap.pet-variant-electric {
-  filter: brightness(1.2) saturate(1.5) hue-rotate(200deg);
-}
-.my-pet-card.pet-variant-electric {
-  box-shadow: 0 0 18px rgba(255,255,0,0.6);
-  border-color: #FFD700 !important;
-  animation: electric-zap 0.6s ease-in-out infinite;
-}
-@keyframes electric-zap {
-  0%,100% { box-shadow: 0 0 18px rgba(255,255,0,0.6); }
-  50%      { box-shadow: 0 0 30px rgba(255,255,0,0.9); }
-}
-
-/* ── NATURE ── */
-.my-pet-card.pet-variant-nature,
-.pet-avatar.pet-variant-nature,
-.pet-avatar-wrap.pet-variant-nature {
-  filter: hue-rotate(80deg) saturate(1.3) brightness(1.05);
-}
-.my-pet-card.pet-variant-nature {
-  box-shadow: 0 0 18px rgba(56,161,105,0.5);
-  border-color: #38A169 !important;
-}
-
-/* ── CRYSTAL ── */
-.my-pet-card.pet-variant-crystal,
-.pet-avatar.pet-variant-crystal,
-.pet-avatar-wrap.pet-variant-crystal {
-  filter: brightness(1.25) saturate(1.4);
-}
-.my-pet-card.pet-variant-crystal {
-  box-shadow: 0 0 22px rgba(99,179,237,0.6);
-  border-color: #63B3ED !important;
-  animation: crystal-shine 2s ease-in-out infinite;
-}
-@keyframes crystal-shine {
-  0%,100% { filter: brightness(1.25) saturate(1.4); }
-  50%      { filter: brightness(1.45) saturate(1.6); }
-}
-
-/* ── GHOST ── */
-.my-pet-card.pet-variant-ghost,
-.pet-avatar.pet-variant-ghost,
-.pet-avatar-wrap.pet-variant-ghost {
-  filter: brightness(1.1) contrast(0.88) opacity(0.85);
-  animation: ghost-float 3s ease-in-out infinite;
-}
-.my-pet-card.pet-variant-ghost {
-  box-shadow: 0 0 20px rgba(200,200,255,0.5);
-  border-color: rgba(153,102,255,0.6) !important;
-}
-@keyframes ghost-float {
-  0%,100% { transform: translateY(0); }
-  50%     { transform: translateY(-5px); }
-}
-
-/* Night mode: preserve effects */
-body.night-mode .my-pet-card.pet-variant-golden  { background: rgba(42,36,64,0.95) !important; }
-body.night-mode .my-pet-card.pet-variant-shiny   { background: rgba(42,36,64,0.95) !important; }
-body.night-mode .my-pet-card.pet-variant-cosmic  { background: rgba(42,36,64,0.95) !important; }
 
