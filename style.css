@@ -15512,3 +15512,394 @@ body.night-mode .event-status-widget:hover {
   .event-status-widget { display: none !important; }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SEASONAL UI THEMES — CSS variable overrides per theme class
+   Applied to <body> as: body.theme-autumn, body.theme-winter, etc.
+   Night mode still works on top of themes (night-mode overrides theme-bg).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── DEFAULT (Classic Purple) — already defined by :root, listed here for reference ── */
+/* --purple: #9966ff; --pink: #ff66cc; --bg-gradient: etc. */
+
+/* ── COZY AUTUMN ── */
+body.theme-autumn {
+  --purple: #c0672a;
+  --pink: #e8a030;
+  --border: #d4844a;
+  background: linear-gradient(180deg, #fff4e6 0%, #ffe0b3 100%) !important;
+}
+body.theme-autumn .navbar {
+  background: linear-gradient(135deg, #c0672a 0%, #e8a030 100%) !important;
+}
+body.theme-autumn .btn-primary,
+body.theme-autumn .btn-action.btn-feed {
+  background: linear-gradient(135deg, #c0672a 0%, #e8a030 100%) !important;
+}
+body.theme-autumn .sidebar-nav-btn.active,
+body.theme-autumn .tab-btn.active {
+  background: linear-gradient(135deg, #c0672a, #e8a030) !important;
+}
+body.theme-autumn .card,
+body.theme-autumn .sidebar-section {
+  border-color: #d4844a !important;
+}
+body.theme-autumn .progress-bar-inner {
+  background: linear-gradient(90deg, #c0672a, #e8a030) !important;
+}
+
+/* Floating leaf particles */
+body.theme-autumn::before {
+  content: '🍂 🍁 🍂 🍁 🍂 🍁';
+  position: fixed;
+  top: -40px;
+  left: 0;
+  width: 100%;
+  font-size: 1.4rem;
+  pointer-events: none;
+  z-index: 0;
+  animation: autumn-leaves 12s linear infinite;
+  white-space: nowrap;
+  letter-spacing: 60px;
+  opacity: 0.5;
+}
+@keyframes autumn-leaves {
+  0%   { transform: translateY(0) translateX(0) rotate(0deg); }
+  100% { transform: translateY(110vh) translateX(80px) rotate(360deg); }
+}
+
+/* ── WINTER AURORA ── */
+body.theme-winter {
+  --purple: #00b4db;
+  --pink: #3a7bd5;
+  --border: #7ecef4;
+  background: linear-gradient(180deg, #e0f4ff 0%, #c0e8ff 100%) !important;
+}
+body.theme-winter .navbar {
+  background: linear-gradient(135deg, #005f99 0%, #00b4db 100%) !important;
+}
+body.theme-winter .btn-primary,
+body.theme-winter .btn-action.btn-feed {
+  background: linear-gradient(135deg, #005f99 0%, #00b4db 100%) !important;
+}
+body.theme-winter .sidebar-nav-btn.active,
+body.theme-winter .tab-btn.active {
+  background: linear-gradient(135deg, #005f99, #00b4db) !important;
+}
+body.theme-winter .card,
+body.theme-winter .sidebar-section {
+  border-color: #7ecef4 !important;
+}
+body.theme-winter .progress-bar-inner {
+  background: linear-gradient(90deg, #005f99, #00d2ff) !important;
+}
+
+/* Gentle snow */
+body.theme-winter::before {
+  content: '❄ ❅ ❆ ❄ ❅ ❆ ❄';
+  position: fixed;
+  top: -40px;
+  left: -20px;
+  width: 120%;
+  font-size: 1.1rem;
+  pointer-events: none;
+  z-index: 0;
+  animation: winter-snow 10s linear infinite;
+  white-space: nowrap;
+  letter-spacing: 50px;
+  opacity: 0.6;
+}
+@keyframes winter-snow {
+  0%   { transform: translateY(-40px) translateX(0); }
+  100% { transform: translateY(110vh) translateX(-40px); }
+}
+
+/* Aurora glow on navbar */
+body.theme-winter .navbar::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, #00ffcc, #3a7bd5, #00ffcc);
+  background-size: 200% 100%;
+  animation: aurora-slide 4s linear infinite;
+}
+@keyframes aurora-slide {
+  0%   { background-position: 0% 0%; }
+  100% { background-position: 200% 0%; }
+}
+
+/* ── SPOOKY HALLOWEEN ── */
+body.theme-halloween {
+  --purple: #ff6b35;
+  --pink: #c0392b;
+  --border: #ff6b35;
+  background: linear-gradient(180deg, #1a0a00 0%, #2d1b00 100%) !important;
+  color: #ffcc88 !important;
+}
+body.theme-halloween .navbar {
+  background: linear-gradient(135deg, #1a0500 0%, #5c1a00 100%) !important;
+}
+body.theme-halloween .btn-primary,
+body.theme-halloween .btn-action.btn-feed {
+  background: linear-gradient(135deg, #c0392b 0%, #ff6b35 100%) !important;
+}
+body.theme-halloween .sidebar-nav-btn.active,
+body.theme-halloween .tab-btn.active {
+  background: linear-gradient(135deg, #c0392b, #ff6b35) !important;
+}
+body.theme-halloween .card,
+body.theme-halloween .sidebar-section {
+  background: rgba(30, 10, 0, 0.95) !important;
+  border-color: #ff6b35 !important;
+  color: #ffcc88 !important;
+}
+body.theme-halloween h1,
+body.theme-halloween h2,
+body.theme-halloween h3 {
+  color: #ff6b35 !important;
+}
+
+/* Glitch flicker effect */
+body.theme-halloween .navbar {
+  animation: spooky-flicker 8s ease-in-out infinite;
+}
+@keyframes spooky-flicker {
+  0%, 94%, 96%, 98%, 100% { opacity: 1; }
+  95%, 97%, 99%            { opacity: 0.85; filter: hue-rotate(30deg); }
+}
+
+/* Floating 👻 */
+body.theme-halloween::before {
+  content: '👻   🕷   🦇   🎃   🕸   🦇   👻';
+  position: fixed;
+  top: -50px;
+  left: 0;
+  width: 100%;
+  font-size: 1.3rem;
+  pointer-events: none;
+  z-index: 0;
+  animation: halloween-float 15s linear infinite;
+  white-space: nowrap;
+  letter-spacing: 40px;
+  opacity: 0.4;
+}
+@keyframes halloween-float {
+  0%   { transform: translateY(0) translateX(0); }
+  50%  { transform: translateY(30px) translateX(20px); }
+  100% { transform: translateY(0) translateX(0); }
+}
+
+/* ── GOLDEN AGE ── */
+body.theme-golden {
+  --purple: #b8860b;
+  --pink: #daa520;
+  --border: #ffd700;
+  background: linear-gradient(180deg, #fffde7 0%, #fff8c0 100%) !important;
+}
+body.theme-golden .navbar {
+  background: linear-gradient(135deg, #8b6914 0%, #daa520 100%) !important;
+}
+body.theme-golden .btn-primary,
+body.theme-golden .btn-action.btn-feed {
+  background: linear-gradient(135deg, #b8860b 0%, #ffd700 100%) !important;
+  color: #3d2b00 !important;
+}
+body.theme-golden .sidebar-nav-btn.active,
+body.theme-golden .tab-btn.active {
+  background: linear-gradient(135deg, #b8860b, #ffd700) !important;
+  color: #3d2b00 !important;
+}
+body.theme-golden .card,
+body.theme-golden .sidebar-section {
+  border-color: #ffd700 !important;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.3) !important;
+}
+body.theme-golden .progress-bar-inner {
+  background: linear-gradient(90deg, #b8860b, #ffd700) !important;
+}
+/* Gold shimmer on navbar */
+body.theme-golden .navbar::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  animation: gold-shimmer 3s linear infinite;
+  pointer-events: none;
+}
+@keyframes gold-shimmer {
+  0%   { left: -60%; }
+  100% { left: 120%; }
+}
+
+/* ── NIGHT MODE OVERRIDE — night mode wins over theme colors for bg/cards ── */
+body.night-mode.theme-autumn,
+body.night-mode.theme-winter,
+body.night-mode.theme-halloween,
+body.night-mode.theme-golden {
+  background: linear-gradient(180deg, #1e1e2e 0%, #2d2d3e 100%) !important;
+}
+body.night-mode.theme-autumn .card,
+body.night-mode.theme-winter .card,
+body.night-mode.theme-golden .card {
+  background: rgba(42, 36, 64, 0.95) !important;
+  color: #e8d5ff !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THEME SELECTOR — Settings page grid
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.theme-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.theme-swatch {
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: all 0.2s;
+  position: relative;
+}
+.theme-swatch:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.15); }
+.theme-swatch.active { border-color: #ffd700 !important; box-shadow: 0 0 0 3px rgba(255,215,0,0.4); }
+.theme-swatch.locked { cursor: not-allowed; opacity: 0.7; }
+
+.theme-swatch-preview {
+  height: 60px;
+  width: 100%;
+}
+.theme-swatch-label {
+  background: rgba(0,0,0,0.5);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 5px 4px;
+}
+.theme-swatch-lock {
+  position: absolute;
+  top: 6px; right: 6px;
+  font-size: 0.9rem;
+  background: rgba(0,0,0,0.6);
+  border-radius: 50%;
+  padding: 2px 4px;
+}
+.theme-swatch-hint {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  text-align: center;
+  padding: 3px 4px 5px;
+  background: rgba(0,0,0,0.4);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROFILE COSMETICS — Equip panel on My Profile page
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Avatar frame rings */
+.profile-avatar-wrap {
+  position: relative;
+  display: inline-block;
+}
+.profile-avatar-wrap .profile-avatar {
+  border: 4px solid #9966ff;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+/* Frame styles applied to profile-avatar via JS */
+.frame-classic  { border-color: #9966ff !important; }
+.frame-silver   { border-color: #c0c0c0 !important; box-shadow: 0 0 10px #c0c0c0 !important; }
+.frame-gold     { border-color: #ffd700 !important; box-shadow: 0 0 15px #ffd700 !important; }
+.frame-fire     { border-color: #ff4500 !important; box-shadow: 0 0 20px #ff4500 !important;
+                  animation: frame-fire-flicker 1.5s ease-in-out infinite; }
+.frame-ice      { border-color: #00d2ff !important; box-shadow: 0 0 16px #00d2ff !important; }
+.frame-rainbow  { animation: frame-rainbow 3s linear infinite !important; }
+.frame-legendary{ border-color: #ffd700 !important; box-shadow: 0 0 30px #ffd700 !important;
+                  animation: frame-legendary-pulse 2s ease-in-out infinite; }
+.frame-void     { border-color: #8b00ff !important; box-shadow: 0 0 20px #8b00ff !important;
+                  animation: frame-void-pulse 2s ease-in-out infinite; }
+.frame-glitch   { border-color: #ff00ff !important; animation: frame-glitch 0.4s linear infinite; }
+
+@keyframes frame-fire-flicker  { 0%,100%{box-shadow:0 0 5px #ff4500}50%{box-shadow:0 0 22px #ff6600} }
+@keyframes frame-rainbow        { 0%{border-color:red}16%{border-color:orange}33%{border-color:yellow}50%{border-color:green}66%{border-color:blue}83%{border-color:indigo}100%{border-color:violet} }
+@keyframes frame-legendary-pulse{ 0%,100%{box-shadow:0 0 15px #ffd700}50%{box-shadow:0 0 35px #ffd700} }
+@keyframes frame-void-pulse     { 0%,100%{box-shadow:0 0 10px #8b00ff}50%{box-shadow:0 0 25px #8b00ff} }
+@keyframes frame-glitch         { 0%,100%{border-color:#ff00ff;transform:translate(0)}25%{border-color:#00ffff;transform:translate(-2px,1px)}75%{border-color:#ffff00;transform:translate(2px,-1px)} }
+
+/* Badge display row */
+.profile-badge-display {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.profile-badge-pip {
+  font-size: 1.4rem;
+  title: attr(data-name);
+  cursor: help;
+}
+
+/* Cosmetics equip panel */
+.cosmetics-panel {
+  margin-top: 32px;
+}
+.cosmetics-panel-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 8px;
+}
+.cosmetics-panel-tab {
+  padding: 7px 16px;
+  border-radius: 20px;
+  border: 2px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+  color: var(--text);
+}
+.cosmetics-panel-tab.active {
+  background: linear-gradient(135deg, #9966ff, #ff66cc);
+  color: white;
+  border-color: transparent;
+}
+.cosmetics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+}
+.cosmetic-item {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  background: var(--cream, #fff);
+}
+.cosmetic-item:hover:not(.locked-cosmetic) { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+.cosmetic-item.equipped-cosmetic { border-color: #ffd700 !important; box-shadow: 0 0 0 3px rgba(255,215,0,0.35); }
+.cosmetic-item.locked-cosmetic   { opacity: 0.55; cursor: not-allowed; }
+
+.cosmetic-preview { height: 64px; width: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; }
+.cosmetic-name    { font-size: 0.78rem; font-weight: 700; text-align: center; padding: 4px 6px; }
+.cosmetic-unlock-hint { font-size: 0.68rem; color: #94a3b8; text-align: center; padding: 2px 6px 6px; }
+.cosmetic-lock-icon { position: absolute; top: 5px; right: 5px; font-size: 0.85rem; }
+.cosmetic-equipped-badge { position: absolute; top: 5px; left: 5px; font-size: 0.7rem; background: #ffd700; color: #3d2b00; padding: 1px 5px; border-radius: 8px; font-weight: 700; }
+
+body.night-mode .cosmetic-item { background: rgba(42,36,64,0.9); border-color: #6644aa; }
+body.night-mode .cosmetic-name { color: #e8d5ff; }
+body.night-mode .cosmetics-panel-tab { color: #e8d5ff; border-color: #6644aa; }
+body.night-mode .cosmetics-panel-tab.active { color: white; }
+

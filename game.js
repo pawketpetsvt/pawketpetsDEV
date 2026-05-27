@@ -242,8 +242,261 @@ var playerSettings = {
   sfx_volume: 80,
   daynight_enabled: true,
   weather_enabled: true,
-  tutorial_completed: false
+  tutorial_completed: false,
+  active_theme: 'classic'
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SEASONAL UI THEMES
+// ═══════════════════════════════════════════════════════════════════════════
+
+var THEME_CATALOG = [
+  { id:'classic',   name:'Classic Purple', emoji:'💜', colors:['#9966ff','#ff66cc'], alwaysUnlocked:true,  unlockHint:'Always free!' },
+  { id:'autumn',    name:'Cozy Autumn',    emoji:'🍂', colors:['#c0672a','#e8a030'], alwaysUnlocked:true,  unlockHint:'Free seasonal theme' },
+  { id:'winter',    name:'Winter Aurora',  emoji:'❄️', colors:['#005f99','#00b4db'], passLevel:15,         unlockHint:'PawketPass Lv. 15' },
+  { id:'halloween', name:'Spooky Season',  emoji:'🎃', colors:['#5c1a00','#ff6b35'], alwaysUnlocked:true,  unlockHint:'Halloween event' },
+  { id:'golden',    name:'Golden Age',     emoji:'✨', colors:['#8b6914','#ffd700'], streakRequired:30,    unlockHint:'30-day login streak' }
+];
+
+function theme_isUnlocked(themeId) {
+  var t = THEME_CATALOG.find(function(x) { return x.id === themeId; });
+  if (!t) return false;
+  if (t.alwaysUnlocked) return true;
+  if (t.passLevel && typeof passProgress !== 'undefined' && passProgress && passProgress.level >= t.passLevel) return true;
+  if (t.streakRequired && currentUser && (currentUser.login_streak || 0) >= t.streakRequired) return true;
+  try {
+    var list = JSON.parse(localStorage.getItem('unlockedThemes') || '[]');
+    if (list.indexOf(themeId) !== -1) return true;
+  } catch(e) {}
+  return false;
+}
+
+function theme_grant(themeId) {
+  try {
+    var list = JSON.parse(localStorage.getItem('unlockedThemes') || '[]');
+    if (list.indexOf(themeId) === -1) {
+      list.push(themeId);
+      localStorage.setItem('unlockedThemes', JSON.stringify(list));
+      var t = THEME_CATALOG.find(function(x) { return x.id === themeId; });
+      if (typeof showToast === 'function') showToast('🎨 Theme unlocked: ' + (t ? t.name : themeId) + '!', 3000);
+    }
+  } catch(e) {}
+}
+
+function theme_apply(themeId) {
+  if (!theme_isUnlocked(themeId)) { showToast('🔒 Theme not unlocked yet!', 2500); return; }
+  THEME_CATALOG.forEach(function(t) { document.body.classList.remove('theme-' + t.id); });
+  if (themeId !== 'classic') document.body.classList.add('theme-' + themeId);
+  playerSettings.active_theme = themeId;
+  try {
+    var key = currentUser ? 'playerSettings_' + currentUser.id : 'playerSettings_guest';
+    var saved = JSON.parse(localStorage.getItem(key) || '{}');
+    saved.active_theme = themeId;
+    localStorage.setItem(key, JSON.stringify(saved));
+  } catch(e) {}
+  document.querySelectorAll('.theme-swatch').forEach(function(sw) {
+    sw.classList.toggle('active', sw.dataset.themeId === themeId);
+  });
+}
+
+function theme_loadSaved() {
+  try {
+    var key = currentUser ? 'playerSettings_' + currentUser.id : 'playerSettings_guest';
+    var saved = JSON.parse(localStorage.getItem(key) || '{}');
+    if (saved.active_theme) { playerSettings.active_theme = saved.active_theme; theme_apply(saved.active_theme); }
+  } catch(e) {}
+}
+
+function theme_renderSelector(containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  var html = '<div class="theme-selector-grid">';
+  THEME_CATALOG.forEach(function(t) {
+    var unlocked = theme_isUnlocked(t.id);
+    var active   = playerSettings.active_theme === t.id;
+    html += '<div class="theme-swatch' + (active ? ' active' : '') + (unlocked ? '' : ' locked') + '"' +
+      ' data-theme-id="' + t.id + '"' + (unlocked ? ' onclick="theme_apply(\'' + t.id + '\')"' : '') + '>' +
+      '<div class="theme-swatch-preview" style="background:linear-gradient(135deg,' + t.colors[0] + ',' + t.colors[1] + ');display:flex;align-items:center;justify-content:center;font-size:1.6rem;">' + t.emoji + '</div>' +
+      '<div class="theme-swatch-label">' + t.name + '</div>' +
+      (!unlocked ? '<div class="theme-swatch-hint">' + t.unlockHint + '</div><div class="theme-swatch-lock">🔒</div>' : '') +
+      '</div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PROFILE COSMETICS CATALOG
+// ═══════════════════════════════════════════════════════════════════════════
+
+var COSMETICS_CATALOG = {
+  backgrounds: [
+    { id:'bg_default',    name:'Classic',       emoji:'💜', gradient:'linear-gradient(135deg,#9966ff,#764ba2)', alwaysUnlocked:true,  unlockHint:'Free for everyone' },
+    { id:'bg_forest',     name:'Forest Glade',  emoji:'🌲', gradient:'linear-gradient(135deg,#134e5e,#71b280)',                       unlockHint:'Reach player level 10' },
+    { id:'bg_stars',      name:'Starry Night',  emoji:'🌌', gradient:'linear-gradient(135deg,#000428,#004e92)',                       unlockHint:'30-day login streak' },
+    { id:'bg_castle',     name:'Battle Keep',   emoji:'🏰', gradient:'linear-gradient(135deg,#2c3e50,#8e44ad)',                       unlockHint:'Win 50 battles' },
+    { id:'bg_desert',     name:'Dusk Desert',   emoji:'🏜️', gradient:'linear-gradient(135deg,#c94b4b,#4b134f)',                       unlockHint:'Win 100 battles' },
+    { id:'bg_clouds',     name:'Cloud Nine',    emoji:'☁️', gradient:'linear-gradient(135deg,#89f7fe,#66a6ff)',                       unlockHint:'Reach player level 20' },
+    { id:'bg_legendary',  name:'Legendary',     emoji:'👑', gradient:'linear-gradient(135deg,#f7971e,#ffd200)',                       unlockHint:'Reach player level 50' },
+    { id:'bg_underwater', name:'Underwater',    emoji:'🐠', gradient:'linear-gradient(135deg,#0052d4,#65c7f7)',                       unlockHint:'50-day login streak' },
+    { id:'bg_volcano',    name:'Volcano',       emoji:'🌋', gradient:'linear-gradient(135deg,#ff512f,#dd2476)',                       unlockHint:'Defeat 10 bosses' },
+    { id:'bg_garden',     name:'Garden',        emoji:'🌸', gradient:'linear-gradient(135deg,#a8edea,#fed6e3)',                       unlockHint:'Feed pets 100 times' }
+  ],
+  frames: [
+    { id:'frame_classic',   name:'Classic',    emoji:'💜', previewColor:'#9966ff', cssClass:'frame-classic',   alwaysUnlocked:true,  unlockHint:'Free for everyone' },
+    { id:'frame_silver',    name:'Silver',     emoji:'⚪', previewColor:'#c0c0c0', cssClass:'frame-silver',                          unlockHint:'Reach player level 10' },
+    { id:'frame_gold',      name:'Gold',       emoji:'🟡', previewColor:'#ffd700', cssClass:'frame-gold',                            unlockHint:'Reach player level 20' },
+    { id:'frame_fire',      name:'Fire',       emoji:'🔥', previewColor:'#ff4500', cssClass:'frame-fire',                            unlockHint:'Win 100 battles' },
+    { id:'frame_ice',       name:'Ice',        emoji:'❄️', previewColor:'#00d2ff', cssClass:'frame-ice',                             unlockHint:'30-day login streak' },
+    { id:'frame_rainbow',   name:'Rainbow',    emoji:'🌈', previewColor:'#ff69b4', cssClass:'frame-rainbow',                         unlockHint:'Complete Bingo blackout' },
+    { id:'frame_legendary', name:'Legendary',  emoji:'✨', previewColor:'#ffd700', cssClass:'frame-legendary',                       unlockHint:'Reach player level 50' },
+    { id:'frame_void',      name:'Void',       emoji:'🌑', previewColor:'#8b00ff', cssClass:'frame-void',                            unlockHint:'Ultra rare drop' },
+    { id:'frame_glitch',    name:'Glitch',     emoji:'📺', previewColor:'#ff00ff', cssClass:'frame-glitch',                          unlockHint:'Secret code: GLITCH' }
+  ],
+  badges: [
+    { id:'badge_recruit',     name:'Recruit',        emoji:'🎖️', color:'#8e8e8e', alwaysUnlocked:false, unlockHint:'Complete tutorial' },
+    { id:'badge_level_20',    name:'Veteran',        emoji:'⭐',  color:'#c0c0c0',                       unlockHint:'Reach player level 20' },
+    { id:'badge_level_50',    name:'Mythic',         emoji:'💫',  color:'#ff9800',                       unlockHint:'Reach player level 50' },
+    { id:'badge_100_battles', name:'Veteran Fighter',emoji:'⚔️',  color:'#5bc0de',                       unlockHint:'Win 100 battles' },
+    { id:'badge_30_days',     name:'Loyal',          emoji:'🗓️',  color:'#5cb85c',                       unlockHint:'30-day login streak' },
+    { id:'badge_pet_20',      name:'Collector',      emoji:'🐾',  color:'#ff69b4',                       unlockHint:'Own 20 pets' },
+    { id:'badge_boss_10',     name:'Boss Slayer',    emoji:'👑',  color:'#ff4500',                       unlockHint:'Defeat 10 bosses' },
+    { id:'badge_treats_100',  name:'Feeder',         emoji:'🍖',  color:'#5dde7a',                       unlockHint:'Feed pets 100 times' }
+  ]
+};
+
+var equippedCosmetics = { background:'bg_default', frame:'frame_classic', badges:[] };
+
+function cosmetics_loadEquipped() {
+  if (!currentUser) return;
+  try {
+    var saved = JSON.parse(localStorage.getItem('equippedCosmetics_' + currentUser.id) || 'null');
+    if (saved) Object.assign(equippedCosmetics, saved);
+  } catch(e) {}
+}
+
+function cosmetics_saveEquipped() {
+  if (!currentUser) return;
+  try { localStorage.setItem('equippedCosmetics_' + currentUser.id, JSON.stringify(equippedCosmetics)); } catch(e) {}
+}
+
+function cosmetics_isOwned(type, id) {
+  var catalog = COSMETICS_CATALOG[type + 's'] || [];
+  var item = catalog.find(function(c) { return c.id === id; });
+  if (!item) return false;
+  if (item.alwaysUnlocked) return true;
+  var stateKey = 'unlocked' + type.charAt(0).toUpperCase() + type.slice(1) + 's';
+  var unlocked = (phase1_state && phase1_state[stateKey]) ? phase1_state[stateKey] : [];
+  return unlocked.indexOf(id) !== -1;
+}
+
+function cosmetics_equip(type, id) {
+  if (!cosmetics_isOwned(type, id)) { showToast('🔒 Cosmetic not unlocked yet!', 2500); return; }
+  var catalog = COSMETICS_CATALOG[type + 's'] || [];
+  var item = catalog.find(function(c) { return c.id === id; });
+  if (!item) return;
+  if (type === 'badge') {
+    var idx = equippedCosmetics.badges.indexOf(id);
+    if (idx !== -1) { equippedCosmetics.badges.splice(idx,1); showToast('Badge removed', 1500); }
+    else { if (equippedCosmetics.badges.length >= 3) equippedCosmetics.badges.shift(); equippedCosmetics.badges.push(id); showToast(item.emoji + ' Badge equipped!', 1500); }
+  } else {
+    equippedCosmetics[type] = id;
+    showToast(item.emoji + ' ' + item.name + ' equipped!', 2000);
+  }
+  cosmetics_saveEquipped();
+  cosmetics_applyToProfile();
+  cosmetics_renderPanel('cosmetics-panel-content', cosmetics_currentTab);
+}
+
+function cosmetics_applyToProfile() {
+  // Profile header background
+  var header = document.querySelector('.myprofile-preview-header, .profile-header');
+  if (header) {
+    var bg = COSMETICS_CATALOG.backgrounds.find(function(b) { return b.id === equippedCosmetics.background; });
+    if (bg) { header.style.background = bg.gradient; header.style.borderRadius = '16px'; header.style.padding = '24px'; }
+  }
+  // Avatar frame
+  var avatars = ['profile-avatar','myprofile-avatar-preview'];
+  avatars.forEach(function(avatarId) {
+    var avatar = document.getElementById(avatarId);
+    if (!avatar) return;
+    COSMETICS_CATALOG.frames.forEach(function(f) { avatar.classList.remove(f.cssClass); });
+    var frame = COSMETICS_CATALOG.frames.find(function(f) { return f.id === equippedCosmetics.frame; });
+    if (frame) { avatar.classList.add(frame.cssClass); avatar.style.borderWidth = '4px'; avatar.style.borderStyle = 'solid'; }
+  });
+  // Badge row
+  var badgeRow = document.getElementById('profile-badge-display');
+  if (badgeRow) {
+    badgeRow.innerHTML = '';
+    equippedCosmetics.badges.forEach(function(badgeId) {
+      var badge = COSMETICS_CATALOG.badges.find(function(b) { return b.id === badgeId; });
+      if (badge) {
+        var pip = document.createElement('span');
+        pip.className = 'profile-badge-pip'; pip.textContent = badge.emoji;
+        pip.title = badge.name; pip.style.filter = 'drop-shadow(0 0 4px ' + badge.color + ')';
+        badgeRow.appendChild(pip);
+      }
+    });
+  }
+}
+
+var cosmetics_currentTab = 'backgrounds';
+
+function cosmetics_renderPanel(containerId, tab) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  cosmetics_currentTab = tab;
+  var typeKey = tab;
+  var catalog = COSMETICS_CATALOG[typeKey] || [];
+  var typeSingular = typeKey === 'backgrounds' ? 'background' : typeKey === 'frames' ? 'frame' : 'badge';
+  var html = '<div class="cosmetics-grid">';
+  catalog.forEach(function(item) {
+    var owned   = cosmetics_isOwned(typeSingular, item.id);
+    var equipped = typeSingular === 'badge'
+      ? equippedCosmetics.badges.indexOf(item.id) !== -1
+      : equippedCosmetics[typeSingular] === item.id;
+    var preview = '';
+    if (typeKey === 'backgrounds') {
+      preview = '<div class="cosmetic-preview" style="background:' + item.gradient + ';border-radius:4px 4px 0 0;"></div>';
+    } else if (typeKey === 'frames') {
+      preview = '<div class="cosmetic-preview"><div style="width:44px;height:44px;border-radius:50%;border:4px solid ' + item.previewColor + ';box-shadow:0 0 10px ' + item.previewColor + ';display:flex;align-items:center;justify-content:center;font-size:1.4rem;">' + item.emoji + '</div></div>';
+    } else {
+      preview = '<div class="cosmetic-preview" style="font-size:2rem;">' + item.emoji + '</div>';
+    }
+    html += '<div class="cosmetic-item' + (equipped?' equipped-cosmetic':'') + (owned?'':' locked-cosmetic') + '"' +
+      (owned ? ' onclick="cosmetics_equip(\'' + typeSingular + '\',\'' + item.id + '\')"' : '') + '>' +
+      preview +
+      (equipped ? '<div class="cosmetic-equipped-badge">ON</div>' : '') +
+      (!owned   ? '<div class="cosmetic-lock-icon">🔒</div>' : '') +
+      '<div class="cosmetic-name">' + item.name + '</div>' +
+      (!owned   ? '<div class="cosmetic-unlock-hint">' + item.unlockHint + '</div>' : '') +
+      '</div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function cosmetics_renderFullPanel(mountId) {
+  var mount = document.getElementById(mountId);
+  if (!mount) return;
+  var tabs = [['backgrounds','🖼️ Backgrounds'],['frames','🔲 Frames'],['badges','🏅 Badges']];
+  var tabHtml = '<div class="cosmetics-panel-tabs">';
+  tabs.forEach(function(tab) {
+    tabHtml += '<button class="cosmetics-panel-tab' + (tab[0] === cosmetics_currentTab ? ' active' : '') + '" onclick="cosmetics_switchTab(\'' + tab[0] + '\')">' + tab[1] + '</button>';
+  });
+  tabHtml += '</div><div id="cosmetics-panel-content"></div>';
+  mount.innerHTML = tabHtml;
+  cosmetics_renderPanel('cosmetics-panel-content', cosmetics_currentTab);
+}
+
+function cosmetics_switchTab(tab) {
+  cosmetics_currentTab = tab;
+  document.querySelectorAll('.cosmetics-panel-tab').forEach(function(btn) {
+    var label = btn.textContent.toLowerCase();
+    btn.classList.toggle('active', label.indexOf(tab.replace('s','')) !== -1);
+  });
+  cosmetics_renderPanel('cosmetics-panel-content', tab);
+}
 
 // Daily tips array for home page
 var dailyTips = [
@@ -1106,6 +1359,10 @@ async function showApp(user) {
 
   // EVENT/WEATHER WIDGET: Initialize navbar widget
   initEventStatusWidget();
+
+  // THEMES & COSMETICS: Load saved preferences
+  theme_loadSaved();
+  cosmetics_loadEquipped();
   
   // PHASE 1: Initialize cosmetics, milestones, daily features
   phase1_init();
@@ -6149,6 +6406,13 @@ async function loadMyProfile() {
     try {
       await loadMyProfileBadges();
       console.log('[loadMyProfile] Badges loaded successfully');
+    } catch (badgeErr) {
+      console.error('[loadMyProfile] Error loading badges:', badgeErr);
+    }
+
+    // Render cosmetics equip panel and apply current cosmetics
+    cosmetics_renderFullPanel('cosmetics-mount');
+    cosmetics_applyToProfile();
     } catch (badgeErr) {
       console.error('[loadMyProfile] Error loading badges:', badgeErr);
     }
@@ -17142,6 +17406,9 @@ async function loadSettings() {
     
     // Apply settings immediately
     applySettings();
+
+    // Render theme selector if container exists
+    theme_renderSelector('theme-selector-mount');
     
   } catch (err) {
     console.error('Error loading settings:', err);
