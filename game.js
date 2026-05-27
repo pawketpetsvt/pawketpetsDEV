@@ -1146,7 +1146,167 @@ function updateAllPoints(pts) {
   var sidebarPoints = document.getElementById('sidebar-points');
   if (sidebarPoints) sidebarPoints.textContent = pts.toLocaleString() + ' PP';
 }
+// ============================================
+// STREAM OVERLAY API ENDPOINTS
+// ============================================
 
+/**
+ * Get pet data for stream overlay
+ * Usage: GET /api/overlay/pet?streamer=EMBERTAIL_USERNAME
+ * Returns: JSON with pet stats for the streamer's active companion
+ */
+async function handleOverlayRequest(request) {
+  const url = new URL(request.url);
+  const streamerName = url.searchParams.get('streamer');
+  
+  if (!streamerName) {
+    return new Response(JSON.stringify({ error: 'Missing streamer param' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+    });
+  }
+  
+  try {
+    // Find player by username
+    const { data: player, error: playerError } = await supabaseClient
+      .from('players')
+      .select('id, username, companion_pet_id')
+      .ilike('username', streamerName)
+      .single();
+    
+    if (playerError || !player) {
+      return new Response(JSON.stringify({ error: 'Streamer not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    }
+    
+    if (!player.companion_pet_id) {
+      return new Response(JSON.stringify({ error: 'No companion pet set', streamer: player.username }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    }
+    
+    // Get companion pet with full data
+    const { data: pet, error: petError } = await supabaseClient
+      .from('user_pets')
+      .select(`
+        id,
+        nickname,
+        level,
+        current_hp,
+        max_hp,
+        hunger,
+        max_hunger,
+        energy,
+        max_energy,
+        happiness,
+        max_happiness,
+        current_variant,
+        pets(name, image_file)
+      `)
+      .eq('id', player.companion_pet_id)
+      .single();
+    
+    if (petError || !pet) {
+      return new Response(JSON.stringify({ error: 'Pet not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    }
+    
+    // Calculate derived stats
+    const hungerPercent = Math.round((pet.hunger / pet.max_hunger) * 100);
+    const energyPercent = Math.round((pet.energy / pet.max_energy) * 100);
+    const happinessPercent = Math.round((pet.happiness / pet.max_happiness) * 100);
+    const hpPercent = Math.round((pet.current_hp / pet.max_hp) * 100);
+    
+    // Get mood emoji
+    let moodEmoji = '😐';
+    if (happinessPercent >= 80) moodEmoji = '😊';
+    else if (happinessPercent >= 60) moodEmoji = '🙂';
+    else if (happinessPercent >= 40) moodEmoji = '😐';
+    else if (happinessPercent >= 20) moodEmoji = '😟';
+    else moodEmoji = '😭';
+    
+    // Get last interaction time (for tip)
+    const lastFed = pet.last_fed ? new Date(pet.last_fed) : null;
+    const lastPlayed = pet.last_played ? new Date(pet.last_played) : null;
+    let lastActive = null;
+    if (lastFed && lastPlayed) {
+      lastActive = lastFed > lastPlayed ? lastFed : lastPlayed;
+    } else if (lastFed) {
+      lastActive = lastFed;
+    } else if (lastPlayed) {
+      lastActive = lastPlayed;
+    }
+    
+    let hoursSince = 'Never';
+    if (lastActive) {
+      const hours = Math.floor((Date.now() - lastActive) / (1000 * 60 * 60));
+      if (hours < 1) hoursSince = 'Just now';
+      else if (hours < 24) hoursSince = `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+      else hoursSince = `${Math.floor(hours / 24)} days ago`;
+    }
+    
+    // Determine tip message
+    let tip = '';
+    if (hungerPercent < 30) tip = '🍽️ Hungry! Feed me in the game!';
+    else if (energyPercent < 30) tip = '😴 Tired! Let me rest...';
+    else if (happinessPercent < 40) tip = '💔 Sad! Play with me in the game!';
+    else tip = '✨ Happy and healthy! Thanks for watching!';
+    
+    const response = {
+      success: true,
+      pet: {
+        id: pet.id,
+        name: pet.nickname || pet.pets?.name || 'Pet',
+        species: pet.pets?.name || 'Pet',
+        level: pet.level,
+        image: pet.pets?.image_file || null,
+        variant: pet.current_variant || null,
+        stats: {
+          hp: { current: pet.current_hp, max: pet.max_hp, percent: hpPercent },
+          hunger: { current: pet.hunger, max: pet.max_hunger, percent: hungerPercent },
+          energy: { current: pet.energy, max: pet.max_energy, percent: energyPercent },
+          happiness: { current: pet.happiness, max: pet.max_happiness, percent: happinessPercent }
+        },
+        mood: { emoji: moodEmoji, text: getMoodText(happinessPercent) },
+        lastActive: hoursSince,
+        tip: tip
+      }
+    };
+    
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-cache'
+      }
+    });
+    
+  } catch (error) {
+    console.error('Overlay API error:', error);
+    return new Response(JSON.stringify({ error: 'Server error' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+    });
+  }
+}
+
+function getMoodText(percent) {
+  if (percent >= 80) return 'Ecstatic';
+  if (percent >= 60) return 'Happy';
+  if (percent >= 40) return 'Content';
+  if (percent >= 20) return 'Unhappy';
+  return 'Miserable';
+}
+
+// If you're using Cloudflare Workers or a separate endpoint, export this.
+// For testing locally, you can access via: 
+// https://YOUR_SITE.com/api/overlay/pet?streamer=YOUR_USERNAME
 // ── LEADERBOARD INITIALIZATION ────────────────────────────
 function initLeaderboardTab() {
   // Set initial state
