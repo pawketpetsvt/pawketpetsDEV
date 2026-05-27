@@ -103,7 +103,7 @@ let currentPetData = null;
 document.addEventListener('DOMContentLoaded', function() {
   fetchPetData();
   // Refresh every 10 seconds
-  refreshInterval = setInterval(fetchPetData, 10000);
+  refreshInterval = setInterval(fetchPetData, 60000); // 60 seconds
 });
 
 async function fetchPetData() {
