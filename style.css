@@ -16237,3 +16237,30 @@ body.night-mode .variant-unlock-notification {
   will-change: transform, opacity;
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VARIANT BUTTON ON PET CARDS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.btn-variant-selector {
+  width: 100%;
+  padding: 8px 10px;
+  margin-top: 4px;
+  font-size: 0.82rem;
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-variant-selector:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+body.night-mode .btn-variant-selector {
+  background: linear-gradient(135deg, #6d28d9, #4f46e5) !important;
+}
+

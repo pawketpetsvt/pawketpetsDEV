@@ -2854,6 +2854,16 @@ function makeMyPetCard(pet) {
     CompanionBuddy.setCompanion(pet.id);
   };
   actions.appendChild(companionBtn);
+
+  // Variant selector button
+  var variantBtn = makeEl('button', {class: 'btn-variant-selector', id: 'variant-btn-' + pet.id});
+  var activeVariant = skinkey_getCurrentVariant(pet.id);
+  var activeVariantData = activeVariant ? BASIC_VARIANTS[activeVariant] : null;
+  variantBtn.textContent = activeVariantData ? (activeVariantData.icon + ' ' + activeVariantData.name) : '🎨 Variant';
+  variantBtn.title = 'Manage variants for this pet';
+  variantBtn.style.cssText = 'width:100%;padding:8px 10px;margin-top:4px;font-size:0.82rem;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:white;border:none;border-radius:12px;font-weight:600;cursor:pointer;transition:all 0.2s;';
+  variantBtn.onclick = function() { showPetVariantModal(pet.id, pet.nickname || pet.pet_type || 'Pet'); };
+  actions.appendChild(variantBtn);
   
   body.appendChild(actions);
 
@@ -20208,6 +20218,11 @@ function skinkey_updateDisplay() {
   keyCounters.forEach(function(el) {
     el.textContent = skinKeyState.keys;
   });
+  // Update navbar skin key display
+  var navKeyCount = document.getElementById('nav-skin-key-count');
+  if (navKeyCount) navKeyCount.textContent = skinKeyState.keys;
+  var navKeyDisplay = document.getElementById('nav-skin-key-display');
+  if (navKeyDisplay) navKeyDisplay.style.display = 'flex';
   skinkey_updateVariantButtons();
 }
 
@@ -20329,6 +20344,82 @@ function skinkey_updateCompanionVariant(variantId) {
       companion.classList.add('pet-variant-' + variantId);
     }
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PET-SPECIFIC VARIANT MANAGER MODAL
+// Uses existing skinkey_unlockVariant / skinkey_applyVariant — no wrappers
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function showPetVariantModal(petId, petName) {
+  if (!currentUser) { showToast('Please log in first', 'error'); return; }
+
+  var modal = makeModal();
+
+  // Header
+  var currentVariantId   = skinkey_getCurrentVariant(petId);
+  var currentVariantData = currentVariantId ? BASIC_VARIANTS[currentVariantId] : null;
+  var keys = skinKeyState.keys;
+
+  var header = '<h2 style="text-align:center;color:var(--purple);margin:0 0 4px;">🎨 ' + escapeHtml(petName) + ' — Variants</h2>' +
+    '<p style="text-align:center;color:var(--text-light);font-size:0.88rem;margin:0 0 14px;">🔑 Skin Keys: <strong style="color:#FFD700;">' + keys + '</strong></p>' +
+    '<div style="background:rgba(153,102,255,0.1);border-radius:10px;padding:10px 14px;margin-bottom:16px;text-align:center;">' +
+    '<span style="font-size:0.9rem;color:var(--text-light);">Currently equipped: </span>' +
+    '<strong style="color:' + (currentVariantData ? currentVariantData.color || '#9966ff' : '#9966ff') + ';">' +
+    (currentVariantData ? currentVariantData.icon + ' ' + currentVariantData.name : '★ Original') + '</strong></div>';
+
+  // Build variant grid
+  var gridHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;max-height:380px;overflow-y:auto;margin-bottom:14px;">';
+
+  // "None / Original" card
+  var noneActive = !currentVariantId;
+  gridHtml += '<div style="border:2px solid ' + (noneActive ? '#9966ff' : 'var(--border)') + ';border-radius:12px;padding:12px;text-align:center;background:' + (noneActive ? 'rgba(153,102,255,0.12)' : 'transparent') + ';position:relative;">' +
+    (noneActive ? '<div style="position:absolute;top:-8px;right:-8px;background:#9966ff;color:white;padding:1px 7px;border-radius:10px;font-size:0.68rem;font-weight:bold;">ACTIVE</div>' : '') +
+    '<div style="font-size:1.8rem;margin-bottom:6px;">★</div>' +
+    '<div style="font-weight:bold;font-size:0.85rem;margin-bottom:3px;">Original</div>' +
+    '<div style="font-size:0.7rem;color:var(--text-light);margin-bottom:8px;">Default appearance</div>' +
+    (noneActive
+      ? '<button disabled style="width:100%;padding:5px;border-radius:7px;border:none;background:#4ade80;color:#1a1a2e;font-size:0.78rem;font-weight:bold;">Equipped</button>'
+      : '<button onclick="skinkey_applyVariant(\'' + petId + '\',null).then(function(){closeModal();tabsLoaded[\'mypets\']=false;loadMyPets();})" style="width:100%;padding:5px;border-radius:7px;border:none;background:rgba(153,102,255,0.2);color:var(--purple);font-size:0.78rem;cursor:pointer;">Remove Variant</button>'
+    ) + '</div>';
+
+  // All BASIC_VARIANTS
+  Object.keys(BASIC_VARIANTS).forEach(function(variantId) {
+    var v = BASIC_VARIANTS[variantId];
+    // Merge color from petVariants if available
+    var pv = petVariants[variantId];
+    var color = (pv && pv.color) ? pv.color : '#9966ff';
+    var isUnlocked = skinkey_isVariantUnlocked(petId, variantId);
+    var isActive   = currentVariantId === variantId;
+    var canAfford  = keys >= (v.cost || 1);
+
+    gridHtml += '<div style="border:2px solid ' + (isActive ? color : 'var(--border)') + ';border-radius:12px;padding:12px;text-align:center;background:' + (isActive ? color + '20' : 'transparent') + ';position:relative;opacity:' + (isUnlocked || canAfford ? '1' : '0.6') + ';' + (isActive ? 'box-shadow:0 0 12px ' + color + '66;' : '') + '">' +
+      (isActive ? '<div style="position:absolute;top:-8px;right:-8px;background:' + color + ';color:white;padding:1px 7px;border-radius:10px;font-size:0.68rem;font-weight:bold;">ACTIVE</div>' : '') +
+      '<div style="font-size:1.8rem;margin-bottom:6px;">' + v.icon + '</div>' +
+      '<div style="font-weight:bold;font-size:0.85rem;margin-bottom:3px;color:' + color + ';">' + v.name + '</div>' +
+      '<div style="font-size:0.7rem;color:var(--text-light);margin-bottom:8px;">' + v.description + '</div>' +
+      '<div style="font-size:0.75rem;font-weight:bold;color:#FFD700;margin-bottom:6px;">' + (v.cost || 1) + ' 🔑</div>';
+
+    if (isActive) {
+      gridHtml += '<button disabled style="width:100%;padding:5px;border-radius:7px;border:none;background:#4ade80;color:#1a1a2e;font-size:0.78rem;font-weight:bold;">Equipped</button>';
+    } else if (isUnlocked) {
+      gridHtml += '<button onclick="skinkey_applyVariant(\'' + petId + '\',\'' + variantId + '\').then(function(){closeModal();tabsLoaded[\'mypets\']=false;loadMyPets();})" style="width:100%;padding:5px;border-radius:7px;border:none;background:linear-gradient(135deg,' + color + ',' + color + 'aa);color:white;font-size:0.78rem;cursor:pointer;font-weight:bold;">Equip</button>';
+    } else {
+      gridHtml += '<button ' + (canAfford ? 'onclick="skinkey_unlockVariant(\'' + petId + '\',\'' + variantId + '\').then(function(ok){if(ok){closeModal();tabsLoaded[\'mypets\']=false;loadMyPets();}})"' : 'disabled') + ' style="width:100%;padding:5px;border-radius:7px;border:none;background:' + (canAfford ? 'linear-gradient(135deg,#FFD700,#FFA500)' : '#555') + ';color:' + (canAfford ? '#1a1a2e' : '#888') + ';font-size:0.75rem;cursor:' + (canAfford ? 'pointer' : 'not-allowed') + ';font-weight:bold;">Unlock (' + (v.cost || 1) + ' 🔑)</button>';
+    }
+
+    gridHtml += '</div>';
+  });
+
+  gridHtml += '</div>';
+
+  var footer = '<div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:10px 14px;font-size:0.8rem;color:var(--text-light);">' +
+    '💡 <strong>Earn Skin Keys:</strong> Bingo blackout • PawketPass Lv.19/24/29/36/42/46/49 • Special events' +
+    '</div>' +
+    '<button onclick="closeModal()" class="btn btn-outline" style="width:100%;margin-top:14px;">Close</button>';
+
+  modal.innerHTML = header + gridHtml + footer;
+  openModal(modal);
 }
 
 function skinkey_buildVariantSelector(userPetId) {

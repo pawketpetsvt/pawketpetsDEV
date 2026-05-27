@@ -208,6 +208,12 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
   <div class="navbar-right">
     <span id="nav-user"></span>
     <span id="nav-points"></span>
+
+    <!-- Skin Key counter — hidden until logged in -->
+    <div id="nav-skin-key-display" style="display:none;align-items:center;gap:4px;background:linear-gradient(135deg,rgba(255,215,0,0.15),rgba(255,165,0,0.15));border-radius:20px;padding:4px 10px;border:1px solid rgba(255,215,0,0.35);cursor:help;" title="Skin Keys — use to unlock pet variants">
+      <span style="font-size:0.95rem;">🔑</span>
+      <span id="nav-skin-key-count" class="skin-key-count" style="font-weight:bold;color:#FFD700;font-size:0.88rem;">0</span>
+    </div>
     <button class="btn-nav-action" id="nav-profile" style="display:none" onclick="showTab('myprofile')">
       <span>👤 Profile</span>
     </button>
