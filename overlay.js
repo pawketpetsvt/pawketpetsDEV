@@ -180,6 +180,9 @@ function updateDisplay(pet) {
   document.getElementById('collapsed-pet-name').textContent = pet.name;
   document.getElementById('collapsed-pet-level').textContent = `Lv.${pet.level}`;
   
+  // ← FIXED: Update collapsed avatar with pet image
+  updateCollapsedAvatar(pet.image);
+  
   // Update expanded view
   document.getElementById('pet-name').textContent = pet.name;
   document.getElementById('pet-level').textContent = `Lv.${pet.level}`;
@@ -234,24 +237,62 @@ function updateDisplay(pet) {
   
   document.getElementById('pet-tip').textContent = tip;
   
-  // Pet image
-  if (pet.image) {
-    const img = document.getElementById('pet-image');
-    const placeholder = document.getElementById('pet-avatar-placeholder');
-    img.src = `https://pawketpets.net/pawketpetsDEV/images/${pet.image}`;
-    img.onload = () => {
-      img.style.display = 'block';
-      placeholder.style.display = 'none';
-    };
-    img.onerror = () => {
-      img.style.display = 'none';
-      placeholder.style.display = 'flex';
-    };
-  }
+  // Update expanded pet image
+  updateExpandedPetImage(pet.image);
   
   // Start the animation cycle (only once)
   if (!animationIntervalStarted) {
     startAnimationCycle();
+  }
+}
+
+// ← NEW FUNCTION: Update collapsed avatar with pet image
+function updateCollapsedAvatar(imageFile) {
+  const collapsedAvatar = document.getElementById('collapsed-avatar');
+  if (!collapsedAvatar) return;
+  
+  if (imageFile) {
+    // Use image instead of emoji
+    collapsedAvatar.innerHTML = '';
+    collapsedAvatar.style.backgroundImage = `url(https://pawketpets.net/pawketpetsDEV/images/${imageFile})`;
+    collapsedAvatar.style.backgroundSize = 'cover';
+    collapsedAvatar.style.backgroundPosition = 'center';
+    collapsedAvatar.style.width = '32px';
+    collapsedAvatar.style.height = '32px';
+    collapsedAvatar.style.borderRadius = '50%';
+    collapsedAvatar.style.fontSize = '0';
+  } else {
+    // Fallback to emoji
+    collapsedAvatar.innerHTML = '🦊';
+    collapsedAvatar.style.backgroundImage = 'none';
+    collapsedAvatar.style.width = 'auto';
+    collapsedAvatar.style.height = 'auto';
+    collapsedAvatar.style.fontSize = '28px';
+  }
+}
+
+// ← NEW FUNCTION: Update expanded pet image
+function updateExpandedPetImage(imageFile) {
+  const img = document.getElementById('pet-image');
+  const placeholder = document.getElementById('pet-avatar-placeholder');
+  
+  if (imageFile && img) {
+    img.src = `https://pawketpets.net/pawketpetsDEV/images/${imageFile}`;
+    img.onload = () => {
+      img.style.display = 'block';
+      if (placeholder) placeholder.style.display = 'none';
+    };
+    img.onerror = () => {
+      img.style.display = 'none';
+      if (placeholder) {
+        placeholder.style.display = 'flex';
+        placeholder.innerHTML = '🐾';
+      }
+    };
+  } else if (placeholder) {
+    img.style.display = 'none';
+    placeholder.style.display = 'flex';
+    placeholder.innerHTML = '🐾';
   }
 }
 
@@ -261,6 +302,16 @@ function showNoCompanionState(streamerName) {
   document.getElementById('pet-name').textContent = 'No Pet Selected';
   document.getElementById('pet-species').textContent = `${streamerName} hasn't set a companion pet!`;
   document.getElementById('pet-tip').textContent = '✨ Go to "My Pets" and click "Set Companion"';
+  
+  // Reset collapsed avatar to emoji
+  const collapsedAvatar = document.getElementById('collapsed-avatar');
+  if (collapsedAvatar) {
+    collapsedAvatar.innerHTML = '🐾';
+    collapsedAvatar.style.backgroundImage = 'none';
+    collapsedAvatar.style.width = 'auto';
+    collapsedAvatar.style.height = 'auto';
+    collapsedAvatar.style.fontSize = '28px';
+  }
 }
 
 function showErrorState() {
@@ -268,4 +319,11 @@ function showErrorState() {
   document.getElementById('collapsed-pet-level').textContent = '';
   document.getElementById('pet-name').textContent = 'Connection Error';
   document.getElementById('pet-tip').textContent = '🔧 Check API URL in overlay.js';
+  
+  // Reset collapsed avatar to emoji
+  const collapsedAvatar = document.getElementById('collapsed-avatar');
+  if (collapsedAvatar) {
+    collapsedAvatar.innerHTML = '⚠️';
+    collapsedAvatar.style.backgroundImage = 'none';
+  }
 }
