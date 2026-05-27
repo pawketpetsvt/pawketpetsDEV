@@ -4033,20 +4033,17 @@ function getItemIconHtml(item) {
 
   // Custom image URL takes priority
   if (item.image_url) {
-    return '<img src="' + item.image_url + '" class="item-icon-img" alt="' + escapeHtml(item.name || '') +
-      '" onerror="this.outerHTML=\'' + escapeHtml(itemEmoji(item.item_type)) + '\';">';
+    return '<img src="' + item.image_url + '" class="item-icon-img" alt="' + escapeHtml(item.name || '') + '" onerror="this.outerHTML=\''+escapeHtml(itemEmoji(item.item_type))+'\'">';
   }
 
-  // Food items: use category image
-  if ((item.item_type === 'food' || item.food_category) && item.food_category &&
-      FOOD_CATEGORY_IMAGES[item.food_category]) {
-    var fb = FOOD_CATEGORY_FALLBACK[item.food_category] || '🍕';
-    return '<img src="' + FOOD_CATEGORY_IMAGES[item.food_category] + '" class="item-icon-img" alt="' +
-      item.food_category + '" onerror="this.style.display=\'none\';' +
-      'if(this.parentElement)this.parentElement.innerHTML=\'' + fb + '\';">';
+  // Food items: use category image; fallback to category emoji on load error
+  if (item.food_category && FOOD_CATEGORY_IMAGES[item.food_category]) {
+    var fb  = FOOD_CATEGORY_FALLBACK[item.food_category] || '🍕';
+    var src = FOOD_CATEGORY_IMAGES[item.food_category];
+    return '<img src="' + src + '" class="item-icon-img" alt="' + escapeHtml(item.food_category) + '" onerror="var p=this.parentElement;if(p){p.innerHTML=\'' + fb + '\';p.style.fontSize=\'2rem\';}">';
   }
 
-  // All other items: type emoji
+  // All other items: type emoji fallback
   return itemEmoji(item.item_type);
 }
 
@@ -4109,6 +4106,8 @@ async function loadShop() {
     .from('items')
     .select('*')
     .or('is_boss_drop.is.null,is_boss_drop.eq.false')
+    .neq('id', '00000000-0000-0000-0000-000000000001')  // Exclude Skin Keys by ID
+    .neq('name', 'Skin Key')                             // Exclude Skin Keys by name
     .order('price', {ascending: true});
   
   if (res.error||!res.data||!res.data.length) { 
@@ -4355,9 +4354,17 @@ async function loadInventory() {
     }
     
     card.appendChild(makeEl('div',{class:'inv-qty'},'x'+row.quantity));
-    var useBtn=makeEl('button',{class:'btn btn-sm btn-primary'},'Use');
-    useBtn.onclick=(function(rId,iName){return function(){openUseModal(rId,iName);};})(row.id, item.name||'Item');
-    card.appendChild(useBtn);
+    // Skip Use button for Skin Keys — they're spent in the Variant menu on pet cards
+    if (item.name === 'Skin Key' || row.item_id === '00000000-0000-0000-0000-000000000001') {
+      var infoBadge = makeEl('div');
+      infoBadge.textContent = '🔑 Use in My Pets → Variant';
+      infoBadge.style.cssText = 'font-size:0.72rem;color:var(--purple);margin-top:4px;text-align:center;opacity:0.85;';
+      card.appendChild(infoBadge);
+    } else {
+      var useBtn=makeEl('button',{class:'btn btn-sm btn-primary'},'Use');
+      useBtn.onclick=(function(rId,iName){return function(){openUseModal(rId,iName);};})(row.id, item.name||'Item');
+      card.appendChild(useBtn);
+    }
     grid.appendChild(card);
   });
 }
@@ -20602,6 +20609,9 @@ function skinkey_updateCompanionVariant(variantId) {
 async function showPetVariantModal(petId, petName) {
   if (!currentUser) { showToast('Please log in first', 'error'); return; }
 
+  // Refresh key balance from DB before showing so it's always current
+  await skinkey_loadUserData();
+
   var modal = makeModal();
 
   // Header
@@ -20718,6 +20728,8 @@ async function skinkey_grantKeys(amount, reason) {
     if (error) throw error;
     skinKeyState.keys = newTotal;
     skinkey_updateDisplay();
+    // Refresh from DB to ensure displayed count is accurate
+    await skinkey_loadUserData();
     showToast('🔑 Received ' + amount + ' Skin Key' + (amount > 1 ? 's' : '') + '!', 'success');
     console.log('🔑 Granted', amount, 'skin keys:', reason);
     return true;
