@@ -6226,7 +6226,7 @@ setTimeout(function() {
 var currentLeaderboard = 'points';
 var leaderboardCache = {
   points: null,
-  pets: null,
+  streak: null,  // streak is never cached — always fetch fresh
   levels: null
 };
 
@@ -6248,8 +6248,8 @@ function switchLeaderboard(type, clickEvent) {
   });
   el('leaderboard-' + type).classList.add('active');
   
-  // Load data if not cached
-  if (!leaderboardCache[type]) {
+  // Load data if not cached (streak is always reloaded — no cache)
+  if (!leaderboardCache[type] || type === 'streak') {
     loadLeaderboard(type);
   }
 }
@@ -6284,49 +6284,50 @@ async function loadLeaderboard(type) {
           };
         });
       
-        } else if (type === 'pets') {
-      // Top players by pet count - query user_pets directly and group
-      var petsRes = await supabaseClient
-        .from('user_pets')
-        .select('user_id');
-      
-      if (petsRes.error) throw petsRes.error;
-      
-      // Count pets per user
-      var petCounts = {};
-      petsRes.data.forEach(function(pet) {
-        petCounts[pet.user_id] = (petCounts[pet.user_id] || 0) + 1;
-      });
-      
-      // Get usernames for all users with pets
-      var userIds = Object.keys(petCounts);
-      
-      if (userIds.length === 0) {
-        data = [];
-      } else {
-        var usersRes = await supabaseClient
+        } else if (type === 'streak') {
+      // ── Login Streak Leaderboard ──
+      // Tries the RPC first; falls back to a direct query if RPC doesn't exist.
+      var rpcRes = await supabaseClient.rpc('get_streak_leaderboard', { limit_count: 10 });
+      var streakRows;
+      if (rpcRes.error) {
+        // Fallback: direct query on players table
+        var fallbackRes = await supabaseClient
           .from('players')
-          .select('id, username')
-          .in('id', userIds);
-        
-        if (usersRes.error) throw usersRes.error;
-        
-        // Match usernames to pet counts and sort
-        var playersWithCounts = usersRes.data.map(function(player) {
+          .select('id, username, login_streak, last_login')
+          .not('username', 'is', null)
+          .order('login_streak', { ascending: false })
+          .order('last_login', { ascending: false })
+          .limit(10);
+        if (fallbackRes.error) throw fallbackRes.error;
+        streakRows = fallbackRes.data;
+      } else {
+        streakRows = rpcRes.data || [];
+      }
+
+      data = (streakRows || [])
+        .filter(function(p) { return p.username; })
+        .map(function(p) {
+          var streak = p.login_streak || 0;
+          var icon = streak >= 30 ? '💎' : streak >= 7 ? '🔥' : '📅';
           return {
-            username: player.username,
-            count: petCounts[player.id] || 0,
-            value: (petCounts[player.id] || 0) + ' pets',
-            stat: (petCounts[player.id] || 0) + ' pets owned'
+            id: p.id,
+            username: p.username,
+            value: icon + ' ' + streak + (streak === 1 ? ' day' : ' days'),
+            stat: p.last_login ? getTimeAgo(p.last_login) : 'Never',
+            streak: streak
           };
         });
-        
-        // Sort by pet count (highest first)
-        playersWithCounts.sort(function(a, b) { return b.count - a.count; });
-        
-        data = playersWithCounts;
+
+      // Store own streak for rank widget (attached to array as property)
+      if (currentUser) {
+        var myRes = await supabaseClient
+          .from('players')
+          .select('login_streak')
+          .eq('id', currentUser.id)
+          .single();
+        data._myStreak = (myRes.data && myRes.data.login_streak) || 0;
       }
-      
+
     } else if (type === 'levels') {
       // Top players by total pet levels
       var res = await supabaseClient.rpc('get_leaderboard_levels');
@@ -6448,6 +6449,27 @@ async function loadLeaderboard(type) {
     });
     
     container.innerHTML = html;
+
+    // ── Streak: append your-rank widget below the list ──
+    if (type === 'streak' && currentUser && data._myStreak !== undefined) {
+      var myStreak = data._myStreak;
+      var myIcon = myStreak >= 30 ? '💎' : myStreak >= 7 ? '🔥' : '📅';
+      var myRank = null;
+      for (var ri = 0; ri < data.length; ri++) {
+        if (data[ri].id === currentUser.id) { myRank = ri + 1; break; }
+      }
+      var rankText = myRank ? '#' + myRank + ' on the leaderboard' : 'Not yet in top 10';
+      var widget = document.createElement('div');
+      widget.style.cssText = 'margin-top:20px;padding:14px 18px;border-radius:14px;background:linear-gradient(135deg,rgba(153,102,255,0.12),rgba(255,102,153,0.08));border:1px solid rgba(153,102,255,0.25);display:flex;align-items:center;justify-content:space-between;';
+      widget.innerHTML =
+        '<div>' +
+          '<div style="font-weight:bold;color:var(--purple-dark);font-size:0.95rem;">Your Streak</div>' +
+          '<div style="color:var(--text-light);font-size:0.82rem;">' + rankText + '</div>' +
+        '</div>' +
+        '<div style="font-size:1.6rem;font-weight:bold;color:var(--purple);">' + myIcon + ' ' + myStreak + (myStreak === 1 ? ' day' : ' days') + '</div>';
+      container.appendChild(widget);
+    }
+
     
   } catch (err) {
     container.innerHTML = '<div class="empty-state"><p>Failed to load leaderboard: ' + err.message + '</p></div>';
