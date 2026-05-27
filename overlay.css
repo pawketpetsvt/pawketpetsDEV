@@ -10,23 +10,122 @@ body {
   overflow: hidden;
 }
 
+/* ============================================
+   BASE CONTAINER
+   ============================================ */
 .overlay-container {
-  width: 360px;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: all 0.4s ease-in-out;
   overflow: hidden;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
+/* ============================================
+   COLLAPSED STATE - Small, minimal
+   ============================================ */
+.overlay-container.collapsed {
+  width: auto;
+  min-width: 180px;
+  max-width: 220px;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  border-radius: 50px;
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.overlay-container.collapsed .expanded-view {
+  display: none;
+}
+
+.overlay-container.collapsed .collapsed-view {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Collapsed view content */
+.collapsed-view {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.collapsed-avatar {
+  font-size: 28px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+.collapsed-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.collapsed-name {
+  font-weight: bold;
+  font-size: 13px;
+  color: white;
+}
+
+.collapsed-level {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.collapsed-expand-hint {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-left: auto;
+  animation: gentlePulse 2s ease-in-out infinite;
+}
+
+@keyframes gentlePulse {
+  0%, 100% { opacity: 0.5; transform: translateX(0); }
+  50% { opacity: 1; transform: translateX(3px); }
+}
+
+/* ============================================
+   EXPANDED STATE - Full card
+   ============================================ */
+.overlay-container.expanded {
+  width: 360px;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  animation: expandBounce 0.5s ease-out;
+}
+
+@keyframes expandBounce {
+  0% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.overlay-container.expanded .collapsed-view {
+  display: none;
+}
+
+.overlay-container.expanded .expanded-view {
+  display: block;
+}
+
+/* ============================================
+   EXPANDED VIEW - Pet Card
+   ============================================ */
 .pet-card {
   display: flex;
   padding: 16px;
   gap: 14px;
 }
 
-/* Pet Avatar */
 .pet-avatar {
   width: 70px;
   height: 70px;
@@ -42,7 +141,6 @@ body {
 
 .pet-avatar-placeholder {
   font-size: 42px;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
 }
 
 .pet-avatar img {
@@ -51,7 +149,6 @@ body {
   object-fit: cover;
 }
 
-/* Pet Info */
 .pet-info {
   flex: 1;
   min-width: 0;
@@ -69,7 +166,7 @@ body {
   font-weight: 700;
   font-size: 16px;
   color: white;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -90,6 +187,51 @@ body {
   margin-bottom: 8px;
 }
 
+/* Quip Bubble */
+.quip-bubble {
+  background: rgba(255, 255, 255, 0.95);
+  color: #2d1b4e;
+  font-size: 11px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  margin-bottom: 10px;
+  position: relative;
+  font-weight: 500;
+  text-align: center;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(153, 102, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.quip-bubble::before {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 20px;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid rgba(255, 255, 255, 0.95);
+}
+
+.quip-bubble.quip-new {
+  animation: quipPop 0.4s ease-out;
+}
+
+@keyframes quipPop {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Pet Mood */
 .pet-mood {
   display: flex;
   align-items: center;
@@ -123,7 +265,6 @@ body {
 .stat-label {
   width: 32px;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 11px;
 }
 
 .stat-bar {
@@ -140,28 +281,29 @@ body {
   border-radius: 3px;
 }
 
-.hp-fill { background: linear-gradient(90deg, #ef4444, #f97316); }
-.hunger-fill { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
-.energy-fill { background: linear-gradient(90deg, #10b981, #34d399); }
-.happiness-fill { background: linear-gradient(90deg, #ec4899, #f472b6); }
+.hp-fill {
+  background: linear-gradient(90deg, #ef4444, #f97316);
+}
+
+.hunger-fill {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.energy-fill {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.happiness-fill {
+  background: linear-gradient(90deg, #ec4899, #f472b6);
+}
 
 .stat-value {
   width: 36px;
   text-align: right;
   color: rgba(255, 255, 255, 0.8);
   font-size: 10px;
-  font-weight: 500;
 }
 
-/* Pet Last Active */
-.pet-last {
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.4);
-  margin-top: 8px;
-  margin-bottom: 4px;
-}
-
-/* Tip */
 .pet-tip {
   font-size: 10px;
   color: rgba(255, 255, 255, 0.6);
@@ -188,113 +330,6 @@ body {
   opacity: 0.5;
 }
 
-/* Variant effects (if pet has variant) */
-.pet-card.variant-golden {
-  border-left: 3px solid #ffd700;
-}
-
-.pet-card.variant-shiny {
-  border-left: 3px solid #00ffff;
-  animation: shinyPulse 2s ease-in-out infinite;
-}
-
-@keyframes shinyPulse {
-  0%, 100% { border-left-color: #00ffff; }
-  50% { border-left-color: #ff00ff; }
-}
-
-.pet-card.variant-shadow {
-  border-left: 3px solid #4a4a4a;
-}
-
-/* Loading state */
-.overlay-container.loading .pet-name {
-  opacity: 0.5;
-}
-
-.overlay-container.loading .stat-fill {
-  animation: loadingPulse 1s ease-in-out infinite;
-}
-
-@keyframes loadingPulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-/* Add these at the end of your overlay.css file */
-
-/* Make it more compact for stream */
-.overlay-container {
-  width: 340px;  /* Slightly narrower */
-  font-size: 0.9em;
-}
-
-/* Better contrast for stream backgrounds */
-.overlay-container {
-  background: rgba(0, 0, 0, 0.8);  /* Slightly darker */
-  backdrop-filter: blur(12px);      /* More blur for readability */
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-/* Make stats pop more */
-.stat-fill {
-  box-shadow: 0 0 2px rgba(0,0,0,0.3);
-}
-
-/* Optional: Add a subtle glow to the pet avatar */
-.pet-avatar {
-  box-shadow: 0 0 0 2px rgba(153, 102, 255, 0.3);
-}
-/* ============================================
-   QUIP BUBBLE - Speech bubble for pet quips
-   ============================================ */
-.quip-bubble {
-  background: rgba(255, 255, 255, 0.95);
-  color: #2d1b4e;
-  font-size: 11px;
-  padding: 8px 12px;
-  border-radius: 16px;
-  margin-bottom: 10px;
-  position: relative;
-  font-weight: 500;
-  text-align: center;
-  transition: all 0.3s ease;
-  border: 1px solid rgba(153, 102, 255, 0.3);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* Speech bubble tail */
-.quip-bubble::before {
-  content: '';
-  position: absolute;
-  bottom: -8px;
-  left: 20px;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-top: 8px solid rgba(255, 255, 255, 0.95);
-}
-
-/* Quip animation when changing */
-.quip-bubble.quip-new {
-  animation: quipPop 0.4s ease-out;
-}
-
-@keyframes quipPop {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.5;
-  }
-  50% {
-    transform: scale(1.02);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-/* ============================================
-   PROMO LINK STYLES
-   ============================================ */
 .promo-link {
   color: #ffcc00 !important;
   text-decoration: none !important;
@@ -307,9 +342,7 @@ body {
   text-decoration: underline !important;
 }
 
-/* ============================================
-   NIGHT MODE / DARK THEME FRIENDLY
-   ============================================ */
+/* Dark mode support */
 @media (prefers-color-scheme: dark) {
   .quip-bubble {
     background: rgba(30, 30, 46, 0.95);
@@ -319,15 +352,5 @@ body {
   
   .quip-bubble::before {
     border-top-color: rgba(30, 30, 46, 0.95);
-  }
-}
-
-/* ============================================
-   RESPONSIVE - Smaller screens
-   ============================================ */
-@media (max-width: 500px) {
-  .quip-bubble {
-    font-size: 9px;
-    padding: 6px 10px;
   }
 }
