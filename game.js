@@ -19506,20 +19506,21 @@ function community_init() {
     if (!isMobile()) {
       // Desktop mode - remove mobile elements
       var menu = document.getElementById('mobile-menu');
-      var hamburger = document.getElementById('hamburger-btn');
+      var hamburger = document.getElementById('hamburger-menu-btn');
       var overlay = document.getElementById('mobile-overlay');
       
       if (menu) menu.style.display = 'none';
-      if (hamburger) hamburger.style.display = 'none';
+      // Only hide/show via JS on mobile — CSS handles desktop hiding
+      if (hamburger && window.innerWidth <= 768) hamburger.style.display = 'none';
       if (overlay) overlay.style.display = 'none';
       document.body.style.overflow = '';
     } else {
       // Mobile mode - ensure elements visible
       var menu = document.getElementById('mobile-menu');
-      var hamburger = document.getElementById('hamburger-btn');
+      var hamburger = document.getElementById('hamburger-menu-btn');
       
       if (menu) menu.style.display = '';
-      if (hamburger) hamburger.style.display = '';
+      if (hamburger && window.innerWidth <= 768) hamburger.style.display = '';
     }
   });
   

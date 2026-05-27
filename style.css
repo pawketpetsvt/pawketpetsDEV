@@ -9587,26 +9587,24 @@ body.night-mode .btn-outline:hover {
 
 /* Hamburger Menu Button - Hidden on Desktop */
 .hamburger-menu-btn {
-  display: none;
-  position: fixed;
-  top: 15px;
-  left: 15px;
+  display: none !important; /* Hidden on desktop — shown only inside @media (max-width: 768px) */
+  position: static;         /* Sits in navbar-left flow on mobile; Phase 1 overrides as needed */
   z-index: 1001;
-  background: #ff6b35; /* Brand orange */
+  background: rgba(255,255,255,0.15);
   color: white;
-  border: none;
+  border: 1px solid rgba(255,255,255,0.3);
   border-radius: 8px;
-  width: 44px;
-  height: 44px;
-  font-size: 28px;
+  width: 40px;
+  height: 40px;
+  font-size: 22px;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
   padding: 0;
+  flex-shrink: 0;
+  margin-right: 8px;
+  transition: transform 0.2s ease;
 }
 
 .hamburger-menu-btn:hover {
@@ -9914,11 +9912,9 @@ body.night-mode .btn-outline:hover {
 /* Extra Small Mobile (< 480px) */
 @media (max-width: 480px) {
   .hamburger-menu-btn {
-    top: 10px !important;
-    left: 10px !important;
-    width: 44px !important;
-    height: 44px !important;
-    font-size: 1.8rem !important;
+    width: 38px !important;
+    height: 38px !important;
+    font-size: 1.6rem !important;
   }
   
   .mobile-nav-menu {
@@ -16445,9 +16441,13 @@ body.night-mode .btn-variant-selector {
   gap: 6px;
 }
 
-/* Desktop: hamburger hidden */
+/* Desktop: hamburger hidden — covers all selector variants */
 @media (min-width: 769px) {
-  .hamburger-menu-btn {
+  .hamburger-menu-btn,
+  .hamburger-btn,
+  #hamburger-btn,
+  #hamburger-menu-btn,
+  [id*="hamburger"] {
     display: none !important;
   }
 }
