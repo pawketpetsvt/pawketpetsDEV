@@ -2845,6 +2845,15 @@ function makeMyPetCard(pet) {
     img.onerror = function(){ this.parentElement.innerHTML='&#128062;'; };
     avatar.appendChild(img);
   } else { avatar.innerHTML='&#128062;'; }
+
+  // Apply variant class immediately so it shows on page load
+  var activeVariant = skinkey_getCurrentVariant(pet.id);
+  if (activeVariant) {
+    var varCls = BASIC_VARIANTS[activeVariant] ? BASIC_VARIANTS[activeVariant].cssClass : 'pet-variant-' + activeVariant;
+    card.classList.add(varCls);
+    avatar.classList.add(varCls);
+    avatarWrap.classList.add(varCls);
+  }
   var moodBadge = makeEl('div', {class:'mood-badge'});
   moodBadge.innerHTML = moodEmoji;
   avatarWrap.appendChild(avatar);
@@ -20561,27 +20570,34 @@ async function skinkey_applyVariant(userPetId, variantId) {
 }
 
 function skinkey_applyVariantToAllDisplays(userPetId, variantId) {
-  var petElements = document.querySelectorAll('[data-pet-id="' + userPetId + '"]');
-  petElements.forEach(function(el) {
-    Object.keys(BASIC_VARIANTS).forEach(function(vid) {
-      el.classList.remove(BASIC_VARIANTS[vid].cssClass);
-    });
-    SPECIAL_VARIANTS.forEach(function(vid) {
-      el.classList.remove('pet-variant-' + vid);
-    });
+  // All variant CSS classes to strip before applying new one
+  var allVariantClasses = Object.keys(BASIC_VARIANTS).map(function(vid) {
+    return BASIC_VARIANTS[vid].cssClass;
+  }).concat(SPECIAL_VARIANTS.map(function(vid) { return 'pet-variant-' + vid; }));
+
+  function applyToEl(el) {
+    if (!el) return;
+    allVariantClasses.forEach(function(cls) { el.classList.remove(cls); });
     if (variantId) {
-      if (BASIC_VARIANTS[variantId]) {
-        el.classList.add(BASIC_VARIANTS[variantId].cssClass);
-      } else {
-        el.classList.add('pet-variant-' + variantId);
-      }
+      var cls = BASIC_VARIANTS[variantId] ? BASIC_VARIANTS[variantId].cssClass : 'pet-variant-' + variantId;
+      el.classList.add(cls);
     }
-  });
+  }
+
+  // Target the card by its actual ID
+  var card = document.getElementById('petcard-' + userPetId);
+  applyToEl(card);
+
+  // Also target the avatar div inside the card
+  if (card) {
+    applyToEl(card.querySelector('.pet-avatar'));
+    applyToEl(card.querySelector('.pet-avatar-wrap'));
+  }
+
+  // Update companion if this is the active companion
   if (window.companionPetId && window.companionPetId === userPetId) {
     skinkey_updateCompanionVariant(variantId);
   }
-  // NOTE: loadMyPets() removed here — DOM classes already updated above,
-  // triggering a full reload was wasteful and could cause update loops.
 }
 
 function skinkey_updateCompanionVariant(variantId) {

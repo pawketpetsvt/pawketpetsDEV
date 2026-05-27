@@ -16527,3 +16527,147 @@ body.night-mode .item-icon-img {
   filter: drop-shadow(1px 2px 4px rgba(0,0,0,0.35));
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PET VARIANT EFFECTS — Extended selectors
+   Covers .my-pet-card (actual card class) + .pet-avatar + .pet-avatar-wrap
+   The existing rules target .pet-card which is never rendered;
+   these mirror every effect on the correct elements.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── GOLDEN ── */
+.my-pet-card.pet-variant-golden,
+.pet-avatar.pet-variant-golden,
+.pet-avatar-wrap.pet-variant-golden {
+  filter: sepia(0.6) hue-rotate(15deg) saturate(2.5) brightness(1.15);
+}
+.my-pet-card.pet-variant-golden {
+  box-shadow: 0 0 25px rgba(255,215,0,0.55);
+  border-color: #FFD700 !important;
+  animation: golden-glow 2s ease-in-out infinite;
+}
+
+/* ── SHINY ── */
+.my-pet-card.pet-variant-shiny,
+.pet-avatar.pet-variant-shiny,
+.pet-avatar-wrap.pet-variant-shiny {
+  animation: shiny-pulse 3s ease-in-out infinite;
+}
+.my-pet-card.pet-variant-shiny {
+  box-shadow: 0 0 20px rgba(255,255,255,0.4);
+  border: 2.5px solid transparent !important;
+  background: linear-gradient(white, white) padding-box,
+              linear-gradient(135deg, #ff00ff, #00ffff, #ffff00, #ff00ff) border-box !important;
+}
+
+/* ── COSMIC ── */
+.my-pet-card.pet-variant-cosmic,
+.pet-avatar.pet-variant-cosmic,
+.pet-avatar-wrap.pet-variant-cosmic {
+  filter: saturate(1.3) brightness(1.1);
+}
+.my-pet-card.pet-variant-cosmic {
+  box-shadow: 0 0 25px rgba(138,43,226,0.6);
+  border: 2.5px solid transparent !important;
+  background: linear-gradient(white,white) padding-box,
+              linear-gradient(135deg,#667eea,#764ba2,#667eea) border-box !important;
+}
+
+/* ── SHADOW ── */
+.my-pet-card.pet-variant-shadow,
+.pet-avatar.pet-variant-shadow,
+.pet-avatar-wrap.pet-variant-shadow {
+  filter: brightness(0.7) saturate(0.8) hue-rotate(260deg);
+}
+.my-pet-card.pet-variant-shadow {
+  box-shadow: 0 0 20px rgba(139,0,139,0.6);
+  border-color: #4B0082 !important;
+}
+
+/* ── FIRE ── */
+.my-pet-card.pet-variant-fire,
+.pet-avatar.pet-variant-fire,
+.pet-avatar-wrap.pet-variant-fire {
+  filter: hue-rotate(-15deg) saturate(1.5) brightness(1.1);
+}
+.my-pet-card.pet-variant-fire {
+  box-shadow: 0 0 20px rgba(255,69,0,0.55);
+  border-color: #FF4500 !important;
+  animation: flame-flicker 1s ease-in-out infinite;
+}
+
+/* ── ICE ── */
+.my-pet-card.pet-variant-ice,
+.pet-avatar.pet-variant-ice,
+.pet-avatar-wrap.pet-variant-ice {
+  filter: hue-rotate(180deg) saturate(1.2) brightness(1.15);
+}
+.my-pet-card.pet-variant-ice {
+  box-shadow: 0 0 20px rgba(0,212,255,0.5);
+  border-color: #00D2FF !important;
+}
+
+/* ── ELECTRIC ── */
+.my-pet-card.pet-variant-electric,
+.pet-avatar.pet-variant-electric,
+.pet-avatar-wrap.pet-variant-electric {
+  filter: brightness(1.2) saturate(1.5) hue-rotate(200deg);
+}
+.my-pet-card.pet-variant-electric {
+  box-shadow: 0 0 18px rgba(255,255,0,0.6);
+  border-color: #FFD700 !important;
+  animation: electric-zap 0.6s ease-in-out infinite;
+}
+@keyframes electric-zap {
+  0%,100% { box-shadow: 0 0 18px rgba(255,255,0,0.6); }
+  50%      { box-shadow: 0 0 30px rgba(255,255,0,0.9); }
+}
+
+/* ── NATURE ── */
+.my-pet-card.pet-variant-nature,
+.pet-avatar.pet-variant-nature,
+.pet-avatar-wrap.pet-variant-nature {
+  filter: hue-rotate(80deg) saturate(1.3) brightness(1.05);
+}
+.my-pet-card.pet-variant-nature {
+  box-shadow: 0 0 18px rgba(56,161,105,0.5);
+  border-color: #38A169 !important;
+}
+
+/* ── CRYSTAL ── */
+.my-pet-card.pet-variant-crystal,
+.pet-avatar.pet-variant-crystal,
+.pet-avatar-wrap.pet-variant-crystal {
+  filter: brightness(1.25) saturate(1.4);
+}
+.my-pet-card.pet-variant-crystal {
+  box-shadow: 0 0 22px rgba(99,179,237,0.6);
+  border-color: #63B3ED !important;
+  animation: crystal-shine 2s ease-in-out infinite;
+}
+@keyframes crystal-shine {
+  0%,100% { filter: brightness(1.25) saturate(1.4); }
+  50%      { filter: brightness(1.45) saturate(1.6); }
+}
+
+/* ── GHOST ── */
+.my-pet-card.pet-variant-ghost,
+.pet-avatar.pet-variant-ghost,
+.pet-avatar-wrap.pet-variant-ghost {
+  filter: brightness(1.1) contrast(0.88) opacity(0.85);
+  animation: ghost-float 3s ease-in-out infinite;
+}
+.my-pet-card.pet-variant-ghost {
+  box-shadow: 0 0 20px rgba(200,200,255,0.5);
+  border-color: rgba(153,102,255,0.6) !important;
+}
+@keyframes ghost-float {
+  0%,100% { transform: translateY(0); }
+  50%     { transform: translateY(-5px); }
+}
+
+/* Night mode: preserve effects */
+body.night-mode .my-pet-card.pet-variant-golden  { background: rgba(42,36,64,0.95) !important; }
+body.night-mode .my-pet-card.pet-variant-shiny   { background: rgba(42,36,64,0.95) !important; }
+body.night-mode .my-pet-card.pet-variant-cosmic  { background: rgba(42,36,64,0.95) !important; }
+
