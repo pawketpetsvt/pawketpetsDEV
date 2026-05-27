@@ -1,12 +1,12 @@
 // Stream Overlay Widget - PawketPetsVT
 // Fetches pet data every 10 seconds and updates the display
 
-// CONFIGURATION - CHANGE THIS TO YOUR STREAMER NAME
-const STREAMER_NAME = 'EMBERTAIL';  // ← CHANGE THIS to your Twitch username
-const API_BASE = 'https://pawketpetsvt.github.io';  // ← CHANGE THIS to your actual domain
-
-// For local testing (uncomment and use a local server)
-// const API_BASE = 'http://localhost:5500';
+// ============================================
+// CONFIGURATION - IMPORTANT: CHANGE THESE TWO LINES
+// ============================================
+const STREAMER_NAME = 'Embertail';  // Your Twitch username (case-sensitive!)
+const API_BASE = 'https://pawketpets-twitch.pawketpetsvt.workers.dev';  // Your Cloudflare Worker URL
+// ============================================
 
 let refreshInterval = null;
 let currentPetData = null;
@@ -20,10 +20,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function fetchPetData() {
   const overlay = document.getElementById('overlay');
-  overlay.classList.add('loading');
+  if (overlay) overlay.classList.add('loading');
   
   try {
-    const response = await fetch(`${API_BASE}/api/overlay/pet?streamer=${encodeURIComponent(STREAMER_NAME)}`, {
+    // Correct URL: /api/overlay (not /api/overlay/pet)
+    const response = await fetch(`${API_BASE}/api/overlay?streamer=${encodeURIComponent(STREAMER_NAME)}`, {
       headers: {
         'Accept': 'application/json'
       }
@@ -38,10 +39,10 @@ async function fetchPetData() {
     if (data.success) {
       updateDisplay(data.pet);
       currentPetData = data.pet;
-      overlay.classList.remove('loading');
+      if (overlay) overlay.classList.remove('loading');
     } else if (data.error === 'No companion pet set') {
-      showNoCompanionState(data.streamer);
-      overlay.classList.remove('loading');
+      showNoCompanionState(STREAMER_NAME);
+      if (overlay) overlay.classList.remove('loading');
     } else {
       throw new Error(data.error || 'Unknown error');
     }
@@ -49,7 +50,7 @@ async function fetchPetData() {
   } catch (error) {
     console.error('Failed to fetch pet data:', error);
     showErrorState();
-    overlay.classList.remove('loading');
+    if (overlay) overlay.classList.remove('loading');
   }
 }
 
@@ -59,9 +60,26 @@ function updateDisplay(pet) {
   document.getElementById('pet-level').textContent = `Lv.${pet.level}`;
   document.getElementById('pet-species').textContent = pet.species;
   
-  // Mood
-  document.getElementById('mood-emoji').textContent = pet.mood.emoji;
-  document.getElementById('mood-text').textContent = pet.mood.text;
+  // Mood helpers
+  function getMoodEmoji(percent) {
+    if (percent >= 80) return '😊';
+    if (percent >= 60) return '🙂';
+    if (percent >= 40) return '😐';
+    if (percent >= 20) return '😟';
+    return '😭';
+  }
+  
+  function getMoodText(percent) {
+    if (percent >= 80) return 'Ecstatic';
+    if (percent >= 60) return 'Happy';
+    if (percent >= 40) return 'Content';
+    if (percent >= 20) return 'Unhappy';
+    return 'Miserable';
+  }
+  
+  const happinessPercent = pet.stats.happiness.percent;
+  document.getElementById('mood-emoji').textContent = getMoodEmoji(happinessPercent);
+  document.getElementById('mood-text').textContent = getMoodText(happinessPercent);
   
   // HP
   const hpPercent = pet.stats.hp.percent;
@@ -79,21 +97,24 @@ function updateDisplay(pet) {
   document.getElementById('energy-text').textContent = `${energyPercent}%`;
   
   // Happiness
-  const happinessPercent = pet.stats.happiness.percent;
   document.getElementById('happiness-fill').style.width = `${happinessPercent}%`;
   document.getElementById('happiness-text').textContent = `${happinessPercent}%`;
   
-  // Last active
-  document.getElementById('pet-last').textContent = `Last active: ${pet.lastActive}`;
+  // Tip message
+  let tip = '';
+  if (hungerPercent < 30) tip = '🍽️ Hungry! Feed me in the game!';
+  else if (energyPercent < 30) tip = '😴 Tired! Let me rest...';
+  else if (happinessPercent < 40) tip = '💔 Sad! Play with me in the game!';
+  else tip = '✨ Happy and healthy! Thanks for watching!';
   
-  // Tip
-  document.getElementById('pet-tip').textContent = pet.tip;
+  document.getElementById('pet-tip').textContent = tip;
+  document.getElementById('pet-last').textContent = 'Updated just now';
   
   // Pet image (if available)
   if (pet.image) {
     const img = document.getElementById('pet-image');
     const placeholder = document.getElementById('pet-avatar-placeholder');
-    img.src = `images/${pet.image}`;
+    img.src = `https://pawketpets.net/pawketpetsDEV/images/${pet.image}`;
     img.onload = () => {
       img.style.display = 'block';
       placeholder.style.display = 'none';
@@ -106,10 +127,11 @@ function updateDisplay(pet) {
   
   // Apply variant class to card
   const card = document.querySelector('.pet-card');
-  // Remove existing variant classes
-  card.classList.remove('variant-golden', 'variant-shiny', 'variant-shadow', 'variant-cosmic', 'variant-fire', 'variant-ice');
-  if (pet.variant) {
-    card.classList.add(`variant-${pet.variant}`);
+  if (card) {
+    card.classList.remove('variant-golden', 'variant-shiny', 'variant-shadow', 'variant-cosmic', 'variant-fire', 'variant-ice');
+    if (pet.variant) {
+      card.classList.add(`variant-${pet.variant}`);
+    }
   }
 }
 
@@ -137,6 +159,6 @@ function showErrorState() {
   document.getElementById('pet-species').textContent = 'Unable to load pet data';
   document.getElementById('mood-emoji').textContent = '⚠️';
   document.getElementById('mood-text').textContent = 'Error';
-  document.getElementById('pet-last').textContent = 'Check streamer name or try again';
-  document.getElementById('pet-tip').textContent = '🔧 Make sure STREAMER_NAME is correct in overlay.js';
+  document.getElementById('pet-last').textContent = 'Check API URL in overlay.js';
+  document.getElementById('pet-tip').textContent = '🔧 Make sure STREAMER_NAME and API_BASE are correct';
 }
