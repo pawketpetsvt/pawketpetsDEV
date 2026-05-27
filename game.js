@@ -1301,6 +1301,19 @@ function initLeaderboardTab() {
 function showTab(tab) {
   // CRITICAL: Clean up all timers when switching tabs to prevent memory leaks
   cleanupAllTimers();
+
+  // WISHES: shop visit — check for any pet that has a visit_shop wish
+  if (tab === 'shop' && currentUser) {
+    Object.keys(petMoodCache).forEach(function(pid) {
+      checkPetWishes('visit_shop', pid).catch(function(){});
+    });
+  }
+  // WISHES: profile visit
+  if (tab === 'profile' && currentUser) {
+    Object.keys(petMoodCache).forEach(function(pid) {
+      checkPetWishes('view_profile', pid).catch(function(){});
+    });
+  }
   
   document.querySelectorAll('#app-content .page-section').forEach(function(s){ s.classList.remove('active'); });
   var sec = el('section-' + tab); if (sec) sec.classList.add('active');
@@ -3007,7 +3020,14 @@ function makeMyPetCard(pet) {
   bars.appendChild(xpRow);
   body.appendChild(bars);
 
-  // Action buttons
+  // ── Mood & Wishes widget (loaded async after card renders) ──
+  var moodMount = makeEl('div', { id: 'mood-widget-' + pet.id });
+  moodMount.innerHTML = '<div style="height:4px"></div>'; // placeholder
+  body.appendChild(moodMount);
+  // Load asynchronously so it doesn't block card render
+  personality_loadMood(pet.id).then(function() {
+    personality_renderWidget(pet.id);
+  }).catch(function(){});
   var actions = makeEl('div', {class:'pet-actions'});
   actions.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;justify-content:center;';
   
@@ -3372,6 +3392,160 @@ function calculateLevelUp(newXp, currentLevel, currentMaxHunger, currentMaxEnerg
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PET PERSONALITIES — Daily Moods & Wishes
+// ═══════════════════════════════════════════════════════════════════════════
+
+var PERSONALITIES = [
+  { key:'playful',  icon:'🎾', label:'Playful',  line:'"Wanna play! Let\'s do something fun!"' },
+  { key:'grumpy',   icon:'😾', label:'Grumpy',   line:'"Fine... I guess."' },
+  { key:'curious',  icon:'🔍', label:'Curious',  line:'"What\'s that over there?!"' },
+  { key:'brave',    icon:'🦁', label:'Brave',    line:'"I\'m not scared of anything!"' },
+  { key:'sleepy',   icon:'😴', label:'Sleepy',   line:'"Five more minutes, please..."' },
+  { key:'hungry',   icon:'🍕', label:'Hungry',   line:'"Got any snacks? I\'m STARVING."' },
+  { key:'sassy',    icon:'💅', label:'Sassy',    line:'"Whatever. I look amazing anyway."' }
+];
+
+var WISH_POOL = [
+  { key:'feed',         text:'wants a yummy meal!',         action:'feed',        reward:25 },
+  { key:'play',         text:'wants to play right now!',    action:'play',        reward:30 },
+  { key:'win_battle',   text:'wants to WIN a battle!',      action:'win_battle',  reward:50 },
+  { key:'visit_shop',   text:'wants to visit the shop!',    action:'visit_shop',  reward:20 },
+  { key:'use_toy',      text:'wants to play with a toy!',   action:'use_toy',     reward:35 },
+  { key:'take_snapshot',text:'wants a glamour shot! 📸',    action:'take_snapshot',reward:25 },
+  { key:'view_profile', text:'wants to check the profile!', action:'view_profile', reward:15 }
+];
+
+// In-memory cache: { petId: { personality, wishes, completedWishes, date } }
+var petMoodCache = {};
+
+// Load (or generate) today's mood for a pet
+async function personality_loadMood(petId) {
+  var today = new Date().toISOString().slice(0, 10);
+
+  // Return from cache if same day
+  if (petMoodCache[petId] && petMoodCache[petId].date === today) {
+    return petMoodCache[petId];
+  }
+
+  // Try DB first
+  var { data: row } = await supabaseClient
+    .from('pet_daily_moods')
+    .select('*')
+    .eq('pet_id', petId)
+    .eq('date', today)
+    .single();
+
+  if (row) {
+    petMoodCache[petId] = {
+      date: today,
+      personality: row.personality,
+      wishes: row.wishes || [],
+      completedWishes: row.completed_wishes || [],
+      rewardClaimed: row.reward_claimed || false
+    };
+    return petMoodCache[petId];
+  }
+
+  // Generate new mood for today
+  var personality = PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)].key;
+  var shuffled = WISH_POOL.slice().sort(function() { return Math.random() - 0.5; });
+  var wishes = shuffled.slice(0, 3).map(function(w) { return { key: w.key, text: w.text, action: w.action, reward: w.reward }; });
+
+  // Save to DB (upsert)
+  await supabaseClient.from('pet_daily_moods').upsert({
+    pet_id: petId,
+    date: today,
+    personality: personality,
+    wishes: wishes,
+    completed_wishes: [],
+    reward_claimed: false
+  }, { onConflict: 'pet_id,date' });
+
+  petMoodCache[petId] = { date: today, personality: personality, wishes: wishes, completedWishes: [], rewardClaimed: false };
+  return petMoodCache[petId];
+}
+
+// Mark a wish action as complete for a pet
+async function personality_completeWish(petId, actionKey) {
+  if (!currentUser) return;
+  var mood = petMoodCache[petId];
+  if (!mood) return;
+
+  var wish = mood.wishes.find(function(w) { return w.action === actionKey && mood.completedWishes.indexOf(w.key) === -1; });
+  if (!wish) return; // no matching unfinished wish
+
+  mood.completedWishes.push(wish.key);
+
+  // Award wish reward
+  await awardPP(wish.reward, 'wish_' + wish.key);
+  showToast('🎯 Wish completed: ' + wish.text + ' +' + wish.reward + ' PP!', 3500);
+
+  // Persist to DB
+  await supabaseClient.from('pet_daily_moods')
+    .update({ completed_wishes: mood.completedWishes })
+    .eq('pet_id', petId)
+    .eq('date', mood.date);
+
+  // Refresh the wish widget on the card
+  personality_renderWidget(petId);
+
+  // All 3 wishes done? Award bonus
+  if (mood.completedWishes.length === 3 && !mood.rewardClaimed) {
+    mood.rewardClaimed = true;
+    await supabaseClient.from('pet_daily_moods')
+      .update({ reward_claimed: true })
+      .eq('pet_id', petId)
+      .eq('date', mood.date);
+    await awardPP(100, 'all_wishes_bonus');
+    await addPassXP(25, 'all_wishes');
+    showToast('🎉 All wishes complete! BONUS +100 PP & +25 Pass XP!', 5000);
+  }
+}
+
+// Build and inject the mood/wish widget into an existing pet card
+function personality_renderWidget(petId) {
+  var mount = document.getElementById('mood-widget-' + petId);
+  if (!mount) return;
+  var mood = petMoodCache[petId];
+  if (!mood) { mount.innerHTML = ''; return; }
+
+  var pDef = PERSONALITIES.find(function(p) { return p.key === mood.personality; }) || PERSONALITIES[0];
+  var allDone = mood.completedWishes.length >= mood.wishes.length;
+
+  var wishRows = mood.wishes.map(function(w) {
+    var done = mood.completedWishes.indexOf(w.key) !== -1;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(153,102,255,0.08);">' +
+      '<span style="font-size:1rem;">' + (done ? '✅' : '🔘') + '</span>' +
+      '<span style="font-size:0.8rem;color:' + (done ? '#aaa' : 'var(--purple-dark)') + ';' + (done ? 'text-decoration:line-through;' : '') + '">' +
+        pDef.icon + ' <em>' + escapeHtml(petState[petId] ? (petState[petId].nickname || 'Your pet') : 'Your pet') + '</em> ' + escapeHtml(w.text) +
+      '</span>' +
+      '<span style="margin-left:auto;font-size:0.75rem;color:#9966ff;font-weight:600;">+' + w.reward + ' PP</span>' +
+    '</div>';
+  }).join('');
+
+  mount.innerHTML =
+    '<div style="background:linear-gradient(135deg,rgba(153,102,255,0.08),rgba(255,102,204,0.05));border-radius:12px;border:1px solid rgba(153,102,255,0.2);padding:10px 12px;margin:8px 0;">' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
+        '<span style="font-size:1.2rem;">' + pDef.icon + '</span>' +
+        '<span style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);">' + pDef.label + ' Mood</span>' +
+        (allDone ? '<span style="margin-left:auto;background:#5dde7a;color:white;padding:2px 8px;border-radius:20px;font-size:0.7rem;font-weight:700;">ALL DONE! 🎉</span>' : '') +
+      '</div>' +
+      '<div style="font-size:0.78rem;color:var(--text-light);font-style:italic;margin-bottom:8px;">' + pDef.line + '</div>' +
+      '<div style="font-size:0.75rem;font-weight:600;color:#9966ff;margin-bottom:4px;">📋 Today\'s Wishes:</div>' +
+      wishRows +
+      (allDone && !mood.rewardClaimed
+        ? '<div style="margin-top:8px;padding:6px 10px;background:rgba(93,222,122,0.15);border-radius:8px;font-size:0.78rem;color:#2d8a4e;font-weight:600;">🎁 Bonus ready: +100 PP — complete a wish to claim!</div>'
+        : '') +
+    '</div>';
+}
+
+// Global wish tracking — call this after any action
+async function checkPetWishes(actionKey, petId) {
+  if (!petId || !currentUser) return;
+  await personality_completeWish(petId, actionKey);
+}
+
 async function feed(petId) {
   // Rate limiting
   if (!canPerformAction('feed_' + petId, 500)) {
@@ -3563,6 +3737,9 @@ async function feedFree(petId) {
   // PAWKETPASS: Update bingo progress for feeding
   updateBingoProgress('feed_pet', 1);
   await addPassXP(2, 'feed');
+  
+  // WISHES: check feed wish
+  checkPetWishes('feed', petId).catch(function(){});
   
   // COMMUNITY GOALS: Track feeding
   community_increment('feed_pets_week1', 1);
@@ -3875,8 +4052,8 @@ async function playFree(petId) {
     updateBingoProgress('play_pet', 1);
     await addPassXP(2, 'play');
 
-    // Update local state
-    petState[petId].energy = result.energy;
+    // WISHES: check play wish
+    checkPetWishes('play', petId).catch(function(){});
     petState[petId].happiness = result.happiness;
     petState[petId].xp = result.xp;
 
@@ -3942,7 +4119,9 @@ async function playWithToy(petId, toyId, toyName) {
   updateBingoProgress('use_toy', 1);
   await addPassXP(2, 'play');
   
-  updateBar(petId, 'energy', result.energy, pet.max_energy);
+  // WISHES: check play and use_toy wishes
+  checkPetWishes('play', petId).catch(function(){});
+  checkPetWishes('use_toy', petId).catch(function(){});
   updateBar(petId, 'happiness', result.happiness, pet.max_happiness);
   updateXpBar(petId, result.xp, pet.level);
   
@@ -7967,6 +8146,8 @@ async function executeBattle(playerStats, enemyStats, petId) {
     if (finalHP > 0 && (finalHP / maxHP) < 0.05) {
       await awardBadge('badge_comeback');
     }
+    // WISHES: battle win
+    checkPetWishes('win_battle', petId).catch(function(){});
   }
 
   // CRITICAL: Force reload pet data AFTER HP is saved
