@@ -1033,6 +1033,17 @@ function closeModal() {
 }
 
 function updateAllPoints(pts) {
+  // Handle RPC response objects (e.g. {new_pp: 500} or {error: ...})
+  if (pts !== null && typeof pts === 'object') {
+    if (typeof pts.new_pp === 'number') {
+      pts = pts.new_pp;
+    } else if (pts.error || pts.message) {
+      console.error('updateAllPoints received error object:', pts);
+      return;
+    } else {
+      pts = 0;
+    }
+  }
   // Handle null/undefined/non-number points
   if (pts === null || pts === undefined || typeof pts !== 'number') {
     console.warn('updateAllPoints received invalid value:', pts);
@@ -1339,8 +1350,13 @@ async function showApp(user) {
 
   var bonus = await checkDailyBonus(user.id);
   if (bonus.awarded) {
-    el('bonus-amount').textContent = bonus.amount + ' PP';
-    el('bonus-modal').classList.add('show');
+    var today = new Date().toISOString().split('T')[0];
+    var modalKey = 'daily_bonus_modal_' + user.id + '_' + today;
+    if (!localStorage.getItem(modalKey)) {
+      el('bonus-amount').textContent = bonus.amount + ' PP';
+      el('bonus-modal').classList.add('show');
+      localStorage.setItem(modalKey, '1');
+    }
     updateAllPoints(bonus.newTotal);
   }
 
@@ -3599,7 +3615,7 @@ async function playFree(petId) {
   if (btn) { btn.disabled = true; btn.textContent = '...'; }
 
   try {
-    var { data: result, error } = await supabaseClient.rpc('play_pet_secure', {
+    var { data: result, error } = await supabaseClient.rpc('play_with_pet_secure', {
       p_pet_id: petId,
       p_item_id: null
     });
@@ -3662,7 +3678,7 @@ async function playWithToy(petId, toyId, toyName) {
   }
   
   // Call RPC to play with toy
-  var { data: result, error } = await supabaseClient.rpc('play_pet_secure', {
+  var { data: result, error } = await supabaseClient.rpc('play_with_pet_secure', {
     p_pet_id: petId,
     p_item_id: toyId
   });
@@ -21655,6 +21671,34 @@ function pass_closeModal() {
 // ═══════════════════════════════════════════════════════════════════════════
 // 10. INITIALIZE PASS UI (Call after loadPassProgress)
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ── pass_updateNavbar: update the navbar Pass button with level + unclaimed count
+function pass_updateNavbar() {
+  var passBtn = document.getElementById('pass-button');
+  if (!passBtn || !passProgress) return;
+
+  var level = passProgress.level || 1;
+  var claimed = passProgress.claimedRewards || passProgress.claimed_rewards || [];
+  var unclaimedCount = 0;
+  for (var i = 1; i <= level; i++) {
+    if (claimed.indexOf(i) === -1) unclaimedCount++;
+  }
+
+  passBtn.style.display = 'flex';
+  var levelDisplay = document.getElementById('pass-level-display');
+  if (levelDisplay) levelDisplay.textContent = level;
+
+  // Show unclaimed badge
+  var existingBadge = passBtn.querySelector('.pass-unclaimed-badge');
+  if (existingBadge) existingBadge.remove();
+  if (unclaimedCount > 0) {
+    var badge = document.createElement('span');
+    badge.className = 'pass-unclaimed-badge';
+    badge.textContent = unclaimedCount;
+    badge.style.cssText = 'background:#f59e0b;color:white;border-radius:50%;padding:1px 6px;font-size:11px;margin-left:4px;font-weight:bold;';
+    passBtn.appendChild(badge);
+  }
+}
 
 // Wrap loadPassProgress to update UI after load
 var originalLoadPassProgress = loadPassProgress;

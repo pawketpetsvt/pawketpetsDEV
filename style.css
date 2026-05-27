@@ -16026,3 +16026,86 @@ body.night-mode .toggle-slider::before {
   background-color: #e8d5ff;
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NIGHT MODE — Additional legibility fixes
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Pet Journal */
+body.night-mode .journal-book {
+  background: linear-gradient(135deg, #2a1a3a 0%, #1e1228 100%) !important;
+  border-color: #8B6914 !important;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5) !important;
+}
+body.night-mode .journal-page {
+  background: rgba(42,36,64,0.95) !important;
+  color: #e8d5ff !important;
+}
+body.night-mode .journal-entry {
+  background: rgba(30,20,50,0.85) !important;
+  border-left: 4px solid #ffa502 !important;
+  color: #e8d5ff !important;
+}
+body.night-mode .journal-entry-label  { color: #ffcc66 !important; }
+body.night-mode .journal-entry-value  { color: #e8d5ff !important; }
+body.night-mode .journal-entry-unknown{ color: #b399dd !important; }
+body.night-mode .journal-pet-name     { color: #ffcc66 !important; }
+body.night-mode .journal-catchphrase  { color: #b589ff !important; font-style: italic; }
+
+/* Notification Dropdown */
+body.night-mode .notification-dropdown {
+  background: #2a2a3a !important;
+  border: 2px solid #9966ff !important;
+}
+body.night-mode .notification-dropdown-header {
+  background: linear-gradient(135deg, #4a3a6a, #3a2a5a) !important;
+  border-bottom: 2px solid #9966ff !important;
+}
+body.night-mode .notification-dropdown-header h3 { color: #ffcc66 !important; }
+body.night-mode .notification-item {
+  border-bottom: 1px solid #4a3a6a !important;
+  color: #e8d5ff !important;
+}
+body.night-mode .notification-item:hover    { background: rgba(153,102,255,0.15) !important; }
+body.night-mode .notification-item.unread   { background: rgba(255,165,2,0.12) !important; border-left: 4px solid #ffa502 !important; }
+body.night-mode .notification-title         { color: #ffcc66 !important; }
+body.night-mode .notification-message       { color: #e8d5ff !important; }
+body.night-mode .notification-time          { color: #b399dd !important; }
+body.night-mode .notification-empty         { color: #b399dd !important; }
+
+/* Battle Log */
+body.night-mode .battle-log-container {
+  background: #2a2a3a !important;
+  border: 2px solid #9966ff !important;
+}
+body.night-mode .battle-log-entry {
+  background: rgba(42,36,64,0.9) !important;
+  color: #e8d5ff !important;
+}
+body.night-mode .battle-log-entry.player-attack { background: rgba(74,222,128,0.12) !important; border-left: 4px solid #4ade80 !important; }
+body.night-mode .battle-log-entry.enemy-attack  { background: rgba(255,107,107,0.12) !important; border-left: 4px solid #ff6b6b !important; }
+body.night-mode .battle-log-entry.victory       { background: rgba(251,191,36,0.12) !important;  border-left: 4px solid #fbbf24 !important; }
+body.night-mode .battle-log-entry.defeat        { background: rgba(156,39,176,0.12) !important;  border-left: 4px solid #9c27b0 !important; }
+
+/* Memory Game */
+body.night-mode .memory-stats {
+  background: rgba(42,36,64,0.95) !important;
+  border: 2px solid #9966ff !important;
+  color: #e8d5ff !important;
+}
+body.night-mode .memory-stats strong          { color: #ffcc66 !important; }
+body.night-mode .memory-grid .memory-card     { background: linear-gradient(135deg,#4a3a6a,#3a2a5a) !important; border: 3px solid #9966ff !important; }
+body.night-mode .memory-grid .memory-card.flipped  { background: #e8d5ff !important; color: #4a3a6a !important; }
+body.night-mode .memory-grid .memory-card.matched  { background: linear-gradient(135deg,#2d6a4f,#1b4d3e) !important; border-color: #4ade80 !important; }
+
+/* Already Adopted button */
+body.night-mode .btn-owned {
+  background: linear-gradient(135deg,#2d6a4f,#1b4d3e) !important;
+  color: #a8e6cf !important;
+  border: 2px solid #40916c !important;
+  font-weight: bold !important;
+}
+body.night-mode .btn-owned:hover {
+  background: linear-gradient(135deg,#40916c,#2d6a4f) !important;
+}
+
