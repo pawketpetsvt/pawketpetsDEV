@@ -244,3 +244,90 @@ body {
 .pet-avatar {
   box-shadow: 0 0 0 2px rgba(153, 102, 255, 0.3);
 }
+/* ============================================
+   QUIP BUBBLE - Speech bubble for pet quips
+   ============================================ */
+.quip-bubble {
+  background: rgba(255, 255, 255, 0.95);
+  color: #2d1b4e;
+  font-size: 11px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  margin-bottom: 10px;
+  position: relative;
+  font-weight: 500;
+  text-align: center;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(153, 102, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Speech bubble tail */
+.quip-bubble::before {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 20px;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid rgba(255, 255, 255, 0.95);
+}
+
+/* Quip animation when changing */
+.quip-bubble.quip-new {
+  animation: quipPop 0.4s ease-out;
+}
+
+@keyframes quipPop {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ============================================
+   PROMO LINK STYLES
+   ============================================ */
+.promo-link {
+  color: #ffcc00 !important;
+  text-decoration: none !important;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.promo-link:hover {
+  color: #ffdd44 !important;
+  text-decoration: underline !important;
+}
+
+/* ============================================
+   NIGHT MODE / DARK THEME FRIENDLY
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+  .quip-bubble {
+    background: rgba(30, 30, 46, 0.95);
+    color: #e8d5ff;
+    border-color: rgba(153, 102, 255, 0.5);
+  }
+  
+  .quip-bubble::before {
+    border-top-color: rgba(30, 30, 46, 0.95);
+  }
+}
+
+/* ============================================
+   RESPONSIVE - Smaller screens
+   ============================================ */
+@media (max-width: 500px) {
+  .quip-bubble {
+    font-size: 9px;
+    padding: 6px 10px;
+  }
+}
