@@ -84,7 +84,7 @@ function startQuipRotation(pet) {
       const quip = getRandomQuip(pet.stats.happiness.percent, pet.stats.hunger.percent, pet.stats.energy.percent);
       updateQuipDisplay(quip);
     }
-  }, 45000);
+  }, 120000);
   
   // Show first quip after 5 seconds
   currentQuipTimeout = setTimeout(() => {
