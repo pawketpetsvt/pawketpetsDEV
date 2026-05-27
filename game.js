@@ -378,37 +378,79 @@ function theme_renderSelector(containerId) {
 
 var COSMETICS_CATALOG = {
   backgrounds: [
-    { id:'bg_default',    name:'Classic',       emoji:'💜', gradient:'linear-gradient(135deg,#9966ff,#764ba2)', alwaysUnlocked:true,  unlockHint:'Free for everyone' },
-    { id:'bg_forest',     name:'Forest Glade',  emoji:'🌲', gradient:'linear-gradient(135deg,#134e5e,#71b280)',                       unlockHint:'Reach player level 10' },
-    { id:'bg_stars',      name:'Starry Night',  emoji:'🌌', gradient:'linear-gradient(135deg,#000428,#004e92)',                       unlockHint:'30-day login streak' },
-    { id:'bg_castle',     name:'Battle Keep',   emoji:'🏰', gradient:'linear-gradient(135deg,#2c3e50,#8e44ad)',                       unlockHint:'Win 50 battles' },
-    { id:'bg_desert',     name:'Dusk Desert',   emoji:'🏜️', gradient:'linear-gradient(135deg,#c94b4b,#4b134f)',                       unlockHint:'Win 100 battles' },
-    { id:'bg_clouds',     name:'Cloud Nine',    emoji:'☁️', gradient:'linear-gradient(135deg,#89f7fe,#66a6ff)',                       unlockHint:'Reach player level 20' },
-    { id:'bg_legendary',  name:'Legendary',     emoji:'👑', gradient:'linear-gradient(135deg,#f7971e,#ffd200)',                       unlockHint:'Reach player level 50' },
-    { id:'bg_underwater', name:'Underwater',    emoji:'🐠', gradient:'linear-gradient(135deg,#0052d4,#65c7f7)',                       unlockHint:'50-day login streak' },
-    { id:'bg_volcano',    name:'Volcano',       emoji:'🌋', gradient:'linear-gradient(135deg,#ff512f,#dd2476)',                       unlockHint:'Defeat 10 bosses' },
-    { id:'bg_garden',     name:'Garden',        emoji:'🌸', gradient:'linear-gradient(135deg,#a8edea,#fed6e3)',                       unlockHint:'Feed pets 100 times' }
+    // ── Free for everyone ──
+    { id:'bg_default',    name:'Classic',        emoji:'💜', gradient:'linear-gradient(135deg,#9966ff,#764ba2)', alwaysUnlocked:true, unlockHint:'Free for everyone' },
+    { id:'bg_dreamy',     name:'Dreamy Skies',   emoji:'☁️', gradient:'linear-gradient(135deg,#a8edea,#fed6e3)', alwaysUnlocked:true, unlockHint:'Free for everyone' },
+    { id:'bg_sunset',     name:'Sunset Glow',    emoji:'🌅', gradient:'linear-gradient(135deg,#ff9a9e,#fecfef)', alwaysUnlocked:true, unlockHint:'Free for everyone' },
+    { id:'bg_midnight',   name:'Midnight Stars', emoji:'🌙', gradient:'linear-gradient(135deg,#2c3e50,#3498db)', alwaysUnlocked:true, unlockHint:'Free for everyone' },
+    { id:'bg_candy',      name:'Candy Land',     emoji:'🍬', gradient:'linear-gradient(135deg,#ff6b9d,#ffb3c6,#ffdee9)', alwaysUnlocked:true, unlockHint:'Free for everyone' },
+    { id:'bg_cafe',       name:'Cozy Café',      emoji:'☕', gradient:'linear-gradient(135deg,#d4a373,#faedcd,#fefae0)', alwaysUnlocked:true, unlockHint:'Free for everyone' },
+    { id:'bg_galaxy',     name:'Cosmic Void',    emoji:'🌌', gradient:'linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)', alwaysUnlocked:true, unlockHint:'Free for everyone' },
+    { id:'bg_garden',     name:'Garden',         emoji:'🌸', gradient:'linear-gradient(135deg,#a8edea,#fed6e3)', alwaysUnlocked:true, unlockHint:'Free for everyone' },
+    // ── Earned ──
+    { id:'bg_forest',     name:'Forest Glade',   emoji:'🌲', gradient:'linear-gradient(135deg,#134e5e,#71b280)',  unlockHint:'Reach player level 10' },
+    { id:'bg_stars',      name:'Starry Night',   emoji:'✨', gradient:'linear-gradient(135deg,#000428,#004e92)',  unlockHint:'30-day login streak' },
+    { id:'bg_castle',     name:'Battle Keep',    emoji:'🏰', gradient:'linear-gradient(135deg,#2c3e50,#8e44ad)',  unlockHint:'Win 50 battles' },
+    { id:'bg_desert',     name:'Dusk Desert',    emoji:'🏜️', gradient:'linear-gradient(135deg,#c94b4b,#4b134f)',  unlockHint:'Win 100 battles' },
+    { id:'bg_clouds',     name:'Cloud Nine',     emoji:'☁️', gradient:'linear-gradient(135deg,#89f7fe,#66a6ff)',  unlockHint:'Reach player level 20' },
+    { id:'bg_rainbow',    name:'Rainbow Road',   emoji:'🌈', gradient:'linear-gradient(90deg,#ff0000,#ff7f00,#ffff00,#00ff00,#0000ff,#4b0082,#9400d3)', unlockHint:'Complete Bingo blackout' },
+    { id:'bg_legendary',  name:'Legendary',      emoji:'👑', gradient:'linear-gradient(135deg,#f7971e,#ffd200)',  unlockHint:'Reach player level 50' },
+    { id:'bg_underwater', name:'Underwater',     emoji:'🐠', gradient:'linear-gradient(135deg,#0052d4,#65c7f7)',  unlockHint:'50-day login streak' },
+    { id:'bg_volcano',    name:'Volcano',        emoji:'🌋', gradient:'linear-gradient(135deg,#ff512f,#dd2476)',  unlockHint:'Defeat 10 bosses' },
+    { id:'bg_aurora',     name:'Aurora Bloom',   emoji:'🌿', gradient:'linear-gradient(135deg,#0f9b8e,#bdc372)',  unlockHint:'Contribute to 10 community goals' },
+    { id:'bg_rose',       name:'Rose Gold',      emoji:'🌹', gradient:'linear-gradient(135deg,#f093fb,#f5576c)',  unlockHint:'Send 50 gifts' },
   ],
   frames: [
-    { id:'frame_classic',   name:'Classic',    emoji:'💜', previewColor:'#9966ff', cssClass:'frame-classic',   alwaysUnlocked:true,  unlockHint:'Free for everyone' },
-    { id:'frame_silver',    name:'Silver',     emoji:'⚪', previewColor:'#c0c0c0', cssClass:'frame-silver',                          unlockHint:'Reach player level 10' },
-    { id:'frame_gold',      name:'Gold',       emoji:'🟡', previewColor:'#ffd700', cssClass:'frame-gold',                            unlockHint:'Reach player level 20' },
-    { id:'frame_fire',      name:'Fire',       emoji:'🔥', previewColor:'#ff4500', cssClass:'frame-fire',                            unlockHint:'Win 100 battles' },
-    { id:'frame_ice',       name:'Ice',        emoji:'❄️', previewColor:'#00d2ff', cssClass:'frame-ice',                             unlockHint:'30-day login streak' },
-    { id:'frame_rainbow',   name:'Rainbow',    emoji:'🌈', previewColor:'#ff69b4', cssClass:'frame-rainbow',                         unlockHint:'Complete Bingo blackout' },
-    { id:'frame_legendary', name:'Legendary',  emoji:'✨', previewColor:'#ffd700', cssClass:'frame-legendary',                       unlockHint:'Reach player level 50' },
-    { id:'frame_void',      name:'Void',       emoji:'🌑', previewColor:'#8b00ff', cssClass:'frame-void',                            unlockHint:'Ultra rare drop' },
-    { id:'frame_glitch',    name:'Glitch',     emoji:'📺', previewColor:'#ff00ff', cssClass:'frame-glitch',                          unlockHint:'Secret code: GLITCH' }
+    // ── Free for everyone ──
+    { id:'frame_classic',   name:'Classic',    emoji:'💜', previewColor:'#9966ff', cssClass:'frame-classic',  alwaysUnlocked:true, unlockHint:'Free for everyone' },
+    { id:'frame_dashed',    name:'Dashed',     emoji:'┅',  previewColor:'#9966ff', cssClass:'frame-dashed',   alwaysUnlocked:true, unlockHint:'Free for everyone' },
+    { id:'frame_dotted',    name:'Dotted',     emoji:'⋯',  previewColor:'#9966ff', cssClass:'frame-dotted',   alwaysUnlocked:true, unlockHint:'Free for everyone' },
+    { id:'frame_double',    name:'Double',     emoji:'═',  previewColor:'#9966ff', cssClass:'frame-double',   alwaysUnlocked:true, unlockHint:'Free for everyone' },
+    { id:'frame_soft',      name:'Soft',       emoji:'●',  previewColor:'#ff99cc', cssClass:'frame-soft',     alwaysUnlocked:true, unlockHint:'Free for everyone' },
+    { id:'frame_glow',      name:'Glowing',    emoji:'💫', previewColor:'#9966ff', cssClass:'frame-glow-free',alwaysUnlocked:true, unlockHint:'Free for everyone' },
+    { id:'frame_paw',       name:'Paw Prints', emoji:'🐾', previewColor:'#ff9966', cssClass:'frame-paw',      alwaysUnlocked:true, unlockHint:'Free for everyone' },
+    // ── Earned ──
+    { id:'frame_silver',    name:'Silver',     emoji:'⚪', previewColor:'#c0c0c0', cssClass:'frame-silver',    unlockHint:'Reach player level 10' },
+    { id:'frame_gold',      name:'Gold',       emoji:'🟡', previewColor:'#ffd700', cssClass:'frame-gold',      unlockHint:'Reach player level 20' },
+    { id:'frame_fire',      name:'Fire',       emoji:'🔥', previewColor:'#ff4500', cssClass:'frame-fire',      unlockHint:'Win 100 battles' },
+    { id:'frame_ice',       name:'Ice',        emoji:'❄️', previewColor:'#00d2ff', cssClass:'frame-ice',       unlockHint:'30-day login streak' },
+    { id:'frame_rainbow',   name:'Rainbow',    emoji:'🌈', previewColor:'#ff69b4', cssClass:'frame-rainbow',   unlockHint:'Complete Bingo blackout' },
+    { id:'frame_sparkle',   name:'Sparkle',    emoji:'✨', previewColor:'#ffd700', cssClass:'frame-sparkle-earned', unlockHint:'Referred 5 friends' },
+    { id:'frame_legendary', name:'Legendary',  emoji:'✨', previewColor:'#ffd700', cssClass:'frame-legendary', unlockHint:'Reach player level 50' },
+    { id:'frame_void',      name:'Void',       emoji:'🌑', previewColor:'#8b00ff', cssClass:'frame-void',      unlockHint:'Ultra rare drop' },
+    { id:'frame_crown',     name:'Crown',      emoji:'👑', previewColor:'#ffd700', cssClass:'frame-crown',     unlockHint:'Win 50 battles in a row' },
+    { id:'frame_glitch',    name:'Glitch',     emoji:'📺', previewColor:'#ff00ff', cssClass:'frame-glitch',    unlockHint:'Secret code: GLITCH' },
   ],
   badges: [
-    { id:'badge_recruit',     name:'Recruit',        emoji:'🎖️', color:'#8e8e8e', alwaysUnlocked:false, unlockHint:'Complete tutorial' },
-    { id:'badge_level_20',    name:'Veteran',        emoji:'⭐',  color:'#c0c0c0',                       unlockHint:'Reach player level 20' },
-    { id:'badge_level_50',    name:'Mythic',         emoji:'💫',  color:'#ff9800',                       unlockHint:'Reach player level 50' },
-    { id:'badge_100_battles', name:'Veteran Fighter',emoji:'⚔️',  color:'#5bc0de',                       unlockHint:'Win 100 battles' },
-    { id:'badge_30_days',     name:'Loyal',          emoji:'🗓️',  color:'#5cb85c',                       unlockHint:'30-day login streak' },
-    { id:'badge_pet_20',      name:'Collector',      emoji:'🐾',  color:'#ff69b4',                       unlockHint:'Own 20 pets' },
-    { id:'badge_boss_10',     name:'Boss Slayer',    emoji:'👑',  color:'#ff4500',                       unlockHint:'Defeat 10 bosses' },
-    { id:'badge_treats_100',  name:'Feeder',         emoji:'🍖',  color:'#5dde7a',                       unlockHint:'Feed pets 100 times' }
+    // ── Free starter badges (equip to show personality) ──
+    { id:'badge_newbie',      name:'Newbie',          emoji:'🌱', color:'#8e8e8e', alwaysUnlocked:true,  unlockHint:'Free for everyone' },
+    { id:'badge_explorer',    name:'Explorer',         emoji:'🗺️', color:'#5cb85c', alwaysUnlocked:true,  unlockHint:'Free for everyone' },
+    { id:'badge_friendly',    name:'Friendly',         emoji:'😊', color:'#f1c40f', alwaysUnlocked:true,  unlockHint:'Free for everyone' },
+    { id:'badge_helpful',     name:'Helpful',          emoji:'🤝', color:'#3498db', alwaysUnlocked:true,  unlockHint:'Free for everyone' },
+    { id:'badge_creative',    name:'Creative',         emoji:'🎨', color:'#9b59b6', alwaysUnlocked:true,  unlockHint:'Free for everyone' },
+    { id:'badge_brave',       name:'Brave',            emoji:'🦁', color:'#e67e22', alwaysUnlocked:true,  unlockHint:'Free for everyone' },
+    // ── Earned badges ──
+    { id:'badge_recruit',     name:'Recruit',          emoji:'🎖️', color:'#8e8e8e', alwaysUnlocked:false, unlockHint:'Complete tutorial' },
+    { id:'badge_level_20',    name:'Veteran',          emoji:'⭐',  color:'#c0c0c0',                       unlockHint:'Reach player level 20' },
+    { id:'badge_level_50',    name:'Mythic',           emoji:'💫',  color:'#ff9800',                       unlockHint:'Reach player level 50' },
+    { id:'badge_100_battles', name:'Veteran Fighter',  emoji:'⚔️',  color:'#5bc0de',                       unlockHint:'Win 100 battles' },
+    { id:'badge_30_days',     name:'Loyal',            emoji:'🗓️',  color:'#5cb85c',                       unlockHint:'30-day login streak' },
+    { id:'badge_100_days',    name:'Devoted',          emoji:'💎',  color:'#5bc0de',                       unlockHint:'100-day login streak' },
+    { id:'badge_pet_20',      name:'Collector',        emoji:'🐾',  color:'#ff69b4',                       unlockHint:'Own 20 pets' },
+    { id:'badge_boss_10',     name:'Boss Slayer',      emoji:'👑',  color:'#ff4500',                       unlockHint:'Defeat 10 bosses' },
+    { id:'badge_treats_100',  name:'Feeder',           emoji:'🍖',  color:'#5dde7a',                       unlockHint:'Feed pets 100 times' },
+    { id:'badge_gift_giver',  name:'Gift Giver',       emoji:'🎁',  color:'#ff6b9d',                       unlockHint:'Send your first gift' },
+    { id:'badge_generous',    name:'Generous Soul',    emoji:'💝',  color:'#ff6b9d',                       unlockHint:'Send 10 gifts' },
+    { id:'badge_philanthropist',name:'Philanthropist', emoji:'🏦',  color:'#ffd700',                       unlockHint:'Send 50 gifts' },
+    { id:'badge_snapshot',    name:'Snapshot',         emoji:'📸',  color:'#5bc0de',                       unlockHint:'Share your first screenshot' },
+    { id:'badge_social_butterfly',name:'Social Butterfly',emoji:'📱',color:'#9b59b6',                    unlockHint:'Share 5 screenshots' },
+    { id:'badge_voter',       name:'Voice of the People',emoji:'🗳️',color:'#3498db',                      unlockHint:'Vote in 3 polls' },
+    { id:'badge_poll_champ',  name:'Poll Champion',    emoji:'📊',  color:'#9b59b6',                       unlockHint:'Vote in 15 polls' },
+    { id:'badge_speed_demon', name:'Speed Demon',      emoji:'⚡',  color:'#ffd700',                       unlockHint:'Win a battle in under 3 turns' },
+    { id:'badge_the_wall',    name:'The Wall',         emoji:'🛡️',  color:'#5bc0de',                       unlockHint:'Win a battle taking <10 damage' },
+    { id:'badge_comeback',    name:'Comeback King',    emoji:'🔥',  color:'#ff4500',                       unlockHint:'Win a battle at <5% HP' },
+    { id:'badge_team_player', name:'Team Player',      emoji:'🤝',  color:'#5cb85c',                       unlockHint:'Contribute to a community goal' },
+    { id:'badge_global_hero', name:'Global Hero',      emoji:'🌍',  color:'#3498db',                       unlockHint:'Contribute to 10 community goals' },
   ]
 };
 
@@ -7699,7 +7741,25 @@ async function executeBattle(playerStats, enemyStats, petId) {
   battleRewards = await saveBattleHistory(petId, enemyStats.id, battleResult, enemyStats);
   
   dbg('✅ saveBattleHistory completed. Rewards:', battleRewards);
-  
+
+  // ── Special battle achievement badges ──
+  if (battleResult.victory) {
+    // Speed Demon: won in under 3 turns
+    if ((battleResult.turnCount || battleResult.turns || 0) < 3) {
+      await awardBadge('badge_speed_demon');
+    }
+    // The Wall: won taking less than 10 total damage
+    if ((battleResult.totalDamageTaken || 0) < 10) {
+      await awardBadge('badge_the_wall');
+    }
+    // Comeback King: won with less than 5% HP remaining
+    var maxHP = battleResult.playerMaxHP || 100;
+    var finalHP = battleResult.playerFinalHP || 0;
+    if (finalHP > 0 && (finalHP / maxHP) < 0.05) {
+      await awardBadge('badge_comeback');
+    }
+  }
+
   // CRITICAL: Force reload pet data AFTER HP is saved
   dbg('🔄 Forcing pet data reload after battle...');
   await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to ensure DB write completes
@@ -13610,10 +13670,11 @@ async function awardReferralRewards(referrerId, newUserId, referrerUsername) {
  */
 async function checkReferralBadges(userId, referralCount) {
   var badges = [
-    { count: 5, badge: 'recruiter', name: 'Recruiter' },
-    { count: 10, badge: 'ambassador', name: 'Ambassador' },
-    { count: 25, badge: 'influencer', name: 'Influencer' },
-    { count: 50, badge: 'legend', name: 'Legend' }
+    { count: 1,  badge: 'referral_rookie', name: 'Referral Rookie' },
+    { count: 5,  badge: 'recruiter',       name: 'Recruiter' },
+    { count: 10, badge: 'ambassador',      name: 'Ambassador' },
+    { count: 25, badge: 'influencer',      name: 'Influencer' },
+    { count: 50, badge: 'legend',          name: 'Legend' }
   ];
   
   for (var i = 0; i < badges.length; i++) {
@@ -21546,6 +21607,14 @@ function screenshot_showModal(imageUrl, fileName, pet, shareTagline) {
   var existing = document.querySelector('.snapshot-modal-overlay');
   if (existing) existing.remove();
 
+  // Track screenshot shares for badge milestones
+  var shareKey = 'screenshots_shared_' + (currentUser ? currentUser.id : 'guest');
+  var shareCount = parseInt(localStorage.getItem(shareKey) || '0') + 1;
+  localStorage.setItem(shareKey, String(shareCount));
+  // Award share badges
+  if (shareCount === 1)  awardBadge('badge_snapshot').catch(function(){});
+  if (shareCount === 5)  awardBadge('badge_social_butterfly').catch(function(){});
+
   var petName = pet.nickname || pet.pet_type || 'pet';
   var tagline = shareTagline || ('Check out my pet ' + petName + ' on PawketPetsVT! 🐾 #PawketPets #VTuber');
   var shareText   = encodeURIComponent(tagline);
@@ -22696,7 +22765,10 @@ async function gift_sendGift(toUserId, toUsername) {
     // Check first-gift badge
     var { count: totalSent } = await supabaseClient
       .from('gifts').select('id', { count: 'exact', head: true }).eq('from_user_id', currentUser.id);
-    if (totalSent === 1) await awardBadge('gift_giver');
+    if (totalSent === 1)  await awardBadge('gift_giver');
+    if (totalSent === 1)  await awardBadge('badge_gift_giver');
+    if (totalSent >= 10)  await awardBadge('badge_generous');
+    if (totalSent >= 50)  await awardBadge('badge_philanthropist');
 
     closeModal();
     showToast('🎁 Gift sent to ' + toUsername + '!', 3000);
@@ -22936,6 +23008,8 @@ var pollSystem = {
       var { count: totalVotes } = await supabaseClient
         .from('poll_votes').select('id', { count: 'exact', head: true }).eq('user_id', currentUser.id);
       if (totalVotes === 5)  await awardBadge('active_citizen');
+      if (totalVotes === 3)  await awardBadge('badge_voter');
+      if (totalVotes === 15) await awardBadge('badge_poll_champ');
       if (totalVotes === 25) await awardBadge('community_leader');
 
       showToast('✅ Vote counted! +25 PP', 3000);

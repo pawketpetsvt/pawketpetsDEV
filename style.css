@@ -16452,3 +16452,22 @@ body.night-mode .btn-variant-selector {
   }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NEW FREE PROFILE FRAMES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.frame-dashed    { border: 3px dashed #9966ff !important; }
+.frame-dotted    { border: 3px dotted #9966ff !important; }
+.frame-double    { border: 4px double #9966ff !important; }
+.frame-soft      { border: 4px solid #ff99cc !important; border-radius: 20px !important; }
+.frame-glow-free { border: 3px solid #9966ff !important; box-shadow: 0 0 12px rgba(153,102,255,0.6) !important; animation: frame-glow-pulse 2.5s ease-in-out infinite; }
+.frame-paw       { border: 3px solid #ff9966 !important; box-shadow: inset 0 0 0 2px #ff9966 !important; }
+.frame-crown     { border-color: #ffd700 !important; box-shadow: 0 0 18px #ffd700, 0 -4px 0 #ffd700 !important; animation: frame-legendary-pulse 2s ease-in-out infinite; }
+.frame-sparkle-earned { border: 3px solid #ffd700 !important; box-shadow: 0 0 8px #ffd700, 0 0 20px rgba(255,215,0,0.4) !important; animation: frame-legendary-pulse 2s ease-in-out infinite; }
+
+@keyframes frame-glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(153,102,255,0.5); }
+  50%       { box-shadow: 0 0 18px rgba(153,102,255,0.9); }
+}
+
