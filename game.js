@@ -21836,8 +21836,16 @@ function pass_showModal() {
     '<div style="width:100%;height:32px;background:rgba(0,0,0,0.4);border-radius:16px;overflow:hidden;position:relative;">' +
     '<div style="width:' + xpPercent + '%;height:100%;background:linear-gradient(90deg,#667eea,#764ba2);transition:width 0.5s ease;box-shadow:0 0 20px rgba(102,126,234,0.6);"></div>' +
     '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-weight:bold;font-size:14px;text-shadow:0 2px 4px rgba(0,0,0,0.8);">' + passProgress.xp + ' / 100</div>' +
-    '</div>' +
-    (passUI.unclaimedLevels.length > 0 ? 
+    '</div>';
+
+  // Populate unclaimedLevels now that passProgress is loaded
+  passUI.unclaimedLevels = [];
+  var claimedList = passProgress.claimedRewards || passProgress.claimed_rewards || [];
+  for (var lvl = 1; lvl <= (passProgress.level || 1); lvl++) {
+    if (claimedList.indexOf(lvl) === -1) passUI.unclaimedLevels.push(lvl);
+  }
+
+  progressSection.innerHTML += (passUI.unclaimedLevels.length > 0 ? 
       '<div style="text-align:center;margin-top:16px;padding:12px;background:rgba(245,158,11,0.2);border-radius:8px;border-left:4px solid #f59e0b;">' +
       '<span style="color:#fbbf24;font-weight:bold;">🎁 ' + passUI.unclaimedLevels.length + ' reward' + (passUI.unclaimedLevels.length > 1 ? 's' : '') + ' ready to claim!</span>' +
       '</div>' : '');
@@ -22102,6 +22110,10 @@ function pass_updateNavbar() {
 }
 
 // Wrap loadPassProgress to update UI after load
+var passUI = {
+  isModalOpen: false,
+  unclaimedLevels: []
+};
 var originalLoadPassProgress = loadPassProgress;
 
 loadPassProgress = async function() {
