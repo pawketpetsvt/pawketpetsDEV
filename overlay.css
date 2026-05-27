@@ -1,0 +1,222 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: transparent;
+  font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+.overlay-container {
+  width: 360px;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.pet-card {
+  display: flex;
+  padding: 16px;
+  gap: 14px;
+}
+
+/* Pet Avatar */
+.pet-avatar {
+  width: 70px;
+  height: 70px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(153, 102, 255, 0.2), rgba(255, 102, 204, 0.2));
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.pet-avatar-placeholder {
+  font-size: 42px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+.pet-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Pet Info */
+.pet-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pet-name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+.pet-name {
+  font-weight: 700;
+  font-size: 16px;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pet-level {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.15);
+  padding: 2px 6px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.pet-species {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 8px;
+}
+
+.pet-mood {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 20px;
+  padding: 4px 10px;
+  margin-bottom: 10px;
+  width: fit-content;
+}
+
+#mood-emoji {
+  font-size: 14px;
+}
+
+#mood-text {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+}
+
+/* Stat Bars */
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.stat-label {
+  width: 32px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+}
+
+.stat-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.stat-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 3px;
+}
+
+.hp-fill { background: linear-gradient(90deg, #ef4444, #f97316); }
+.hunger-fill { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.energy-fill { background: linear-gradient(90deg, #10b981, #34d399); }
+.happiness-fill { background: linear-gradient(90deg, #ec4899, #f472b6); }
+
+.stat-value {
+  width: 36px;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* Pet Last Active */
+.pet-last {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+/* Tip */
+.pet-tip {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(153, 102, 255, 0.2);
+  padding: 6px 8px;
+  border-radius: 8px;
+  margin-top: 8px;
+  border-left: 2px solid #9966ff;
+}
+
+/* Footer */
+.overlay-footer {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 8px 16px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.4);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.footer-separator {
+  opacity: 0.5;
+}
+
+/* Variant effects (if pet has variant) */
+.pet-card.variant-golden {
+  border-left: 3px solid #ffd700;
+}
+
+.pet-card.variant-shiny {
+  border-left: 3px solid #00ffff;
+  animation: shinyPulse 2s ease-in-out infinite;
+}
+
+@keyframes shinyPulse {
+  0%, 100% { border-left-color: #00ffff; }
+  50% { border-left-color: #ff00ff; }
+}
+
+.pet-card.variant-shadow {
+  border-left: 3px solid #4a4a4a;
+}
+
+/* Loading state */
+.overlay-container.loading .pet-name {
+  opacity: 0.5;
+}
+
+.overlay-container.loading .stat-fill {
+  animation: loadingPulse 1s ease-in-out infinite;
+}
+
+@keyframes loadingPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
