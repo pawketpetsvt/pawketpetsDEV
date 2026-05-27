@@ -939,13 +939,18 @@ function esw_showModal() {
   var isEvent = widget.dataset.type === 'event';
   var bonuses = (widget.dataset.bonuses || '').trim();
   var title = (widget.dataset.icon || '') + ' ' + (widget.dataset.name || 'Today\'s Conditions');
-  var body  = '<p style="margin-bottom:14px;line-height:1.5;">' + escapeHtml(widget.dataset.desc || '') + '</p>';
+
+  // Build a DOM-based modal instead of passing HTML strings to showCenteredModal
+  var modal = makeModal();
+  var html = '<h2 style="color:var(--purple);margin-bottom:14px;">' + escapeHtml(title) + '</h2>';
+  html += '<p style="margin-bottom:14px;line-height:1.6;">' + escapeHtml(widget.dataset.desc || '') + '</p>';
 
   if (bonuses) {
-    body += '<div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.4);border-radius:10px;padding:12px 16px;margin-bottom:12px;">';
-    body += '<strong style="color:#fbbf24;">✨ Active ' + (isEvent ? 'Event ' : '') + 'Bonuses:</strong><br><br>';
-    body += '<span style="line-height:2;">' + escapeHtml(bonuses).replace(/\n/g, '<br>') + '</span>';
-    body += '</div>';
+    html += '<div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.4);border-radius:10px;padding:12px 16px;margin-bottom:14px;">';
+    html += '<strong style="color:#fbbf24;">✨ Active ' + (isEvent ? 'Event ' : '') + 'Bonuses:</strong><br><br>';
+    // bonuses are newline-separated plain text
+    html += '<span style="line-height:2.2;white-space:pre-line;">' + escapeHtml(bonuses) + '</span>';
+    html += '</div>';
   }
 
   if (isEvent && widget.dataset.endDate) {
@@ -956,17 +961,13 @@ function esw_showModal() {
       var remaining = daysLeft > 0
         ? daysLeft + 'd ' + (hoursLeft % 24) + 'h remaining'
         : hoursLeft > 0 ? hoursLeft + 'h remaining' : 'Ending very soon!';
-      body += '<p style="color:#94a3b8;font-size:0.85rem;">⏰ ' + remaining + '</p>';
+      html += '<p style="color:#94a3b8;font-size:0.85rem;">⏰ ' + escapeHtml(remaining) + '</p>';
     } catch(e) {}
   }
 
-  if (typeof showCenteredModal === 'function') {
-    showCenteredModal(title, body, widget.dataset.icon || '🌤️');
-  } else {
-    var modal = makeModal();
-    modal.innerHTML = '<h2>' + title + '</h2>' + body + '<button class="btn btn-outline" onclick="closeModal()" style="margin-top:16px;width:100%;">Close</button>';
-    openModal(modal);
-  }
+  html += '<button class="btn btn-outline" onclick="closeModal()" style="margin-top:16px;width:100%;">Close</button>';
+  modal.innerHTML = html;
+  openModal(modal);
 }
 
 function initEventStatusWidget() {
@@ -17335,6 +17336,13 @@ async function loadEquipmentShop() {
     if (res.error) throw res.error;
     
     var equipment = res.data || [];
+
+    // Apply active filter
+    if (typeof currentEquipmentFilter !== 'undefined' && currentEquipmentFilter !== 'all') {
+      equipment = equipment.filter(function(item) {
+        return item.equipment_type === currentEquipmentFilter;
+      });
+    }
     
     var html = '<div class="shop-rotation-banner">';
     html += '<div class="rotation-week">📅 Week ' + currentWeek + ' Rotation</div>';
@@ -21160,45 +21168,59 @@ async function screenshot_generate(petId) {
   if (snapBtn) { snapBtn.textContent = '⏳'; snapBtn.disabled = true; }
 
   try {
-    // Pull fresh pet data including title join
-    var { data: pet, error } = await supabaseClient
+    // ── STEP 1: Basic pet data (no joins) ──
+    var { data: pet, error: petErr } = await supabaseClient
       .from('user_pets')
-      .select('*, players(username), user_pet_titles(pet_titles(*))')
+      .select('*')
       .eq('id', petId)
       .single();
 
-    if (error || !pet) {
+    if (petErr || !pet) {
+      console.error('Pet fetch error:', petErr);
       showToast('Could not load pet data', 3000);
       return;
     }
 
-    // Also fetch a scrapbook memory for this pet (most recent)
+    // ── STEP 2: Owner username ──
+    var { data: ownerRow } = await supabaseClient
+      .from('players').select('username').eq('id', pet.user_id).single();
+
+    // ── STEP 3: Species / image file ──
+    var { data: species } = await supabaseClient
+      .from('pets').select('name, image_file').eq('id', pet.pet_id).single();
+
+    // ── STEP 4: Active title (separate query, no join) ──
+    var activeTitle = null;
+    if (pet.active_pet_title_id) {
+      var { data: titleRow } = await supabaseClient
+        .from('pet_titles').select('*').eq('id', pet.active_pet_title_id).single();
+      activeTitle = titleRow || null;
+    }
+
+    // ── STEP 5: Scrapbook memory ──
+    var memory = null;
     var { data: memories } = await supabaseClient
       .from('pet_scrapbook')
-      .select('memory_text, memory_type')
+      .select('memory_text')
       .eq('pet_id', petId)
       .order('created_at', { ascending: false })
       .limit(1);
+    if (memories && memories.length > 0) memory = memories[0].memory_text;
 
-    var memory = memories && memories.length > 0 ? memories[0].memory_text : null;
+    // ── Build values with fallbacks ──
+    var petType = species ? species.name : (pet.pet_type || 'Pet');
 
     // Get active title text and rarity color
     var titleText = '';
     var titleColor = '#9966ff';
-    if (pet.active_pet_title_id && pet.user_pet_titles) {
-      var activeTitleEntry = pet.user_pet_titles.find(function(upt) {
-        return upt.pet_titles && upt.pet_titles.id === pet.active_pet_title_id;
-      });
-      if (activeTitleEntry && activeTitleEntry.pet_titles) {
-        var t = activeTitleEntry.pet_titles;
-        titleText = (t.icon || '') + ' ' + (t.display_name || '');
-        var rarityColors = { common:'#8e8e8e', uncommon:'#5cb85c', rare:'#5bc0de', epic:'#9c27b0', legendary:'#ff9800' };
-        titleColor = rarityColors[t.rarity] || '#9966ff';
-      }
+    if (activeTitle) {
+      titleText = (activeTitle.icon || '') + ' ' + (activeTitle.display_name || '');
+      var rarityColors = { common:'#8e8e8e', uncommon:'#5cb85c', rare:'#5bc0de', epic:'#9c27b0', legendary:'#ff9800' };
+      titleColor = rarityColors[activeTitle.rarity] || '#9966ff';
     }
 
     // Variant info
-    var variantKey = pet.current_variant;
+    var variantKey = pet.current_variant || pet.variant || null;
     var variantDef = variantKey && petVariants ? petVariants[variantKey] : null;
     var variantColor = variantDef ? variantDef.color : null;
     var variantLabel = variantDef ? variantDef.icon + ' ' + variantDef.name : null;
@@ -21211,7 +21233,12 @@ async function screenshot_generate(petId) {
     var gradTop    = variantColor ? variantColor : '#667eea';
     var gradBottom = variantColor ? (variantColor + 'aa') : '#764ba2';
 
-    // Build canvas
+    // Pet image
+    var petImageMap = { Ember:'ember.png', Pyxie:'pyxie.png', Steve:'cowbee.png', Kleat:'kelta.png', Blushimia:'blushimia.png', Aria:'aria.png', Jess:'jess.png', Gnarly:'gnarly.png' };
+    var imgFile = (species && species.image_file) || petImageMap[petType] || (petType ? petType.toLowerCase() + '.png' : 'placeholder.png');
+    var imgSrc = 'images/pets/' + imgFile;
+
+    // ── Build canvas ──
     var canvas = document.createElement('canvas');
     canvas.width = 600;
     canvas.height = 820;
@@ -21237,26 +21264,17 @@ async function screenshot_generate(petId) {
 
     // ── White card panel ──
     ctx.fillStyle = 'rgba(255,255,255,0.97)';
-    ctx.beginPath();
-    ctx.roundRect(30, 30, 540, 760, 24);
-    ctx.fill();
+    ctx.fillRect(30, 30, 540, 760);
 
     // ── Colored header strip ──
     ctx.fillStyle = gradTop + 'dd';
-    ctx.beginPath();
-    ctx.roundRect(30, 30, 540, 140, [24, 24, 0, 0]);
-    ctx.fill();
+    ctx.fillRect(30, 30, 540, 140);
 
     // ── Pet image ──
-    var petImageMap = { Ember:'ember.png', Pyxie:'pyxie.png', Steve:'cowbee.png', Kleat:'kelta.png', Blushimia:'blushimia.png', Aria:'aria.png', Jess:'jess.png', Gnarly:'gnarly.png' };
-    var imgFile = petImageMap[pet.pet_type] || (pet.pet_type ? pet.pet_type.toLowerCase() + '.png' : 'placeholder.png');
-    var imgSrc = 'images/pets/' + imgFile;
-
     await new Promise(function(resolve) {
       var img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = function() {
-        // Draw with slight drop shadow
         ctx.shadowColor = 'rgba(0,0,0,0.25)';
         ctx.shadowBlur = 20;
         ctx.drawImage(img, 200, 55, 200, 200);
@@ -21264,7 +21282,6 @@ async function screenshot_generate(petId) {
         resolve();
       };
       img.onerror = function() {
-        // Fallback: draw emoji
         ctx.font = '110px serif';
         ctx.textAlign = 'center';
         ctx.fillText(typeEmoji, 300, 220);
@@ -21276,9 +21293,7 @@ async function screenshot_generate(petId) {
     // ── Variant badge (top-right of image) ──
     if (variantLabel) {
       ctx.fillStyle = variantColor;
-      ctx.beginPath();
-      ctx.roundRect(380, 65, 160, 38, 12);
-      ctx.fill();
+      ctx.fillRect(380, 65, 160, 38);
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 18px Arial';
       ctx.textAlign = 'center';
@@ -21289,7 +21304,7 @@ async function screenshot_generate(petId) {
     ctx.fillStyle = '#1a1a2e';
     ctx.font = 'bold 42px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(pet.nickname || pet.pet_type, 300, 300);
+    ctx.fillText(pet.nickname || petType, 300, 300);
 
     // ── Active title ──
     if (titleText) {
@@ -21300,12 +21315,10 @@ async function screenshot_generate(petId) {
 
     // ── Species + level pill ──
     ctx.fillStyle = '#f0ecff';
-    ctx.beginPath();
-    ctx.roundRect(180, 348, 240, 36, 18);
-    ctx.fill();
+    ctx.fillRect(180, 348, 240, 36);
     ctx.fillStyle = '#5a3fa0';
     ctx.font = '18px Arial';
-    ctx.fillText(typeEmoji + ' ' + pet.pet_type + '  •  Lv.' + pet.level, 300, 371);
+    ctx.fillText(typeEmoji + ' ' + petType + '  •  Lv.' + (pet.level || 1), 300, 371);
 
     // ── Divider ──
     ctx.strokeStyle = '#e8e0ff';
@@ -21316,16 +21329,14 @@ async function screenshot_generate(petId) {
 
     // ── Stats grid (2×2) ──
     var stats = [
-      { label: 'HP',  value: pet.current_hp + ' / ' + pet.max_hp, icon: '❤️', x: 120, y: 455 },
-      { label: 'ATK', value: pet.attack,   icon: '⚔️', x: 380, y: 455 },
-      { label: 'DEF', value: pet.defense,  icon: '🛡️', x: 120, y: 515 },
-      { label: 'SPD', value: pet.speed,    icon: '💨', x: 380, y: 515 }
+      { label: 'HP',  value: (pet.current_hp || pet.base_hp || 30) + ' / ' + (pet.max_hp || pet.base_hp || 30), icon: '❤️', x: 120, y: 455 },
+      { label: 'ATK', value: pet.base_attack || 5,   icon: '⚔️', x: 380, y: 455 },
+      { label: 'DEF', value: pet.base_defense || 3,  icon: '🛡️', x: 120, y: 515 },
+      { label: 'SPD', value: pet.base_speed || 4,    icon: '💨', x: 380, y: 515 }
     ];
     stats.forEach(function(s) {
       ctx.fillStyle = '#f7f4ff';
-      ctx.beginPath();
-      ctx.roundRect(s.x - 90, s.y - 28, 180, 44, 10);
-      ctx.fill();
+      ctx.fillRect(s.x - 90, s.y - 28, 180, 44);
       ctx.fillStyle = '#333';
       ctx.font = 'bold 18px Arial';
       ctx.textAlign = 'center';
@@ -21335,12 +21346,10 @@ async function screenshot_generate(petId) {
     // ── Scrapbook memory ──
     if (memory) {
       ctx.fillStyle = '#fdf6ff';
-      ctx.beginPath();
-      ctx.roundRect(60, 545, 480, 60, 12);
-      ctx.fill();
+      ctx.fillRect(60, 545, 480, 60);
       ctx.strokeStyle = '#d4b8ff';
       ctx.lineWidth = 1.5;
-      ctx.stroke();
+      ctx.strokeRect(60, 545, 480, 60);
       ctx.fillStyle = '#7a5ca0';
       ctx.font = 'italic 15px Arial';
       ctx.textAlign = 'center';
@@ -21350,7 +21359,7 @@ async function screenshot_generate(petId) {
     }
 
     // ── Backstory snippet ──
-    var backstory = petBackstories[pet.pet_type] || '';
+    var backstory = (petBackstories && petBackstories[petType]) || '';
     if (backstory) {
       ctx.fillStyle = '#666';
       ctx.font = 'italic 14px Arial';
@@ -21370,7 +21379,7 @@ async function screenshot_generate(petId) {
     ctx.fillStyle = '#aaa';
     ctx.font = '15px Arial';
     ctx.textAlign = 'left';
-    ctx.fillText('👤 ' + (pet.players ? pet.players.username : 'Trainer'), 70, 678);
+    ctx.fillText('👤 ' + (ownerRow ? ownerRow.username : 'Trainer'), 70, 678);
     ctx.textAlign = 'right';
     ctx.fillText('📅 ' + new Date().toLocaleDateString(), 530, 678);
 
@@ -21386,7 +21395,7 @@ async function screenshot_generate(petId) {
     // ── Generate blob and show modal ──
     canvas.toBlob(function(blob) {
       var url = URL.createObjectURL(blob);
-      var petName = (pet.nickname || pet.pet_type || 'pet').replace(/[^a-zA-Z0-9]/g, '_');
+      var petName = (pet.nickname || petType || 'pet').replace(/[^a-zA-Z0-9]/g, '_');
       screenshot_showModal(url, petName, pet);
     }, 'image/png');
 
