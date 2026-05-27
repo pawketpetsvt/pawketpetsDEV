@@ -7,83 +7,95 @@
   <link rel="stylesheet" href="overlay.css">
 </head>
 <body>
-  <div class="overlay-container" id="overlay">
-    <div class="pet-card">
-      <!-- Pet Image -->
-      <div class="pet-avatar" id="pet-avatar">
-        <div class="pet-avatar-placeholder" id="pet-avatar-placeholder">🐾</div>
-        <img id="pet-image" style="display: none;" alt="Pet">
+  <div class="overlay-container collapsed" id="overlay">
+    
+    <!-- COLLAPSED VIEW (always visible, small) -->
+    <div class="collapsed-view">
+      <div class="collapsed-avatar" id="collapsed-avatar">🦊</div>
+      <div class="collapsed-info">
+        <span class="collapsed-name" id="collapsed-pet-name">Loading...</span>
+        <span class="collapsed-level" id="collapsed-pet-level"></span>
+      </div>
+      <div class="collapsed-expand-hint">▶</div>
+    </div>
+    
+    <!-- EXPANDED VIEW (shows when expanded) -->
+    <div class="expanded-view">
+      <div class="pet-card">
+        <!-- Pet Image -->
+        <div class="pet-avatar" id="pet-avatar">
+          <div class="pet-avatar-placeholder" id="pet-avatar-placeholder">🐾</div>
+          <img id="pet-image" style="display: none;" alt="Pet">
+        </div>
+        
+        <!-- Pet Info -->
+        <div class="pet-info">
+          <div class="pet-name-row">
+            <span class="pet-name" id="pet-name">Loading...</span>
+            <span class="pet-level" id="pet-level">Lv.?</span>
+          </div>
+          <div class="pet-species" id="pet-species"></div>
+          
+          <!-- Quip Bubble -->
+          <div class="quip-bubble" id="pet-quip">
+            💬 Loading...
+          </div>
+          
+          <!-- Mood -->
+          <div class="pet-mood" id="pet-mood">
+            <span id="mood-emoji">😐</span>
+            <span id="mood-text">Loading...</span>
+          </div>
+          
+          <!-- HP Bar -->
+          <div class="stat-row">
+            <span class="stat-label">❤️ HP</span>
+            <div class="stat-bar">
+              <div class="stat-fill hp-fill" id="hp-fill" style="width: 0%"></div>
+            </div>
+            <span class="stat-value" id="hp-text">0/0</span>
+          </div>
+          
+          <!-- Hunger Bar -->
+          <div class="stat-row">
+            <span class="stat-label">🍽️ Hunger</span>
+            <div class="stat-bar">
+              <div class="stat-fill hunger-fill" id="hunger-fill" style="width: 0%"></div>
+            </div>
+            <span class="stat-value" id="hunger-text">0%</span>
+          </div>
+          
+          <!-- Energy Bar -->
+          <div class="stat-row">
+            <span class="stat-label">⚡ Energy</span>
+            <div class="stat-bar">
+              <div class="stat-fill energy-fill" id="energy-fill" style="width: 0%"></div>
+            </div>
+            <span class="stat-value" id="energy-text">0%</span>
+          </div>
+          
+          <!-- Happiness Bar -->
+          <div class="stat-row">
+            <span class="stat-label">💖 Happiness</span>
+            <div class="stat-bar">
+              <div class="stat-fill happiness-fill" id="happiness-fill" style="width: 0%"></div>
+            </div>
+            <span class="stat-value" id="happiness-text">0%</span>
+          </div>
+          
+          <!-- Tip -->
+          <div class="pet-tip" id="pet-tip">✨ Loading...</div>
+        </div>
       </div>
       
-      <!-- Pet Info -->
-      <div class="pet-info">
-        <div class="pet-name-row">
-          <span class="pet-name" id="pet-name">Loading...</span>
-          <span class="pet-level" id="pet-level">Lv.?</span>
-        </div>
-        <div class="pet-species" id="pet-species"></div>
-        
-        <!-- Quip Bubble -->
-        <div class="quip-bubble" id="pet-quip">
-          💬 Loading...
-        </div>
-        
-        <!-- Mood -->
-        <div class="pet-mood" id="pet-mood">
-          <span id="mood-emoji">😐</span>
-          <span id="mood-text">Loading...</span>
-        </div>
-        
-        <!-- HP Bar -->
-        <div class="stat-row">
-          <span class="stat-label">❤️ HP</span>
-          <div class="stat-bar">
-            <div class="stat-fill hp-fill" id="hp-fill" style="width: 0%"></div>
-          </div>
-          <span class="stat-value" id="hp-text">0/0</span>
-        </div>
-        
-        <!-- Hunger Bar -->
-        <div class="stat-row">
-          <span class="stat-label">🍽️ Hunger</span>
-          <div class="stat-bar">
-            <div class="stat-fill hunger-fill" id="hunger-fill" style="width: 0%"></div>
-          </div>
-          <span class="stat-value" id="hunger-text">0%</span>
-        </div>
-        
-        <!-- Energy Bar -->
-        <div class="stat-row">
-          <span class="stat-label">⚡ Energy</span>
-          <div class="stat-bar">
-            <div class="stat-fill energy-fill" id="energy-fill" style="width: 0%"></div>
-          </div>
-          <span class="stat-value" id="energy-text">0%</span>
-        </div>
-        
-        <!-- Happiness Bar -->
-        <div class="stat-row">
-          <span class="stat-label">💖 Happiness</span>
-          <div class="stat-bar">
-            <div class="stat-fill happiness-fill" id="happiness-fill" style="width: 0%"></div>
-          </div>
-          <span class="stat-value" id="happiness-text">0%</span>
-        </div>
-        
-        <!-- Last Active -->
-        <div class="pet-last" id="pet-last">Last active: --</div>
-        
-        <!-- Tip -->
-        <div class="pet-tip" id="pet-tip">✨ Loading...</div>
+      <!-- Footer -->
+      <div class="overlay-footer">
+        <span>🐾 PawketPetsVT</span>
+        <span class="footer-separator">•</span>
+        <a href="https://pawketpets.net" target="_blank" class="promo-link">🎮 Get your own pet!</a>
       </div>
     </div>
     
-    <!-- Footer with Promotion Link -->
-    <div class="overlay-footer">
-      <span>🐾 PawketPetsVT</span>
-      <span class="footer-separator">•</span>
-      <a href="https://pawketpets.net" target="_blank" class="promo-link">🎮 Get your own pet!</a>
-    </div>
   </div>
   
   <script src="overlay.js"></script>
