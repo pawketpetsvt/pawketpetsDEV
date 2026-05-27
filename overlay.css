@@ -354,3 +354,21 @@ body {
     border-top-color: rgba(30, 30, 46, 0.95);
   }
 }
+/* Collapsed avatar image styling */
+.collapsed-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+}
+
+/* When it has an image (background-image set) */
+.collapsed-avatar[style*="background-image"] {
+  font-size: 0;
+}
