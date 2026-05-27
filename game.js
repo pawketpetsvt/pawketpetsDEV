@@ -488,6 +488,200 @@ var GAME_CONSTANTS = {
   TUTORIAL_PP_REWARD:  100,   // PP awarded for completing tutorial
   TUTORIAL_SKIP_PP:    50,    // PP awarded for skipping tutorial
 };
+// ═══════════════════════════════════════════════════════════════════════════
+// EVENT / WEATHER STATUS NAVBAR WIDGET
+// Shows active event (priority) or current weather in the navbar center.
+// Hover = tooltip, click = full detail modal.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateEventStatusWidget() {
+  var widget = document.getElementById('event-status-widget');
+  if (!widget) return;
+
+  var iconEl = document.getElementById('event-status-icon');
+  var textEl = document.getElementById('event-status-text');
+  var dotEl  = document.getElementById('event-status-dot');
+
+  // Priority: active world event > today's weather from todayFeatures > weatherSystem
+  var hasEvent = false;
+
+  if (typeof worldEvents !== 'undefined' && worldEvents.currentEvent) {
+    var ev = worldEvents.currentEvent;
+    iconEl.textContent = ev.icon || '🎪';
+    textEl.textContent = ev.name.length > 18 ? ev.name.substring(0, 15) + '…' : ev.name;
+    dotEl.className = 'event-status-dot event-active';
+    widget.dataset.type    = 'event';
+    widget.dataset.name    = ev.name;
+    widget.dataset.desc    = ev.description || '';
+    widget.dataset.icon    = ev.icon || '🎪';
+    widget.dataset.bonuses = esw_getEventBonusText(ev.effects || {});
+    widget.dataset.endDate = (worldEvents.eventEndDate || '').toString();
+    hasEvent = true;
+  } else {
+    // Fall back to todayFeatures weather (already loaded) or weatherSystem
+    var weatherId   = null;
+    var weatherName = 'Clear';
+    var weatherIcon = '☀️';
+    var weatherDesc = 'Normal conditions today.';
+
+    if (typeof todayFeatures !== 'undefined' && todayFeatures.current) {
+      var twId = todayFeatures.current.weather;
+      // todayFeatures.current.weather may be an id string or object
+      if (typeof twId === 'object' && twId !== null) { twId = twId.id; }
+      var tw = todayFeatures.weatherTypes.find(function(w) { return w.id === twId; });
+      if (tw) {
+        weatherId   = tw.id;
+        weatherName = tw.name;
+        weatherIcon = tw.emoji || tw.icon || '☀️';
+        weatherDesc = tw.effect || tw.description || '';
+      }
+    } else if (typeof weatherSystem !== 'undefined' && weatherSystem.currentWeather) {
+      var ws = weatherSystem.currentWeather;
+      weatherId   = ws.id;
+      weatherName = ws.name;
+      weatherIcon = ws.icon;
+      weatherDesc = ws.description || '';
+    }
+
+    iconEl.textContent = weatherIcon;
+    textEl.textContent = weatherName;
+    dotEl.className    = 'event-status-dot active';
+    widget.dataset.type = 'weather';
+    widget.dataset.name = weatherName;
+    widget.dataset.desc = weatherDesc;
+    widget.dataset.icon = weatherIcon;
+    widget.dataset.bonuses = esw_getWeatherBonusText(weatherId);
+  }
+
+  widget.style.display = 'flex';
+}
+
+function esw_getEventBonusText(effects) {
+  var parts = [];
+  if (effects.battleXpBonus   && effects.battleXpBonus > 1)   parts.push('⚔️ +' + Math.round((effects.battleXpBonus - 1) * 100) + '% Battle XP');
+  if (effects.ppGainBonus     && effects.ppGainBonus > 1)      parts.push('💜 +' + Math.round((effects.ppGainBonus - 1) * 100) + '% PP Gain');
+  if (effects.encounterRate   && effects.encounterRate > 1)    parts.push('✨ +' + Math.round((effects.encounterRate - 1) * 100) + '% Encounters');
+  if (effects.energyRegen     && effects.energyRegen > 1)      parts.push('⚡ ' + effects.energyRegen + 'x Energy Regen');
+  if (effects.happinessGain   && effects.happinessGain > 1)    parts.push('💖 +' + Math.round((effects.happinessGain - 1) * 100) + '% Happiness');
+  if (effects.shopDiscount    && effects.shopDiscount < 1)     parts.push('🛒 ' + Math.round((1 - effects.shopDiscount) * 100) + '% Off Shop');
+  if (effects.spoonDamageBonus && effects.spoonDamageBonus > 1) parts.push('🥄 +' + Math.round((effects.spoonDamageBonus - 1) * 100) + '% Spoon Damage');
+  if (effects.randomBonusChance) parts.push('🎲 ' + Math.round(effects.randomBonusChance * 100) + '% Random Bonus Chance');
+  return parts.join('\n') || 'No special bonuses';
+}
+
+function esw_getWeatherBonusText(weatherId) {
+  var map = {
+    clear:   '☀️ Normal conditions',
+    sunny:   '☀️ Pets are extra happy today!',
+    rainy:   '🌊 Water types: +25% XP',
+    foggy:   '🌫️ Rare encounters: +10%',
+    windy:   '💨 All pets move +15% faster',
+    snowy:   '❄️ Ice types: +25% XP',
+    stormy:  '⚡ Electric types: +25% XP\n⚔️ Battles deal +10% damage',
+    starry:  '✨ Mystical bonuses active',
+    rainbow: '🌈 All types: +10% XP (lucky day!)',
+    cursed:  '🟣 Strange energies… beware'
+  };
+  return map[weatherId] || '✨ Normal conditions';
+}
+
+function esw_showTooltip() {
+  esw_hideTooltip();
+  var widget = document.getElementById('event-status-widget');
+  if (!widget) return;
+
+  var isEvent = widget.dataset.type === 'event';
+  var bonuses = (widget.dataset.bonuses || '').trim();
+
+  var timerHtml = '';
+  if (isEvent && widget.dataset.endDate) {
+    try {
+      var end = new Date(widget.dataset.endDate);
+      var hoursLeft = Math.max(0, Math.floor((end - Date.now()) / 3600000));
+      if (hoursLeft > 0) {
+        timerHtml = '<div class="esw-tooltip-timer">⏰ ' + hoursLeft + ' hour' + (hoursLeft !== 1 ? 's' : '') + ' remaining</div>';
+      } else {
+        timerHtml = '<div class="esw-tooltip-timer">⏰ Ending soon!</div>';
+      }
+    } catch(e) {}
+  }
+
+  var tip = document.createElement('div');
+  tip.className = 'esw-tooltip';
+  tip.id = 'esw-tooltip';
+  tip.innerHTML =
+    '<div class="esw-tooltip-title"><span>' + (widget.dataset.icon || '🌤️') + '</span><span>' + escapeHtml(widget.dataset.name || '') + (isEvent ? ' <span style="font-size:0.7rem;background:#fbbf2433;color:#fbbf24;padding:2px 6px;border-radius:6px;margin-left:4px;">EVENT</span>' : '') + '</span></div>' +
+    '<div class="esw-tooltip-desc">' + escapeHtml(widget.dataset.desc || '') + '</div>' +
+    (bonuses ? '<div class="esw-tooltip-bonus">' + escapeHtml(bonuses).replace(/\n/g, '<br>') + '</div>' : '') +
+    timerHtml;
+
+  document.body.appendChild(tip);
+
+  // Position below widget
+  var rect = widget.getBoundingClientRect();
+  var tipW = 290;
+  var left = rect.left + rect.width / 2 - tipW / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
+  tip.style.top  = (rect.bottom + 8) + 'px';
+  tip.style.left = left + 'px';
+}
+
+function esw_hideTooltip() {
+  var tip = document.getElementById('esw-tooltip');
+  if (tip) tip.remove();
+}
+
+function esw_showModal() {
+  esw_hideTooltip();
+  var widget = document.getElementById('event-status-widget');
+  if (!widget) return;
+
+  var isEvent = widget.dataset.type === 'event';
+  var bonuses = (widget.dataset.bonuses || '').trim();
+  var title = (widget.dataset.icon || '') + ' ' + (widget.dataset.name || 'Today\'s Conditions');
+  var body  = '<p style="margin-bottom:14px;line-height:1.5;">' + escapeHtml(widget.dataset.desc || '') + '</p>';
+
+  if (bonuses) {
+    body += '<div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.4);border-radius:10px;padding:12px 16px;margin-bottom:12px;">';
+    body += '<strong style="color:#fbbf24;">✨ Active ' + (isEvent ? 'Event ' : '') + 'Bonuses:</strong><br><br>';
+    body += '<span style="line-height:2;">' + escapeHtml(bonuses).replace(/\n/g, '<br>') + '</span>';
+    body += '</div>';
+  }
+
+  if (isEvent && widget.dataset.endDate) {
+    try {
+      var end = new Date(widget.dataset.endDate);
+      var hoursLeft = Math.max(0, Math.floor((end - Date.now()) / 3600000));
+      var daysLeft  = Math.floor(hoursLeft / 24);
+      var remaining = daysLeft > 0
+        ? daysLeft + 'd ' + (hoursLeft % 24) + 'h remaining'
+        : hoursLeft > 0 ? hoursLeft + 'h remaining' : 'Ending very soon!';
+      body += '<p style="color:#94a3b8;font-size:0.85rem;">⏰ ' + remaining + '</p>';
+    } catch(e) {}
+  }
+
+  if (typeof showCenteredModal === 'function') {
+    showCenteredModal(title, body, widget.dataset.icon || '🌤️');
+  } else {
+    var modal = makeModal();
+    modal.innerHTML = '<h2>' + title + '</h2>' + body + '<button class="btn btn-outline" onclick="closeModal()" style="margin-top:16px;width:100%;">Close</button>';
+    openModal(modal);
+  }
+}
+
+function initEventStatusWidget() {
+  updateEventStatusWidget();
+  // Refresh every minute
+  setInterval(updateEventStatusWidget, 60000);
+  // Hover tooltip
+  var widget = document.getElementById('event-status-widget');
+  if (widget) {
+    widget.addEventListener('mouseenter', esw_showTooltip);
+    widget.addEventListener('mouseleave', esw_hideTooltip);
+    widget.addEventListener('click', esw_showModal);
+  }
+}
+
 // Sync soundCooldown now that GAME_CONSTANTS is defined
 soundCooldown = GAME_CONSTANTS.SOUND_COOLDOWN_MS;
 
@@ -909,6 +1103,9 @@ async function showApp(user) {
   // SCRAPBOOK & COMMUNITY GOALS: Initialize systems
   scrapbook_init();
   community_init();
+
+  // EVENT/WEATHER WIDGET: Initialize navbar widget
+  initEventStatusWidget();
   
   // PHASE 1: Initialize cosmetics, milestones, daily features
   phase1_init();
@@ -2275,8 +2472,16 @@ function makeMyPetCard(pet) {
   
   actions.appendChild(feedBtn); 
   actions.appendChild(playBtn);
-  
-  // Companion button
+
+  // Snapshot button
+  var snapBtn = makeEl('button', {class:'btn-action btn-snapshot', id:'snap-'+pet.id});
+  snapBtn.textContent = '📸';
+  snapBtn.title = 'Take a Snapshot of this pet!';
+  snapBtn.style.cssText = 'background:linear-gradient(135deg,#764ba2,#9966ff);color:white;border:none;border-radius:10px;padding:8px 12px;font-size:1rem;cursor:pointer;transition:transform 0.15s;';
+  snapBtn.onmouseover = function() { this.style.transform = 'scale(1.1)'; };
+  snapBtn.onmouseout  = function() { this.style.transform = 'scale(1)'; };
+  snapBtn.onclick = function() { screenshot_generate(pet.id); };
+  actions.appendChild(snapBtn);
   var companionBtn = makeEl('button', {class: 'btn-companion'});
   companionBtn.textContent = '🐾 Set as Companion';
   companionBtn.style.cssText = 'margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#9966ff 0%,#ff66cc 100%);color:white;border:none;border-radius:12px;font-weight:600;cursor:pointer;transition:transform 0.2s;';
@@ -3748,7 +3953,11 @@ var petFoodPreferences = {
     disliked_item: 'Rainbow Cake',
     hated_item: 'Sushi Roll',
     hobby: 'Competitive dueling',
-    fun_fact: 'Once won a spoon dueling championship!'
+    fun_fact: 'Once won a spoon dueling championship!',
+    sleep_habit: 'night owl',
+    weather_preference: 'loves sun',
+    catchphrase: 'Fire solves everything, obviously! 🔥',
+    secret_talent: 'Can light a campfire with a single wink'
   },
   
   'Pyxie': {
@@ -3757,7 +3966,11 @@ var petFoodPreferences = {
     disliked_item: 'Grilled Salmon',
     hated_item: 'Spicy Burrito',
     hobby: 'Professional napping',
-    fun_fact: 'Can sleep for 16 hours straight!'
+    fun_fact: 'Can sleep for 16 hours straight!',
+    sleep_habit: 'heavy sleeper',
+    weather_preference: 'loves fog',
+    catchphrase: 'I have a plan. It involves napping. ✨',
+    secret_talent: 'Can nap in any position, including upside down'
   },
   
   'Steve': {
@@ -3766,7 +3979,11 @@ var petFoodPreferences = {
     disliked_item: 'Hot Wings',
     hated_item: 'Curry Feast',
     hobby: 'Being a menace',
-    fun_fact: 'As chill as a fire in hell, controlled like the beasts of Australia!'
+    fun_fact: 'As chill as a fire in hell, controlled like the beasts of Australia!',
+    sleep_habit: 'power napper',
+    weather_preference: 'hates weather',
+    catchphrase: 'Cluck, bawk, buck... you know the rest. 🐔',
+    secret_talent: 'Somehow always the last one standing in any situation'
   },
   
   'Kleat': {
@@ -3775,7 +3992,11 @@ var petFoodPreferences = {
     disliked_item: 'Shrimp Tempura',
     hated_item: 'Grilled Steak',
     hobby: 'Studying void and galaxy magic',
-    fun_fact: 'A grand mage who can open portals to other worlds!'
+    fun_fact: 'A grand mage who can open portals to other worlds!',
+    sleep_habit: 'night owl',
+    weather_preference: 'loves fog',
+    catchphrase: 'Yip, yap, teehee — I opened a portal! ✨',
+    secret_talent: 'Can sense when someone is about to say something stupid'
   },
   
   'Blushimia': {
@@ -3784,7 +4005,11 @@ var petFoodPreferences = {
     disliked_item: 'Banana Bread',
     hated_item: 'Honey Cookies',
     hobby: 'Breaking out of video games',
-    fun_fact: 'Escaped her video game after gaining sentience!'
+    fun_fact: 'Escaped her video game after gaining sentience!',
+    sleep_habit: 'early bird',
+    weather_preference: 'loves sun',
+    catchphrase: 'What the glob?! I\'m free!! 👑',
+    secret_talent: 'Can find the hidden exit in literally any room'
   },
   
   'Aria': {
@@ -3793,7 +4018,11 @@ var petFoodPreferences = {
     disliked_item: 'Apple Pie',
     hated_item: 'Grape Juice',
     hobby: 'Collecting bones and writing stories',
-    fun_fact: 'A fae rosy maple moth who uses bones as currency!'
+    fun_fact: 'A fae rosy maple moth who uses bones as currency!',
+    sleep_habit: 'night owl',
+    weather_preference: 'loves rain',
+    catchphrase: 'Do you want to see my bones? 🦋',
+    secret_talent: 'Can identify any creature by its skeleton alone'
   },
   
   'Gnarly': {
@@ -3802,7 +4031,11 @@ var petFoodPreferences = {
     disliked_item: 'Roasted Chicken',
     hated_item: 'Seafood Soup',
     hobby: 'Playing arcade games and collecting Furbies',
-    fun_fact: 'Runs the PaleoPlex arcade! Loves nachos!'
+    fun_fact: 'Runs the PaleoPlex arcade! Loves nachos!',
+    sleep_habit: 'power napper',
+    weather_preference: 'loves sun',
+    catchphrase: 'High score? Watch me. 🎮',
+    secret_talent: 'Has never lost a game of Pac-Man. Not once.'
   },
   
   'Jess': {
@@ -3811,7 +4044,11 @@ var petFoodPreferences = {
     disliked_item: 'Cheese Platter',
     hated_item: 'Veggie Noodles',
     hobby: 'Potion brewing and fossil collecting',
-    fun_fact: 'A paleoart Parasaur who makes potions!'
+    fun_fact: 'A paleoart Parasaur who makes potions!',
+    sleep_habit: 'early bird',
+    weather_preference: 'loves rain',
+    catchphrase: 'This fossil is 65 million years cuter than you. 🦕',
+    secret_talent: 'Can brew a potion that tastes terrible but works perfectly'
   }
 };
 
@@ -10756,16 +10993,16 @@ function renderJournalPage() {
   var content = el('journal-page-content');
   if (!content) return;
   
-  // Map pet types to their PNG filenames
+  // Map pet types to their PNG filenames (team pets only)
   var petImageMap = {
-    'Ember': 'ember.png',
-    'Pyxie': 'pyxie.png',
-    'Steve': 'cowbee.png',
-    'Bunny': 'bunny.png',
-    'Fox': 'fox.png',
-    'Wolf': 'wolf.png',
-    'Deer': 'deer.png',
-    'Bird': 'bird.png'
+    'Ember':     'ember.png',
+    'Pyxie':     'pyxie.png',
+    'Steve':     'cowbee.png',
+    'Kleat':     'kelta.png',
+    'Blushimia': 'blushimia.png',
+    'Aria':      'aria.png',
+    'Jess':      'jess.png',
+    'Gnarly':    'gnarly.png'
   };
   
   var imageSrc = 'images/pets/' + (petImageMap[petType] || petType.toLowerCase() + '.png');
@@ -10799,7 +11036,7 @@ function renderJournalPage() {
     html += '  <div class="journal-entry-value">' + (discoveries.hated ? prefs.hated_item : '<span class="journal-entry-unknown">???</span>') + '</div>';
     html += '</div>';
     
-    html += '<div class="journal-entry">';
+    html += '<div class="journal-entry">';\
     html += '  <div class="journal-entry-label">🎨 Hobby:</div>';
     html += '  <div class="journal-entry-value">' + (discoveries.hobby ? prefs.hobby : '<span class="journal-entry-unknown">???</span>') + '</div>';
     html += '</div>';
@@ -10808,8 +11045,28 @@ function renderJournalPage() {
     html += '  <div class="journal-entry-label">✨ Fun Fact:</div>';
     html += '  <div class="journal-entry-value">' + (discoveries.fun_fact ? prefs.fun_fact : '<span class="journal-entry-unknown">???</span>') + '</div>';
     html += '</div>';
+
+    html += '<div class="journal-entry">';
+    html += '  <div class="journal-entry-label">😴 Sleep Habit:</div>';
+    html += '  <div class="journal-entry-value">' + (discoveries.sleep_habit ? prefs.sleep_habit : '<span class="journal-entry-unknown">???</span>') + '</div>';
+    html += '</div>';
+
+    html += '<div class="journal-entry">';
+    html += '  <div class="journal-entry-label">🌤️ Weather Preference:</div>';
+    html += '  <div class="journal-entry-value">' + (discoveries.weather_preference ? prefs.weather_preference : '<span class="journal-entry-unknown">???</span>') + '</div>';
+    html += '</div>';
+
+    html += '<div class="journal-entry">';
+    html += '  <div class="journal-entry-label">💬 Catchphrase:</div>';
+    html += '  <div class="journal-entry-value journal-catchphrase">' + (discoveries.catchphrase ? '"' + prefs.catchphrase + '"' : '<span class="journal-entry-unknown">???</span>') + '</div>';
+    html += '</div>';
+
+    html += '<div class="journal-entry">';
+    html += '  <div class="journal-entry-label">🎭 Secret Talent:</div>';
+    html += '  <div class="journal-entry-value">' + (discoveries.secret_talent ? prefs.secret_talent : '<span class="journal-entry-unknown">???</span>') + '</div>';
+    html += '</div>';
     
-    var total = 6;
+    var total = 10; // 4 food + hobby + fun_fact + sleep_habit + weather_preference + catchphrase + secret_talent
     var discovered = Object.keys(discoveries).length;
     html += '<div style="text-align:center;margin-top:30px;padding:15px;background:rgba(153,102,255,0.2);border-radius:12px;">';
     html += '  <strong>Discovery Progress:</strong> ' + discovered + ' / ' + total;
@@ -19995,22 +20252,49 @@ var todayFeatures = {
   current: null,
   
   weatherTypes: [
-    { id: 'sunny', emoji: '☀️', name: 'Sunny', effect: 'Pets are extra happy!' },
-    { id: 'rainy', emoji: '🌧️', name: 'Rainy', effect: 'Water types +25% XP' },
-    { id: 'cloudy', emoji: '☁️', name: 'Cloudy', effect: 'Normal conditions' },
-    { id: 'foggy', emoji: '🌫️', name: 'Foggy', effect: 'Rare encounters +10%' },
-    { id: 'snowy', emoji: '❄️', name: 'Snowy', effect: 'Ice types +25% XP' },
-    { id: 'stormy', emoji: '⛈️', name: 'Stormy', effect: 'Electric types +25% XP' }
+    { id: 'sunny',    emoji: '☀️',  name: 'Sunny',    effect: 'Pets are extra happy! +10% happiness from all actions' },
+    { id: 'rainy',    emoji: '🌧️',  name: 'Rainy',    effect: 'Water types earn +25% XP' },
+    { id: 'cloudy',   emoji: '☁️',  name: 'Cloudy',   effect: 'Normal conditions — a peaceful day' },
+    { id: 'foggy',    emoji: '🌫️',  name: 'Foggy',    effect: 'Rare encounters +10% chance' },
+    { id: 'snowy',    emoji: '❄️',  name: 'Snowy',    effect: 'Ice types earn +25% XP; energy drains 15% slower' },
+    { id: 'stormy',   emoji: '⛈️',  name: 'Stormy',   effect: 'Electric types +25% XP; battles deal +10% damage' },
+    { id: 'windy',    emoji: '💨',  name: 'Windy',    effect: 'Speed +15% for all pets today' },
+    { id: 'rainbow',  emoji: '🌈',  name: 'Rainbow',  effect: 'All types earn +10% XP! A lucky day!' }
   ],
   
   bonusTypes: [
-    { id: 'double_xp', name: '2x Battle XP', multiplier: 2.0 },
-    { id: 'double_pp', name: '2x PawketPoints', multiplier: 2.0 },
-    { id: 'fast_energy', name: '50% Faster Energy Regen', multiplier: 1.5 },
-    { id: 'bonus_drops', name: '+25% Item Drops', multiplier: 1.25 },
-    { id: 'rare_boost', name: 'Rare Encounters +50%', multiplier: 1.5 }
+    { id: 'double_xp',    name: '2x Battle XP',              multiplier: 2.0,  icon: '⚔️' },
+    { id: 'double_pp',    name: '2x PawketPoints',           multiplier: 2.0,  icon: '💜' },
+    { id: 'fast_energy',  name: '50% Faster Energy Regen',   multiplier: 1.5,  icon: '⚡' },
+    { id: 'bonus_drops',  name: '+25% Item Drops',           multiplier: 1.25, icon: '📦' },
+    { id: 'rare_boost',   name: 'Rare Encounters +50%',      multiplier: 1.5,  icon: '✨' },
+    { id: 'cheap_shop',   name: '20% Off Shop Prices',       multiplier: 0.8,  icon: '🛒' },
+    { id: 'happy_boost',  name: '+30% Happiness Gains',      multiplier: 1.3,  icon: '😊' },
+    { id: 'mystery_bonus',name: 'Mystery Bonus (changes hourly!)', multiplier: 1.0, icon: '🎲' }
   ],
-  
+
+  // Event modifiers — shown as highlighted banner alert
+  eventModifiers: [
+    { id: 'rare_encounters', label: 'RARE ENCOUNTERS',    icon: '⭐', desc: '+50% rare spawns today!',          color: '#FFD700' },
+    { id: 'double_xp',       label: 'DOUBLE XP',          icon: '⚔️', desc: '2x XP from all battles!',           color: '#ff6eb4' },
+    { id: 'cheap_shop',      label: 'MARKET SALE',        icon: '🛒', desc: '20% off everything in the shop!',   color: '#5dde7a' },
+    { id: 'fast_energy',     label: 'ENERGIZED',          icon: '⚡', desc: 'Energy recovers 2x faster today!',  color: '#5bc0de' },
+    { id: 'bonus_drops',     label: 'BONUS DROPS',        icon: '📦', desc: '+50% item drop rate!',              color: '#ff9f43' },
+    { id: 'none',            label: '',                   icon: '',   desc: '',                                  color: '' }
+  ],
+
+  // Flavor text by weather
+  flavorTexts: {
+    sunny:   ['A perfect day to take your pet for an adventure!', 'The sun is shining and your pets feel amazing!', 'Clear skies bring good fortune — get out there!'],
+    rainy:   ['The rain brings a cozy stay-inside vibe.', 'Perfect weather for potion brewing and fossil hunting.', 'Puddles everywhere. Your water pets are thriving.'],
+    cloudy:  ['A quiet, peaceful day. Nothing unusual.', 'Clouds roll in, but the vibes are immaculate.', 'Calm and chill. A good day to just exist.'],
+    foggy:   ['Something stirs in the fog... rare things lurk.', 'Visibility is low. Mysterious encounters await.', 'The fog hides secrets. Explore carefully.'],
+    snowy:   ['Everything is fluffy and cold and perfect.', 'Snow day! Your pets are absolutely losing it.', 'The world is quiet and beautiful today.'],
+    stormy:  ['THUNDER. Your electric pets are HYPED.', 'Stay inside or don\'t — your call. Bold choice.', 'The storm brings power and chaos equally.'],
+    windy:   ['Your pets are running approximately 15% faster today.', 'The wind carries faint sounds of chaos. Exciting.', 'Hold onto your hats. And your pets.'],
+    rainbow: ['A rainbow appeared! Today is undeniably your lucky day.', 'The rainbow is real and the luck is real. Probably.', 'Maximum good vibes. All pets sensing great energy.']
+  },
+
   petTypes: ['fire', 'water', 'grass', 'electric', 'ice', 'normal'],
   
   headlines: [
@@ -20023,14 +20307,35 @@ var todayFeatures = {
     '🎪 Traveling merchant spotted!',
     '🏆 New leaderboard champion!',
     '💫 Strange energy detected...',
-    '🎨 New cosmetics coming soon!'
-  ]
+    '🎨 New cosmetics coming soon!',
+    '🦋 Rare butterfly swarm spotted near ruins!',
+    '🍄 Mushroom population up 400%. Experts baffled.',
+    '🐾 Local pets form union. Demands: more treats.',
+    '🌙 Moon unusually large tonight. Pets unaffected.',
+    '📜 Ancient scroll discovered. Contains recipes?'
+  ],
+
+  // Mystery bonus changes every hour
+  getMysteryBonus: function() {
+    var hour = new Date().getHours();
+    var bonuses = [
+      { name: '3x XP this hour!',          icon: '🌟' },
+      { name: 'Free shop item available!',  icon: '🎁' },
+      { name: '+50% PP from battles!',      icon: '💜' },
+      { name: 'Double happiness gains!',    icon: '💕' },
+      { name: 'Energy costs -50%!',         icon: '⚡' },
+      { name: 'Rare encounter guaranteed!', icon: '✨' }
+    ];
+    return bonuses[hour % bonuses.length];
+  }
 };
 
 async function today_init() {
   await today_loadOrGenerate();
   today_displayBanner();
   today_applyEffects();
+  // Refresh widget now that weather is loaded
+  updateEventStatusWidget();
 }
 
 async function today_loadOrGenerate() {
@@ -20077,13 +20382,25 @@ function today_generate() {
   var featuredType = todayFeatures.petTypes[Math.floor(Math.random() * todayFeatures.petTypes.length)];
   var eventChance = ['low', 'normal', 'high'][Math.floor(Math.random() * 3)];
   var headline = todayFeatures.headlines[Math.floor(Math.random() * todayFeatures.headlines.length)];
-  
+
+  // Pick an event modifier (30% chance of a real one, 70% none)
+  var modifierPool = todayFeatures.eventModifiers.slice(0, -1); // exclude 'none'
+  var eventModifier = Math.random() < 0.3
+    ? modifierPool[Math.floor(Math.random() * modifierPool.length)]
+    : todayFeatures.eventModifiers[todayFeatures.eventModifiers.length - 1]; // 'none'
+
+  // Flavor text based on weather
+  var flavorOptions = todayFeatures.flavorTexts[weather.id] || ['Today is a fine day.'];
+  var flavorText = flavorOptions[Math.floor(Math.random() * flavorOptions.length)];
+
   return {
     weather: weather,
     bonus: bonus,
     featuredType: featuredType,
     eventChance: eventChance,
-    headline: headline
+    headline: headline,
+    eventModifier: eventModifier,
+    flavorText: flavorText
   };
 }
 
@@ -20094,42 +20411,74 @@ function today_displayBanner() {
   var features = todayFeatures.current;
   if (!features) return;
   
-  var weather = todayFeatures.weatherTypes.find(function(w) { return w.id === features.weather; });
-  var bonus = todayFeatures.bonusTypes.find(function(b) { return b.id === features.bonus_type; });
-  
+  var weather = todayFeatures.weatherTypes.find(function(w) { return w.id === (features.weather && features.weather.id ? features.weather.id : features.weather); });
+  var bonus = todayFeatures.bonusTypes.find(function(b) { return b.id === (features.bonus && features.bonus.id ? features.bonus.id : features.bonus_type); });
+  var eventModifier = features.eventModifier || null;
+  var flavorText = features.flavorText || '';
+  var mysteryBonus = todayFeatures.getMysteryBonus();
+
+  // Event modifier alert (only shown if there is one)
+  var modifierHtml = '';
+  if (eventModifier && eventModifier.id !== 'none' && eventModifier.label) {
+    modifierHtml = `
+      <div class="today-modifier-alert" style="background:${eventModifier.color}22;border:2px solid ${eventModifier.color};border-radius:10px;padding:10px 16px;margin-bottom:10px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:1.4rem;">${eventModifier.icon}</span>
+        <div>
+          <strong style="color:${eventModifier.color};font-size:1rem;">${eventModifier.label}!</strong>
+          <div style="font-size:0.85rem;opacity:0.85;">${eventModifier.desc}</div>
+        </div>
+      </div>`;
+  }
+
+  // Mystery bonus (changes hourly — shown inline)
+  var mysteryHtml = bonus && bonus.id === 'mystery_bonus'
+    ? `<div class="today-detail-item" style="background:rgba(255,159,67,0.1);border-radius:8px;padding:8px;">
+        🎲 <strong>Mystery Hour:</strong> ${mysteryBonus.icon} ${mysteryBonus.name}
+        <div style="font-size:0.8rem;opacity:0.7;">Changes every hour!</div>
+       </div>`
+    : '';
+
   var banner = document.createElement('div');
   banner.className = 'today-banner collapsed';
+  banner.id = 'today-banner';
   banner.innerHTML = `
     <div class="today-summary" onclick="todayBanner_toggle()">
       <span class="today-icon">🌟</span>
       <span class="today-text">
-        Today: ${weather ? weather.emoji + ' ' + weather.name : ''} • 
-        ${bonus ? '⚡ ' + bonus.name : ''} • 
-        ✨ ${features.featured_type} Day
+        ${weather ? weather.emoji + ' ' + weather.name : ''} •
+        ${bonus ? bonus.icon + ' ' + bonus.name : ''} •
+        ✨ ${features.featured_type || features.featuredType} Day
       </span>
       <span class="today-arrow">▼</span>
     </div>
     <div class="today-details" style="display:none;">
+      ${modifierHtml}
+      <div class="today-flavor" style="font-style:italic;opacity:0.85;margin-bottom:10px;padding:8px 12px;background:rgba(153,102,255,0.08);border-radius:8px;">
+        "${flavorText}"
+      </div>
       <div class="today-detail-item">
         <strong>Weather:</strong> ${weather ? weather.emoji + ' ' + weather.name : 'Unknown'}
         <div class="detail-effect">${weather ? weather.effect : ''}</div>
       </div>
       <div class="today-detail-item">
-        <strong>Bonus:</strong> ${bonus ? '⚡ ' + bonus.name : 'None'}
+        <strong>${bonus ? bonus.icon : '⚡'} Bonus:</strong> ${bonus ? bonus.name : 'None'}
+      </div>
+      ${mysteryHtml}
+      <div class="today-detail-item">
+        <strong>✨ Featured:</strong> ${features.featured_type || features.featuredType}-type pets earn +50% XP
       </div>
       <div class="today-detail-item">
-        <strong>Featured:</strong> ✨ ${features.featured_type}-type pets earn +50% XP
-      </div>
-      <div class="today-detail-item">
-        <strong>Events:</strong> ${features.event_chance} chance of random events
+        <strong>Events:</strong> ${features.event_chance || features.eventChance} chance of random events
       </div>
       <div class="today-news">
-        📰 ${features.news_headline}
+        📰 ${features.news_headline || features.headline}
       </div>
     </div>
   `;
   
-  // Insert at top of home content
+  // Remove old banner if exists, insert at top
+  var existing = document.getElementById('today-banner');
+  if (existing) existing.remove();
   if (homeContent.firstChild) {
     homeContent.insertBefore(banner, homeContent.firstChild);
   } else {
@@ -20405,112 +20754,326 @@ async function dailyWelcome_show() {
 // 6. SCREENSHOT CARD SYSTEM
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PET SNAPSHOT CARD — 600x800 shareable card with title, variant, stats
+// Called by the "📸 Snapshot" button on each pet card in My Pets
+// ═══════════════════════════════════════════════════════════════════════════
+
 async function screenshot_generate(petId) {
+  var snapBtn = document.getElementById('snap-' + petId);
+  if (snapBtn) { snapBtn.textContent = '⏳'; snapBtn.disabled = true; }
+
   try {
-    // Get pet data
-    var { data: pet } = await supabaseClient
+    // Pull fresh pet data including title join
+    var { data: pet, error } = await supabaseClient
       .from('user_pets')
-      .select('*, players(username)')
+      .select('*, players(username), user_pet_titles(pet_titles(*))')
       .eq('id', petId)
       .single();
-    
-    if (!pet) {
-      alert('Pet not found');
+
+    if (error || !pet) {
+      showToast('Could not load pet data', 3000);
       return;
     }
-    
-    // Create canvas
+
+    // Also fetch a scrapbook memory for this pet (most recent)
+    var { data: memories } = await supabaseClient
+      .from('pet_scrapbook')
+      .select('memory_text, memory_type')
+      .eq('pet_id', petId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    var memory = memories && memories.length > 0 ? memories[0].memory_text : null;
+
+    // Get active title text and rarity color
+    var titleText = '';
+    var titleColor = '#9966ff';
+    if (pet.active_pet_title_id && pet.user_pet_titles) {
+      var activeTitleEntry = pet.user_pet_titles.find(function(upt) {
+        return upt.pet_titles && upt.pet_titles.id === pet.active_pet_title_id;
+      });
+      if (activeTitleEntry && activeTitleEntry.pet_titles) {
+        var t = activeTitleEntry.pet_titles;
+        titleText = (t.icon || '') + ' ' + (t.display_name || '');
+        var rarityColors = { common:'#8e8e8e', uncommon:'#5cb85c', rare:'#5bc0de', epic:'#9c27b0', legendary:'#ff9800' };
+        titleColor = rarityColors[t.rarity] || '#9966ff';
+      }
+    }
+
+    // Variant info
+    var variantKey = pet.current_variant;
+    var variantDef = variantKey && petVariants ? petVariants[variantKey] : null;
+    var variantColor = variantDef ? variantDef.color : null;
+    var variantLabel = variantDef ? variantDef.icon + ' ' + variantDef.name : null;
+
+    // Pet type emoji map
+    var typeEmojis = { fire:'🔥', water:'💧', grass:'🌿', electric:'⚡', ice:'❄️', normal:'⭐', default:'🐾' };
+    var typeEmoji = typeEmojis[pet.pet_type] || typeEmojis.default;
+
+    // Card colors by variant (fallback to default purple gradient)
+    var gradTop    = variantColor ? variantColor : '#667eea';
+    var gradBottom = variantColor ? (variantColor + 'aa') : '#764ba2';
+
+    // Build canvas
     var canvas = document.createElement('canvas');
     canvas.width = 600;
-    canvas.height = 800;
+    canvas.height = 820;
     var ctx = canvas.getContext('2d');
-    
-    // Background gradient
-    var gradient = ctx.createLinearGradient(0, 0, 0, 800);
-    gradient.addColorStop(0, '#667eea');
-    gradient.addColorStop(1, '#764ba2');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 600, 800);
-    
-    // Card background
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    ctx.roundRect(40, 40, 520, 720, 20);
+
+    // ── Background gradient ──
+    var bg = ctx.createLinearGradient(0, 0, 600, 820);
+    bg.addColorStop(0, gradTop);
+    bg.addColorStop(1, gradBottom);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 600, 820);
+
+    // ── Decorative corner dots ──
+    ['#ffffff22', '#ffffff11'].forEach(function(c, i) {
+      ctx.fillStyle = c;
+      ctx.beginPath();
+      ctx.arc(60 + i * 10, 60 + i * 10, 80 + i * 20, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(540 - i * 10, 760 - i * 10, 80 + i * 20, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // ── White card panel ──
+    ctx.fillStyle = 'rgba(255,255,255,0.97)';
+    ctx.beginPath();
+    ctx.roundRect(30, 30, 540, 760, 24);
     ctx.fill();
-    
-    // Pet sprite (simplified - would need actual sprite rendering)
-    ctx.fillStyle = '#333';
-    ctx.font = '120px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('🐾', 300, 250);
-    
-    // Pet name
-    ctx.fillStyle = '#333';
-    ctx.font = 'bold 48px Arial';
-    ctx.fillText(pet.nickname || pet.pet_type, 300, 350);
-    
-    // Level and variant
-    ctx.font = '28px Arial';
-    ctx.fillText('Level ' + pet.level, 300, 400);
-    if (pet.current_variant) {
-      ctx.fillText(pet.current_variant + ' Variant', 300, 440);
+
+    // ── Colored header strip ──
+    ctx.fillStyle = gradTop + 'dd';
+    ctx.beginPath();
+    ctx.roundRect(30, 30, 540, 140, [24, 24, 0, 0]);
+    ctx.fill();
+
+    // ── Pet image ──
+    var petImageMap = { Ember:'ember.png', Pyxie:'pyxie.png', Steve:'cowbee.png', Kleat:'kelta.png', Blushimia:'blushimia.png', Aria:'aria.png', Jess:'jess.png', Gnarly:'gnarly.png' };
+    var imgFile = petImageMap[pet.pet_type] || (pet.pet_type ? pet.pet_type.toLowerCase() + '.png' : 'placeholder.png');
+    var imgSrc = 'images/pets/' + imgFile;
+
+    await new Promise(function(resolve) {
+      var img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = function() {
+        // Draw with slight drop shadow
+        ctx.shadowColor = 'rgba(0,0,0,0.25)';
+        ctx.shadowBlur = 20;
+        ctx.drawImage(img, 200, 55, 200, 200);
+        ctx.shadowBlur = 0;
+        resolve();
+      };
+      img.onerror = function() {
+        // Fallback: draw emoji
+        ctx.font = '110px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(typeEmoji, 300, 220);
+        resolve();
+      };
+      img.src = imgSrc;
+    });
+
+    // ── Variant badge (top-right of image) ──
+    if (variantLabel) {
+      ctx.fillStyle = variantColor;
+      ctx.beginPath();
+      ctx.roundRect(380, 65, 160, 38, 12);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 18px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(variantLabel, 460, 89);
     }
-    
-    // Type
-    ctx.fillStyle = '#666';
-    ctx.font = '24px Arial';
-    ctx.fillText('🔥 ' + pet.pet_type + ' Type', 300, 490);
-    
-    // Stats
-    ctx.textAlign = 'left';
-    ctx.font = '22px Arial';
-    ctx.fillText('❤️ HP: ' + pet.max_hp, 100, 560);
-    ctx.fillText('⚔️ ATK: ' + pet.attack, 100, 600);
-    ctx.fillText('🛡️ DEF: ' + pet.defense, 350, 560);
-    ctx.fillText('⚡ SPD: ' + pet.speed, 350, 600);
-    
-    // Owner
+
+    // ── Pet nickname ──
+    ctx.fillStyle = '#1a1a2e';
+    ctx.font = 'bold 42px Arial';
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#999';
-    ctx.font = '20px Arial';
-    ctx.fillText('Owned by: ' + (pet.players ? pet.players.username : 'Unknown'), 300, 680);
-    
-    // PawketPets branding
-    ctx.fillStyle = '#667eea';
-    ctx.font = 'bold 24px Arial';
-    ctx.fillText('PawketPets.com', 300, 730);
-    
-    // Convert to image
+    ctx.fillText(pet.nickname || pet.pet_type, 300, 300);
+
+    // ── Active title ──
+    if (titleText) {
+      ctx.fillStyle = titleColor;
+      ctx.font = 'bold 20px Arial';
+      ctx.fillText(titleText, 300, 332);
+    }
+
+    // ── Species + level pill ──
+    ctx.fillStyle = '#f0ecff';
+    ctx.beginPath();
+    ctx.roundRect(180, 348, 240, 36, 18);
+    ctx.fill();
+    ctx.fillStyle = '#5a3fa0';
+    ctx.font = '18px Arial';
+    ctx.fillText(typeEmoji + ' ' + pet.pet_type + '  •  Lv.' + pet.level, 300, 371);
+
+    // ── Divider ──
+    ctx.strokeStyle = '#e8e0ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(60, 400); ctx.lineTo(540, 400);
+    ctx.stroke();
+
+    // ── Stats grid (2×2) ──
+    var stats = [
+      { label: 'HP',  value: pet.current_hp + ' / ' + pet.max_hp, icon: '❤️', x: 120, y: 455 },
+      { label: 'ATK', value: pet.attack,   icon: '⚔️', x: 380, y: 455 },
+      { label: 'DEF', value: pet.defense,  icon: '🛡️', x: 120, y: 515 },
+      { label: 'SPD', value: pet.speed,    icon: '💨', x: 380, y: 515 }
+    ];
+    stats.forEach(function(s) {
+      ctx.fillStyle = '#f7f4ff';
+      ctx.beginPath();
+      ctx.roundRect(s.x - 90, s.y - 28, 180, 44, 10);
+      ctx.fill();
+      ctx.fillStyle = '#333';
+      ctx.font = 'bold 18px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(s.icon + ' ' + s.label + ': ' + s.value, s.x, s.y);
+    });
+
+    // ── Scrapbook memory ──
+    if (memory) {
+      ctx.fillStyle = '#fdf6ff';
+      ctx.beginPath();
+      ctx.roundRect(60, 545, 480, 60, 12);
+      ctx.fill();
+      ctx.strokeStyle = '#d4b8ff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = '#7a5ca0';
+      ctx.font = 'italic 15px Arial';
+      ctx.textAlign = 'center';
+      // Trim long memories
+      var memText = '💭 ' + (memory.length > 80 ? memory.substring(0, 77) + '...' : memory);
+      ctx.fillText(memText, 300, 580);
+    }
+
+    // ── Backstory snippet ──
+    var backstory = petBackstories[pet.pet_type] || '';
+    if (backstory) {
+      ctx.fillStyle = '#666';
+      ctx.font = 'italic 14px Arial';
+      ctx.textAlign = 'center';
+      var bText = backstory.length > 70 ? backstory.substring(0, 67) + '...' : backstory;
+      ctx.fillText(bText, 300, 630);
+    }
+
+    // ── Divider ──
+    ctx.strokeStyle = '#e8e0ff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(60, 650); ctx.lineTo(540, 650);
+    ctx.stroke();
+
+    // ── Owner + date ──
+    ctx.fillStyle = '#aaa';
+    ctx.font = '15px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('👤 ' + (pet.players ? pet.players.username : 'Trainer'), 70, 678);
+    ctx.textAlign = 'right';
+    ctx.fillText('📅 ' + new Date().toLocaleDateString(), 530, 678);
+
+    // ── Branding ──
+    ctx.fillStyle = gradTop;
+    ctx.font = 'bold 22px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('🐾 PawketPetsVT', 300, 725);
+    ctx.fillStyle = '#bbb';
+    ctx.font = '13px Arial';
+    ctx.fillText('pawketpetsvt.com', 300, 746);
+
+    // ── Generate blob and show modal ──
     canvas.toBlob(function(blob) {
       var url = URL.createObjectURL(blob);
-      screenshot_showDownloadModal(url, pet.nickname || pet.pet_type);
-    });
-    
+      var petName = (pet.nickname || pet.pet_type || 'pet').replace(/[^a-zA-Z0-9]/g, '_');
+      screenshot_showModal(url, petName, pet);
+    }, 'image/png');
+
   } catch (err) {
-    console.error('Error generating screenshot:', err);
-    alert('Failed to generate screenshot');
+    console.error('Snapshot error:', err);
+    showToast('Failed to generate snapshot', 3000);
+  } finally {
+    if (snapBtn) { snapBtn.textContent = '📸'; snapBtn.disabled = false; }
   }
 }
 
-function screenshot_showDownloadModal(imageUrl, petName) {
-  var modal = document.createElement('div');
-  modal.className = 'modal-overlay screenshot-modal';
-  modal.innerHTML = `
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>📸 Screenshot Ready!</h2>
-        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button>
+function screenshot_showModal(imageUrl, fileName, pet) {
+  // Remove any existing snapshot modal
+  var existing = document.querySelector('.snapshot-modal-overlay');
+  if (existing) existing.remove();
+
+  var petName = pet.nickname || pet.pet_type || 'pet';
+  var shareText = encodeURIComponent('Check out my pet ' + petName + ' on PawketPetsVT! 🐾 #PawketPets #VTuber');
+  var shareUrl  = encodeURIComponent('https://pawketpetsvt.com');
+
+  var twitterUrl  = 'https://twitter.com/intent/tweet?text=' + shareText + '&url=' + shareUrl;
+  var blueskyText = encodeURIComponent('Check out my pet ' + petName + ' on PawketPetsVT! 🐾 https://pawketpetsvt.com #PawketPets');
+  var blueskyUrl  = 'https://bsky.app/intent/compose?text=' + blueskyText;
+
+  var overlay = document.createElement('div');
+  overlay.className = 'snapshot-modal-overlay modal-overlay-custom';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:10001;';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+  overlay.innerHTML = `
+    <div style="background:#1e1e2e;border-radius:20px;padding:28px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:2px solid #9966ff;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h2 style="color:#e8d5ff;margin:0;font-size:1.3rem;">📸 Pet Snapshot Ready!</h2>
+        <button onclick="this.closest('.snapshot-modal-overlay').remove()" style="background:rgba(255,255,255,0.1);border:none;color:#e8d5ff;font-size:1.2rem;cursor:pointer;border-radius:8px;padding:4px 10px;">✕</button>
       </div>
-      <div class="modal-body">
-        <img src="${imageUrl}" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
-        <div style="margin-top: 20px;">
-          <a href="${imageUrl}" download="${petName}_card.png" class="btn-primary">
-            Download Image 📥
+
+      <img src="${imageUrl}" style="width:100%;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,0.4);margin-bottom:18px;display:block;">
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <a href="${imageUrl}" download="${fileName}_card.png"
+           style="display:block;text-align:center;padding:13px;background:linear-gradient(135deg,#9966ff,#b589ff);color:white;border-radius:12px;font-weight:700;font-size:1rem;text-decoration:none;">
+          💾 Download as PNG
+        </a>
+
+        <button onclick="screenshot_copyToClipboard('${imageUrl}', this)"
+           style="padding:12px;background:#3a3a4e;color:#e8d5ff;border:2px solid #9966ff;border-radius:12px;font-weight:600;font-size:0.95rem;cursor:pointer;">
+          📋 Copy to Clipboard
+        </button>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <a href="${twitterUrl}" target="_blank"
+             style="display:block;text-align:center;padding:11px;background:#1da1f2;color:white;border-radius:12px;font-weight:600;font-size:0.9rem;text-decoration:none;">
+            🐦 Share on X/Twitter
+          </a>
+          <a href="${blueskyUrl}" target="_blank"
+             style="display:block;text-align:center;padding:11px;background:#0085ff;color:white;border-radius:12px;font-weight:600;font-size:0.9rem;text-decoration:none;">
+            🦋 Share on Bluesky
           </a>
         </div>
       </div>
+
+      <p style="color:#888;font-size:0.8rem;text-align:center;margin-top:14px;margin-bottom:0;">
+        Tip: Download first, then attach the image when sharing on social media!
+      </p>
     </div>
   `;
-  document.body.appendChild(modal);
+
+  document.body.appendChild(overlay);
+}
+
+async function screenshot_copyToClipboard(imageUrl, btn) {
+  try {
+    var response = await fetch(imageUrl);
+    var blob = await response.blob();
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    btn.textContent = '✅ Copied!';
+    setTimeout(function() { btn.textContent = '📋 Copy to Clipboard'; }, 2000);
+  } catch (err) {
+    // Fallback: open image in new tab for manual save
+    window.open(imageUrl, '_blank');
+    btn.textContent = '🔗 Opened in new tab';
+    setTimeout(function() { btn.textContent = '📋 Copy to Clipboard'; }, 2000);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -21227,97 +21790,6 @@ function dailyWelcome_show() {
     showModal('Welcome Back!', html);
   } else {
     showCelebrationModal('Welcome Back!', 'Day ' + streak + ' Streak!');
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 6. SCREENSHOT CARDS
-// ═══════════════════════════════════════════════════════════════════════════
-
-async function screenshot_generate(petId) {
-  try {
-    var { data: pet } = await supabaseClient
-      .from('user_pets')
-      .select('*, players(username)')
-      .eq('id', petId)
-      .single();
-    
-    if (!pet) { alert('Pet not found'); return; }
-    
-    var canvas = document.createElement('canvas');
-    canvas.width = 600;
-    canvas.height = 800;
-    var ctx = canvas.getContext('2d');
-    
-    var gradient = ctx.createLinearGradient(0, 0, 0, 800);
-    gradient.addColorStop(0, '#667eea');
-    gradient.addColorStop(1, '#764ba2');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 600, 800);
-    
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    ctx.fillRect(40, 40, 520, 720);
-    
-    ctx.fillStyle = '#333';
-    ctx.font = '120px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('🐾', 300, 250);
-    
-    ctx.font = 'bold 48px Arial';
-    ctx.fillText(pet.nickname || pet.pet_type, 300, 350);
-    
-    ctx.font = '28px Arial';
-    ctx.fillText('Level ' + pet.level, 300, 400);
-    
-    if (pet.current_variant) {
-      ctx.font = '22px Arial';
-      ctx.fillStyle = '#667eea';
-      ctx.fillText(pet.current_variant + ' Variant', 300, 440);
-    }
-    
-    ctx.fillStyle = '#666';
-    ctx.font = '24px Arial';
-    ctx.fillText('🔥 ' + pet.pet_type + ' Type', 300, 490);
-    
-    ctx.fillStyle = '#333';
-    ctx.textAlign = 'left';
-    ctx.font = '22px Arial';
-    ctx.fillText('❤️ HP: ' + pet.max_hp, 100, 560);
-    ctx.fillText('⚔️ ATK: ' + pet.attack, 100, 600);
-    ctx.fillText('🛡️ DEF: ' + pet.defense, 350, 560);
-    ctx.fillText('⚡ SPD: ' + pet.speed, 350, 600);
-    
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#999';
-    ctx.font = '20px Arial';
-    ctx.fillText('Owned by: ' + (pet.players ? pet.players.username : 'Unknown'), 300, 680);
-    
-    ctx.fillStyle = '#667eea';
-    ctx.font = 'bold 24px Arial';
-    ctx.fillText('PawketPets.com', 300, 730);
-    
-    canvas.toBlob(function(blob) {
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = (pet.nickname || pet.pet_type) + '_card.png';
-      a.click();
-      
-      // Use existing showModal if available, fallback to showCenteredModal
-      if (typeof showModal === 'function') {
-        showModal('📸 Screenshot Generated!',
-          '<div style="text-align:center;padding:20px;">' +
-          '<p style="margin-bottom:20px;">Your pet card has been downloaded!</p>' +
-          '<img src="' + url + '" style="max-width:300px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">' +
-          '</div>'
-        );
-      } else {
-        showSuccessModal('Screenshot Generated!', 'Your pet card has been downloaded!');
-      }
-    });
-  } catch (err) {
-    console.error('Screenshot error:', err);
-    alert('Failed to generate screenshot');
   }
 }
 
