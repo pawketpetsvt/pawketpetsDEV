@@ -220,3 +220,27 @@ body {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
 }
+/* Add these at the end of your overlay.css file */
+
+/* Make it more compact for stream */
+.overlay-container {
+  width: 340px;  /* Slightly narrower */
+  font-size: 0.9em;
+}
+
+/* Better contrast for stream backgrounds */
+.overlay-container {
+  background: rgba(0, 0, 0, 0.8);  /* Slightly darker */
+  backdrop-filter: blur(12px);      /* More blur for readability */
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Make stats pop more */
+.stat-fill {
+  box-shadow: 0 0 2px rgba(0,0,0,0.3);
+}
+
+/* Optional: Add a subtle glow to the pet avatar */
+.pet-avatar {
+  box-shadow: 0 0 0 2px rgba(153, 102, 255, 0.3);
+}
