@@ -69,22 +69,20 @@ function getRandomQuip(happinessPercent, hungerPercent, energyPercent) {
   return quipList[Math.floor(Math.random() * quipList.length)];
 }
 
-// Rotate quips every 45 seconds
+// Rotate quips every 2 minutes
 let quipInterval = null;
 let currentQuipTimeout = null;
+let quipRotationActive = false;
 
 function startQuipRotation(pet) {
-  // Clear existing intervals
+  // If rotation is already active, don't restart it
+  if (quipRotationActive) return;
+  
+  quipRotationActive = true;
+  
+  // Clear any existing intervals just in case
   if (quipInterval) clearInterval(quipInterval);
   if (currentQuipTimeout) clearTimeout(currentQuipTimeout);
-  
-  // Update quip every 45 seconds
-  quipInterval = setInterval(() => {
-    if (pet) {
-      const quip = getRandomQuip(pet.stats.happiness.percent, pet.stats.hunger.percent, pet.stats.energy.percent);
-      updateQuipDisplay(quip);
-    }
-  }, 120000);
   
   // Show first quip after 5 seconds
   currentQuipTimeout = setTimeout(() => {
@@ -93,6 +91,14 @@ function startQuipRotation(pet) {
       updateQuipDisplay(quip);
     }
   }, 5000);
+  
+  // Update quip every 2 minutes
+  quipInterval = setInterval(() => {
+    if (pet) {
+      const quip = getRandomQuip(pet.stats.happiness.percent, pet.stats.hunger.percent, pet.stats.energy.percent);
+      updateQuipDisplay(quip);
+    }
+  }, 120000); // 2 minutes = 120,000 milliseconds
 }
 
 function updateQuipDisplay(quip) {
@@ -205,9 +211,9 @@ function updateDisplay(pet) {
   else tip = '✨ Happy and healthy! Thanks for watching!';
   
   document.getElementById('pet-tip').textContent = tip;
-  document.getElementById('pet-last').textContent = 'Updated just now';
+  document.getElementById('pet-last').textContent = '🎮 Get your own pet at pawketpets.net!';
   
-  // Start quip rotation with pet data
+  // Start quip rotation with pet data (only starts once)
   startQuipRotation(pet);
   
   // Pet image (if available)
