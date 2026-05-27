@@ -2780,30 +2780,34 @@ function makeMyPetCard(pet) {
 
   // Action buttons
   var actions = makeEl('div', {class:'pet-actions'});
+  actions.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;justify-content:center;';
   
   // Feed/Play buttons with event delegation
   var feedBtn = makeEl('button', {class:'btn-action btn-feed', id:'feed-'+pet.id}, 'Feed');
   feedBtn.setAttribute('data-pet-id', pet.id);
+  feedBtn.style.cssText = 'flex:1;min-width:60px;padding:7px 10px;font-size:0.82rem;';
   
   var playBtn = makeEl('button', {class:'btn-action btn-play', id:'play-'+pet.id}, pet.energy >= 10 ? 'Play' : 'Tired!');
   playBtn.setAttribute('data-pet-id', pet.id);
   playBtn.disabled = pet.energy < 10;
+  playBtn.style.cssText = 'flex:1;min-width:60px;padding:7px 10px;font-size:0.82rem;';
   
   actions.appendChild(feedBtn); 
   actions.appendChild(playBtn);
 
-  // Snapshot button
+  // Snapshot button — compact icon only
   var snapBtn = makeEl('button', {class:'btn-action btn-snapshot', id:'snap-'+pet.id});
   snapBtn.textContent = '📸';
   snapBtn.title = 'Take a Snapshot of this pet!';
-  snapBtn.style.cssText = 'background:linear-gradient(135deg,#764ba2,#9966ff);color:white;border:none;border-radius:10px;padding:8px 12px;font-size:1rem;cursor:pointer;transition:transform 0.15s;';
+  snapBtn.style.cssText = 'background:linear-gradient(135deg,#764ba2,#9966ff);color:white;border:none;border-radius:10px;padding:7px 10px;font-size:0.9rem;cursor:pointer;transition:transform 0.15s;flex:0 0 auto;';
   snapBtn.onmouseover = function() { this.style.transform = 'scale(1.1)'; };
   snapBtn.onmouseout  = function() { this.style.transform = 'scale(1)'; };
   snapBtn.onclick = function() { screenshot_generate(pet.id); };
   actions.appendChild(snapBtn);
   var companionBtn = makeEl('button', {class: 'btn-companion'});
-  companionBtn.textContent = '🐾 Set as Companion';
-  companionBtn.style.cssText = 'margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#9966ff 0%,#ff66cc 100%);color:white;border:none;border-radius:12px;font-weight:600;cursor:pointer;transition:transform 0.2s;';
+  companionBtn.textContent = '🐾 Set Companion';
+  companionBtn.title = 'Set as your active companion';
+  companionBtn.style.cssText = 'margin-top:6px;width:100%;padding:8px 10px;font-size:0.82rem;background:linear-gradient(135deg,#9966ff 0%,#ff66cc 100%);color:white;border:none;border-radius:12px;font-weight:600;cursor:pointer;transition:transform 0.2s;';
   companionBtn.onmouseover = function() { this.style.transform = 'scale(1.02)'; };
   companionBtn.onmouseout = function() { this.style.transform = 'scale(1)'; };
   companionBtn.onclick = function() {
@@ -19199,6 +19203,18 @@ var phase1_state = {
 // ═══════════════════════════════════════════════════════════════════════════
 // INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════════════
+
+async function newFeatures_init() {
+  dbg('🚀 Initializing new features...');
+  try {
+    if (typeof today_init === 'function') await today_init();
+    if (typeof calendar_init === 'function') await calendar_init();
+    if (typeof dailyWelcome_check === 'function') dailyWelcome_check();
+    dbg('✅ New features initialized!');
+  } catch (err) {
+    console.error('❌ New features initialization error:', err);
+  }
+}
 
 async function phase1_init() {
   if (!currentUser) {

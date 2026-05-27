@@ -16109,3 +16109,91 @@ body.night-mode .btn-owned:hover {
   background: linear-gradient(135deg,#40916c,#2d6a4f) !important;
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NIGHT MODE — Toast Notifications
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+body.night-mode .pixel-toast {
+  background: linear-gradient(135deg,#2a2a3a,#1e1e2e) !important;
+  border: 3px solid #9966ff !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5) !important;
+}
+body.night-mode .pixel-toast-message { color: #e8d5ff !important; }
+
+body.night-mode .pixel-toast-success {
+  border-color: #4ade80 !important;
+  background: linear-gradient(135deg,#1a3a2a,#0a2a1a) !important;
+}
+body.night-mode .pixel-toast-success .pixel-toast-icon { background:#4ade80 !important; color:#1a1a2e !important; }
+
+body.night-mode .pixel-toast-error {
+  border-color: #ff6b6b !important;
+  background: linear-gradient(135deg,#3a1a1a,#2a0a0a) !important;
+}
+body.night-mode .pixel-toast-error .pixel-toast-icon { background:#ff6b6b !important; color:#1a1a2e !important; }
+
+body.night-mode .pixel-toast-warning {
+  border-color: #ffa502 !important;
+  background: linear-gradient(135deg,#3a2a0a,#2a1a00) !important;
+}
+body.night-mode .pixel-toast-warning .pixel-toast-icon { background:#ffa502 !important; color:#1a1a2e !important; }
+
+body.night-mode .pixel-toast-info {
+  border-color: #9966ff !important;
+  background: linear-gradient(135deg,#2a2a3a,#1a1a2e) !important;
+}
+body.night-mode .pixel-toast-info .pixel-toast-icon { background:#9966ff !important; color:white !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NIGHT MODE — Celebration & Achievement Modals
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Phase 1 milestone celebration */
+body.night-mode .phase1-celebration-card {
+  background: linear-gradient(135deg,#2a2a3a,#1e1e2e) !important;
+  border: 3px solid #ffa502 !important;
+}
+body.night-mode .phase1-celebration-title { color: #ffcc66 !important; }
+body.night-mode .phase1-celebration-text  { color: #e8d5ff !important; }
+
+/* Founder celebration */
+body.night-mode .founder-modal {
+  background: linear-gradient(135deg,#2a2a3a,#1e1e2e) !important;
+  border-color: #fbbf24 !important;
+}
+body.night-mode .founder-tier     { background: rgba(251,191,36,0.15) !important; }
+body.night-mode .founder-rewards  { background: rgba(0,0,0,0.4) !important; }
+body.night-mode .founder-header h2,
+body.night-mode .founder-body h3  { color: #ffcc66 !important; }
+
+/* Rare drop celebration */
+body.night-mode .rare-drop-modal {
+  background: linear-gradient(135deg,#2a2a3a,#1e1e2e) !important;
+}
+body.night-mode .rare-drop-name  { color: #ffcc66 !important; }
+body.night-mode .rare-drop-desc  { color: #e8d5ff !important; }
+body.night-mode .rare-drop-stats { background: rgba(0,0,0,0.4) !important; }
+
+/* Pass level up */
+body.night-mode .pass-levelup-modal .modal-content,
+body.night-mode .pass-levelup-modal > div {
+  background: linear-gradient(135deg,#2a2a3a,#1e1e2e) !important;
+}
+body.night-mode .pass-levelup-modal h2 { color: #ffcc66 !important; }
+
+/* Badge notification (top-right corner) */
+body.night-mode .badge-notification {
+  background: linear-gradient(135deg,#2a2a3a,#1e1e2e) !important;
+  border: 3px solid #ffa502 !important;
+}
+body.night-mode .badge-notif-title { color: #ffcc66 !important; }
+body.night-mode .badge-notif-name  { color: #e8d5ff !important; }
+body.night-mode .badge-notif-desc  { color: #b399dd !important; }
+
+/* Variant unlock notification */
+body.night-mode .variant-unlock-notification {
+  background: linear-gradient(135deg,#2a2a3a,#1e1e2e) !important;
+  border: 3px solid #9966ff !important;
+}
+
