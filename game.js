@@ -14514,11 +14514,22 @@ async function guild_donate() {
   if (!guildState.myGuild) return;
   try {
     await awardPP(-amount, 'guild_donation');
-    await supabaseClient.from('guilds').update({ guild_treasury: supabaseClient.rpc ? undefined : 0 }).eq('id', guildState.myGuild.guild_id);
-    // Use raw update with increment via RPC if available, fallback to fetch+update
-    var { data: g } = await supabaseClient.from('guilds').select('guild_treasury').eq('id', guildState.myGuild.guild_id).single();
-    await supabaseClient.from('guilds').update({ guild_treasury: (g ? g.guild_treasury : 0) + amount }).eq('id', guildState.myGuild.guild_id);
-    await supabaseClient.from('guild_members').update({ total_contributions: amount }).eq('guild_id', guildState.myGuild.guild_id).eq('user_id', currentUser.id);
+
+    // Fetch current treasury and contributions, then increment both
+    var { data: g } = await supabaseClient
+      .from('guilds').select('guild_treasury').eq('id', guildState.myGuild.guild_id).single();
+    await supabaseClient.from('guilds')
+      .update({ guild_treasury: ((g && g.guild_treasury) || 0) + amount })
+      .eq('id', guildState.myGuild.guild_id);
+
+    // Increment member contributions (not overwrite)
+    var { data: m } = await supabaseClient
+      .from('guild_members').select('total_contributions')
+      .eq('guild_id', guildState.myGuild.guild_id).eq('user_id', currentUser.id).single();
+    await supabaseClient.from('guild_members')
+      .update({ total_contributions: ((m && m.total_contributions) || 0) + amount })
+      .eq('guild_id', guildState.myGuild.guild_id).eq('user_id', currentUser.id);
+
     showToast('💰 Donated ' + amount + ' PP to the treasury!', 3000);
     loadGuildPage();
   } catch(err) { showToast('Failed: ' + err.message, 3000); }
@@ -15018,15 +15029,30 @@ var _explorationStreaks = {};
 
 async function checkExplorationStreak(petId, zone) {
   var key = petId + ':' + zone;
+
+  // Restore from DB if not in memory (page refresh recovery)
+  if (!_explorationStreaks[key]) {
+    try {
+      var { data: last } = await supabaseClient
+        .from('expeditions')
+        .select('streak_count')
+        .eq('pet_id', petId)
+        .eq('zone', zone)
+        .eq('claimed', true)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (last && last.streak_count) _explorationStreaks[key] = last.streak_count;
+    } catch(e) {}
+  }
+
   _explorationStreaks[key] = (_explorationStreaks[key] || 0) + 1;
   var streak = _explorationStreaks[key];
-
-  // Persist streak count to expedition row if column exists
-  await supabaseClient.from('expeditions')
+  // Persist streak count (fire-and-forget — streak_count column optional)
+  supabaseClient.from('expeditions')
     .update({ streak_count: streak })
-    .eq('pet_id', petId)
-    .eq('zone', zone)
-    .eq('claimed', false)
+    .eq('pet_id', petId).eq('zone', zone).eq('user_id', currentUser.id)
+    .order('started_at', { ascending: false }).limit(1)
     .catch(function(){});
 
   var bonusMsg = '';
