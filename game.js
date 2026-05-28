@@ -3949,15 +3949,20 @@ async function race_init() {
   // Load tracks if not cached
   if (!_raceTracks) await race_loadTracks();
 
-  // Check daily race count
-  var today = new Date().toISOString().slice(0, 10);
-  var { count } = await supabaseClient
-    .from('race_history')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', currentUser.id)
-    .gte('created_at', today + 'T00:00:00Z');
+  // Check daily race count — table may not exist yet, default to 0
+  try {
+    var today = new Date().toISOString().slice(0, 10);
+    var { count } = await supabaseClient
+      .from('race_history')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', currentUser.id)
+      .gte('created_at', today + 'T00:00:00Z');
+    raceState.racesLeft = Math.max(0, RACE_DAILY_MAX - (count || 0));
+  } catch(e) {
+    dbg('race_init: race_history table not found, defaulting racesLeft to max');
+    raceState.racesLeft = RACE_DAILY_MAX;
+  }
 
-  raceState.racesLeft = Math.max(0, RACE_DAILY_MAX - (count || 0));
   raceState.selectedPets = [];
   raceState.bet = 10;
 
@@ -3965,14 +3970,25 @@ async function race_init() {
 }
 
 // ── Setup UI ─────────────────────────────────────────────────────────────
-function race_renderSetup() {
+async function race_renderSetup() {
   var area = document.getElementById('race-area');
   if (!area) return;
 
-  // Eligible player pets: level 5+, energy >= RACE_ENERGY_COST
-  var myPets = Object.values(petState).filter(function(p) {
-    return (p.level || 1) >= 5 && (p.energy || 0) >= RACE_ENERGY_COST;
-  });
+  area.innerHTML = '<div class="spinner"></div>';
+
+  // Query DB directly — don't rely on petState being populated
+  var myPets = [];
+  try {
+    var { data: dbPets, error } = await supabaseClient
+      .from('user_pets')
+      .select('id, nickname, level, energy, base_speed, current_variant, pets(name, image_file)')
+      .eq('user_id', currentUser.id);
+    if (!error && dbPets) {
+      myPets = dbPets.filter(function(p) {
+        return (p.level || 1) >= 5 && (p.energy || 0) >= RACE_ENERGY_COST;
+      });
+    }
+  } catch(e) { dbg('race_renderSetup: DB query failed', e); }
 
   var petsHtml = myPets.length === 0
     ? '<div style="color:#ff6b6b;font-size:0.85rem;text-align:center;">No eligible pets (need level 5+, ' + RACE_ENERGY_COST + '+ energy)</div>'
@@ -4030,7 +4046,8 @@ function race_renderSetup() {
 
 function race_petAvatar(p) {
   if (p.isCpu) return p.emoji || '🐾';
-  if (p.image_file) return '<img src="images/' + p.image_file + '" style="width:28px;height:28px;object-fit:contain;" onerror="this.outerHTML=\'🐾\';">';
+  var imgFile = p.image_file || (p.pets && p.pets.image_file);
+  if (imgFile) return '<img src="images/' + imgFile + '" style="width:28px;height:28px;object-fit:contain;" onerror="this.outerHTML=\'🐾\';">';
   return '🐾';
 }
 
@@ -5513,13 +5530,13 @@ async function checkSidebarStreamStatus() {
       }
     }
     
-    // If no token, can't check - this is a Twitch API limitation
+    // If no token, can't check live status — still sort by whatever is currently shown
     if (!token) {
-      // Only log once per session to avoid spam
       if (!twitchTokenLoggedOnce) {
         console.log('No Twitch token available - cannot check live status');
         twitchTokenLoggedOnce = true;
       }
+      sortStreamerList();
       return;
     }
     
@@ -7744,6 +7761,11 @@ async function loadProfile(username) {
     
     // Load badges
     await loadProfileBadges(profile.id);
+    
+    // Update profile action buttons (add/remove friend, block, etc.)
+    // Set the profile user ID first so updateProfileButtons knows whose profile this is
+    window.currentProfileUserId = profile.id;
+    updateProfileButtons().catch(function(){});
     
   } catch (err) {
     el('profile-username').textContent = 'Error loading profile';
@@ -10275,19 +10297,23 @@ async function loadBattlePets() {
       if (_battleExpeditionPetIds.indexOf(userPet.id) !== -1) return;
 
       var pet = userPet.pets;
-      if (!pet) return; // safety — skip if join returned null
+      // If join returned null (table name mismatch / RLS), use nickname and placeholder
+      var petName = (pet && (pet.name)) || userPet.nickname || 'Pet';
+      var petImage = (pet && pet.image_file) ? 'images/pets/' + pet.image_file : null;
 
       var card = makeEl('div', { class: 'battle-pet-card' });
       card.onclick = function() { selectBattlePet(userPet.id, card); };
 
       var img = makeEl('img');
-      img.src = 'images/pets/' + (pet.image_file || 'placeholder.png');
-      img.alt = pet.name || 'Pet';
-      img.onerror = function() { this.style.display = 'none'; };
-      card.appendChild(img);
+      if (petImage) {
+        img.src = petImage;
+        img.alt = petName;
+        img.onerror = function() { this.style.display = 'none'; };
+        card.appendChild(img);
+      }
 
       var name = makeEl('div', { class: 'battle-pet-card-name' });
-      name.textContent = userPet.nickname || pet.name || 'Pet';
+      name.textContent = userPet.nickname || petName;
       card.appendChild(name);
 
       var level = makeEl('div', { class: 'battle-pet-card-level' });
@@ -10329,7 +10355,13 @@ async function loadBattlePets() {
     });
 
     if (rendered === 0) {
-      grid.innerHTML = '<div class="empty-state"><p>All your pets are exploring! Wait for them to return. 🧭</p></div>';
+      var expCount = _battleExpeditionPetIds.length;
+      var totalCount = res.data.length;
+      grid.innerHTML = '<div class="empty-state"><p>' +
+        (expCount > 0 && expCount === totalCount
+          ? 'All your pets are exploring! Wait for them to return. 🧭'
+          : 'No battle-ready pets found. Adopt a pet first! 🐾') +
+        '</p><button class="btn btn-outline btn-sm" onclick="loadBattlePets()" style="margin-top:8px;">🔄 Retry</button></div>';
     }
 
     var helperText = el('battle-helper-text');
