@@ -16484,3 +16484,24 @@ body.night-mode .item-icon-img {
   transition: all 0.2s;
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BATTLE-PAGE EXPEDITION SECTION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#battle-expedition-section details > summary::-webkit-details-marker { display: none; }
+#battle-expedition-section details summary:hover { background: rgba(153,102,255,0.04); }
+
+.battle-exp-zone-card:hover {
+  border-color: var(--purple) !important;
+  background: rgba(153,102,255,0.08) !important;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  #battle-expedition-section .battle-exp-zone-card {
+    padding: 6px 4px !important;
+    font-size: 0.7rem;
+  }
+}
+
