@@ -15780,7 +15780,7 @@ async function loadForumThreads(categoryId) {
       <div class="forum-thread-content">
         <div class="forum-thread-title">${escapeHtml(thread.title)}</div>
         <div class="forum-thread-meta">
-          Started by <strong>${thread.players.username}</strong> • ${timeAgo}
+          Started by <strong>${escapeHtml(thread.players.username)}</strong> • ${timeAgo}
         </div>
       </div>
       <div class="forum-thread-stats">
@@ -15937,6 +15937,10 @@ async function submitNewThread() {
     showToast('Please fill in both title and message!');
     return;
   }
+
+  // Strip HTML tags before storing (defence-in-depth; display already uses escapeHtml)
+  title   = title.replace(/<[^>]*>/g, '');
+  content = content.replace(/<[^>]*>/g, '');
   
   // Check if banned
   var { data: ban } = await supabaseClient
@@ -15987,6 +15991,9 @@ async function submitReply() {
     showToast('Please write a reply!');
     return;
   }
+
+  // Strip HTML tags before storing
+  content = content.replace(/<[^>]*>/g, '');
   
   // Check if banned
   var { data: ban } = await supabaseClient
