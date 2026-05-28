@@ -14573,6 +14573,49 @@ async function loadReferralData(userId) {
       el('referral-link-input').value = referralLink;
       el('referral-count').textContent = player.referrals_count || 0;
       el('referral-pp-earned').textContent = ((player.referrals_count || 0) * 200) + ' PP';
+
+      // Inject milestone progress below the card if mount exists
+      var milestoneMount = document.getElementById('referral-milestone-progress');
+      if (milestoneMount) {
+        var count = player.referrals_count || 0;
+        var nextM = REFERRAL_MILESTONES.find(function(m) { return m.count > count; });
+        var prevM = null;
+        for (var mi = REFERRAL_MILESTONES.length - 1; mi >= 0; mi--) {
+          if (REFERRAL_MILESTONES[mi].count <= count) { prevM = REFERRAL_MILESTONES[mi]; break; }
+        }
+        var pct = nextM
+          ? Math.round(((count - (prevM ? prevM.count : 0)) / (nextM.count - (prevM ? prevM.count : 0))) * 100)
+          : 100;
+
+        var tierColors = { common:'#8e8e8e', uncommon:'#5cb85c', rare:'#5bc0de', epic:'#9c27b0', legendary:'#ff9800' };
+        var milestoneRows = REFERRAL_MILESTONES.map(function(m) {
+          var done = count >= m.count;
+          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(153,102,255,0.08);font-size:0.8rem;">' +
+            '<span style="font-size:1rem;">' + (done ? '✅' : '🔘') + '</span>' +
+            '<span style="flex:1;color:' + (done ? '#aaa' : 'var(--purple-dark)') + ';' + (done ? 'text-decoration:line-through;' : '') + '">' +
+              m.label + ' <em style="color:var(--text-light);">(' + m.count + ' referrals)</em>' +
+            '</span>' +
+            '<span style="color:' + (tierColors[m.tier]||'#9966ff') + ';font-weight:700;font-size:0.72rem;">' + m.tier.toUpperCase() + '</span>' +
+          '</div>';
+        }).join('');
+
+        milestoneMount.innerHTML =
+          '<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">' +
+            '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:10px;">🏆 Referral Milestones</div>' +
+            (nextM
+              ? '<div style="margin-bottom:12px;">' +
+                  '<div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-light);margin-bottom:4px;">' +
+                    '<span>Progress to <strong>' + nextM.label + '</strong></span>' +
+                    '<span>' + count + ' / ' + nextM.count + '</span>' +
+                  '</div>' +
+                  '<div style="background:rgba(153,102,255,0.12);border-radius:20px;height:10px;overflow:hidden;">' +
+                    '<div style="width:' + pct + '%;height:100%;background:linear-gradient(90deg,#9966ff,#ff66cc);border-radius:20px;transition:width 0.5s;"></div>' +
+                  '</div>' +
+                '</div>'
+              : '<div style="font-size:0.82rem;color:#5dde7a;margin-bottom:12px;">🎉 All milestones unlocked!</div>') +
+            milestoneRows +
+          '</div>';
+      }
     }
     
     console.log('✅ Referral system loaded. Code:', player.referral_code);
@@ -14651,15 +14694,19 @@ async function awardReferralRewards(referrerId, newUserId, referrerUsername) {
       .single();
     
     if (referrerData) {
+      var newCount = (referrerData.referrals_count || 0) + 1;
       await supabaseClient
         .from('players')
         .update({
           pawketpoints: (referrerData.pawketpoints || 0) + 200,
-          referrals_count: (referrerData.referrals_count || 0) + 1
+          referrals_count: newCount
         })
         .eq('id', referrerId);
       
-      console.log('💰 Awarded 200 PP to referrer');
+      dbg('💰 Awarded 200 PP to referrer');
+
+      // Check milestone rewards AFTER count is saved
+      await grantReferralMilestone(referrerId, newCount);
     }
     
     // Award new user 100 PP
@@ -14694,6 +14741,89 @@ async function awardReferralRewards(referrerId, newUserId, referrerUsername) {
     
   } catch (err) {
     console.error('❌ Error awarding referral rewards:', err);
+  }
+}
+
+/**
+ * Referral milestone definitions and reward granting
+ */
+var REFERRAL_MILESTONES = [
+  { count:1,  badge:'referral_rookie',  title:null,               skinKeys:0, frame:null,          label:'Referral Rookie',       tier:'common' },
+  { count:3,  badge:null,               title:null,               skinKeys:1, frame:null,          label:'Triple Recruiter',      tier:'uncommon' },
+  { count:5,  badge:'recruiter',        title:'community_builder', skinKeys:0, frame:null,          label:'Community Builder',     tier:'rare' },
+  { count:10, badge:'ambassador',       title:'pied_piper',        skinKeys:1, frame:null,          label:'Pied Piper',            tier:'rare' },
+  { count:25, badge:'influencer',       title:null,               skinKeys:2, frame:'frame_sparkle-earned', label:'Influencer',   tier:'epic' },
+  { count:50, badge:'legend',           title:null,               skinKeys:3, frame:'frame_crown',  label:'Legendary Recruiter',   tier:'legendary' }
+];
+
+async function grantReferralMilestone(userId, newCount) {
+  // Find the exact milestone this count hits (not all previous ones)
+  var milestone = REFERRAL_MILESTONES.find(function(m) { return m.count === newCount; });
+  if (!milestone) return;
+
+  // Award badge
+  if (milestone.badge) {
+    await awardBadge(milestone.badge).catch(function(){});
+  }
+
+  // Award player title
+  if (milestone.title) {
+    await awardPlayerTitle(milestone.title, userId).catch(function(){});
+  }
+
+  // Award skin keys
+  if (milestone.skinKeys > 0) {
+    await skinkey_grantKeys(milestone.skinKeys, 'referral_milestone_' + newCount).catch(function(){});
+  }
+
+  // Unlock cosmetic frame
+  if (milestone.frame) {
+    await phase1_unlockCosmetic('frame', milestone.frame, userId).catch(function(){});
+  }
+
+  // Bonus PP for milestone
+  var bonusPP = newCount * 10; // 10 PP per referral as milestone bonus
+  await awardPP(bonusPP, 'referral_milestone_' + newCount).catch(function(){});
+
+  // Show celebration if it's the current user
+  if (currentUser && currentUser.id === userId) {
+    referral_showMilestoneCelebration(milestone, bonusPP);
+  }
+}
+
+function referral_showMilestoneCelebration(milestone, bonusPP) {
+  var tierColors = {
+    common:    '#8e8e8e',
+    uncommon:  '#5cb85c',
+    rare:      '#5bc0de',
+    epic:      '#9c27b0',
+    legendary: '#ff9800'
+  };
+  var color = tierColors[milestone.tier] || '#9966ff';
+
+  var modal = makeModal();
+  modal.innerHTML =
+    '<div style="text-align:center;padding:10px 0;">' +
+      '<div style="font-size:3rem;margin-bottom:10px;">🎉</div>' +
+      '<div style="font-size:0.75rem;font-weight:700;letter-spacing:2px;color:' + color + ';text-transform:uppercase;margin-bottom:6px;">' + milestone.tier + ' milestone</div>' +
+      '<div style="font-weight:800;font-size:1.2rem;color:var(--purple-dark);margin-bottom:6px;">' + milestone.label + '</div>' +
+      '<div style="color:var(--text-light);font-size:0.85rem;margin-bottom:16px;">' + milestone.count + ' friends referred!</div>' +
+      '<div style="background:linear-gradient(135deg,rgba(153,102,255,0.1),rgba(255,102,204,0.08));border-radius:14px;padding:16px;margin-bottom:16px;">' +
+        '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:10px;">🎁 Milestone Rewards</div>' +
+        (milestone.badge    ? '<div style="font-size:0.82rem;margin:4px 0;">🎖️ Badge: ' + milestone.badge.replace(/_/g,' ') + '</div>' : '') +
+        (milestone.title    ? '<div style="font-size:0.82rem;margin:4px 0;">📜 Title unlocked!</div>' : '') +
+        (milestone.skinKeys ? '<div style="font-size:0.82rem;margin:4px 0;">🔑 ' + milestone.skinKeys + ' Skin Key' + (milestone.skinKeys > 1 ? 's' : '') + '!</div>' : '') +
+        (milestone.frame    ? '<div style="font-size:0.82rem;margin:4px 0;">🖼️ Exclusive frame unlocked!</div>' : '') +
+        '<div style="font-size:0.82rem;margin:4px 0;color:#e6a800;">💰 +' + bonusPP + ' bonus PP!</div>' +
+      '</div>' +
+      '<button class="btn btn-primary" onclick="closeModal()" style="width:100%;">Awesome! 🚀</button>' +
+    '</div>';
+
+  openModal(modal);
+
+  // Confetti for epic/legendary
+  if (milestone.tier === 'epic' || milestone.tier === 'legendary') {
+    if (typeof createConfettiBurst === 'function') createConfettiBurst();
   }
 }
 
