@@ -103,7 +103,7 @@ function preloadPrioritySounds() {
       audioCache[key] = audio;
     }
   });
-  console.log('✅ Priority audio preloaded:', prioritySounds.join(', '));
+  dbg('✅ Priority audio preloaded:', prioritySounds.join(', '));
 }
 
 function loadSoundOnDemand(soundKey) {
@@ -120,7 +120,7 @@ function loadSoundOnDemand(soundKey) {
     audioCache[soundKey] = null;
   };
   audioCache[soundKey] = audio;
-  console.log('🔊 Loaded sound on demand:', soundKey);
+  dbg('🔊 Loaded sound on demand:', soundKey);
   return audio;
 }
 
@@ -1620,7 +1620,7 @@ async function showApp(user) {
   var pr = await supabaseClient.from('players').select('username, pawketpoints').eq('id', user.id).maybeSingle();
   
   if (!pr.data) {
-    console.log('🚨 Player not found! Auto-creating fresh player account...');
+    dbg('🚨 Player not found! Auto-creating fresh player account...');
     
     // Generate a safe temporary username (NOT from email for privacy!)
     var tempUsername = 'Player' + Math.floor(Math.random() * 100000);
@@ -1638,7 +1638,7 @@ async function showApp(user) {
       .single();
     
     if (createResult.data) {
-      console.log('✅ Fresh player account created:', createResult.data);
+      dbg('✅ Fresh player account created:', createResult.data);
       pr = createResult;
       
       // Show welcome notification with prompt to set username
@@ -1729,10 +1729,10 @@ async function showApp(user) {
 
   // Restore last active tab from URL hash
   var hash = window.location.hash;
-  console.log('Page loaded with hash:', hash);
+  dbg('Page loaded with hash:', hash);
   if (hash && hash.startsWith('#tab-')) {
     var savedTab = hash.replace('#tab-', '');
-    console.log('Restoring saved tab:', savedTab);
+    dbg('Restoring saved tab:', savedTab);
     showTab(savedTab);
   } else if (hash && hash.includes('access_token')) {
     // Twitch auth callback
@@ -1741,7 +1741,7 @@ async function showApp(user) {
     // Only show home if no tab is currently active and no hash
     var currentTab = document.querySelector('.page-content.active');
     if (!currentTab) {
-      console.log('No saved tab, showing home');
+      dbg('No saved tab, showing home');
       showTab('home');
     }
   }
@@ -1835,7 +1835,7 @@ async function updateSidebarStats() {
     
     // If player doesn't exist, they're being auto-created - skip stats for now
     if (!player) {
-      console.log('⏳ Player not yet created, skipping sidebar stats...');
+      dbg('⏳ Player not yet created, skipping sidebar stats...');
       return;
     }
     
@@ -2780,6 +2780,7 @@ async function saveNickname(petId) {
 async function useItem(petId) {
   var sel = el('sel-'+petId); 
   if (!sel || !sel.value) return;
+  if (!canPerformAction('use_item', 500)) return;
   
   var idx = inventoryItems.findIndex(function(i){ return i.invId === sel.value; }); 
   if (idx === -1) return;
@@ -2794,16 +2795,16 @@ async function useItem(petId) {
   
   var updates = {};
   
-  console.log('=== USE ITEM DEBUG ===');
-  console.log('Item:', item);
-  console.log('Item effect:', item.effect);
-  console.log('Item value:', item.value);
-  console.log('Item effect_value:', item.effect_value);
+  dbg('=== USE ITEM DEBUG ===');
+  dbg('Item:', item);
+  dbg('Item effect:', item.effect);
+  dbg('Item value:', item.value);
+  dbg('Item effect_value:', item.effect_value);
   
   // Handle healing items (HP restoration)
   var healValue = item.value || item.effect_value || 0;
-  console.log('Heal value calculated:', healValue);
-  console.log('Is healing item?', item.effect === 'healing', healValue > 0);
+  dbg('Heal value calculated:', healValue);
+  dbg('Is healing item?', item.effect === 'healing', healValue > 0);
   
   if (item.effect === 'healing' && healValue > 0) {
     // Get current HP and max HP from database
@@ -2824,7 +2825,7 @@ async function useItem(petId) {
     var currentHP = (petRes.data.current_hp !== null && petRes.data.current_hp !== undefined) ? petRes.data.current_hp : (petRes.data.base_hp || 30);
     var maxHP = petRes.data.max_hp || petRes.data.base_hp || 30;
     
-    console.log('🩹 Healing - Current HP:', currentHP, 'Max HP:', maxHP, 'Heal amount:', healValue);
+    dbg('🩹 Healing - Current HP:', currentHP, 'Max HP:', maxHP, 'Heal amount:', healValue);
     
     // Check if already at full HP
     if (currentHP >= maxHP) {
@@ -5533,7 +5534,7 @@ async function checkSidebarStreamStatus() {
     // If no token, can't check live status — still sort by whatever is currently shown
     if (!token) {
       if (!twitchTokenLoggedOnce) {
-        console.log('No Twitch token available - cannot check live status');
+        dbg('No Twitch token available - cannot check live status');
         twitchTokenLoggedOnce = true;
       }
       sortStreamerList();
@@ -5587,7 +5588,7 @@ async function checkSidebarStreamStatus() {
       });
     }
     
-    console.log('✅ Sidebar stream status checked');
+    dbg('✅ Sidebar stream status checked');
     sortStreamerList();
   } catch (err) {
     console.error('❌ Error checking sidebar stream status:', err);
@@ -5760,7 +5761,7 @@ async function loadUserBadges() {
   }
   
   earnedBadges = res.data.map(b => b.badges.badge_key);
-  console.log('[Badges] User has earned:', earnedBadges);
+  dbg('[Badges] User has earned:', earnedBadges);
 }
 async function awardBadge(badgeKey) {
   if (!currentUser) return;
@@ -5779,7 +5780,7 @@ async function awardBadge(badgeKey) {
       .single();
     
     if (badgeError || !badge) {
-      console.log('[Badges] Badge not found in database:', badgeKey);
+      dbg('[Badges] Badge not found in database:', badgeKey);
       return;
     }
     
@@ -5793,7 +5794,7 @@ async function awardBadge(badgeKey) {
     
     if (insertError) {
       if (insertError.code === '23505') {
-        console.log('[Badges] User already has badge:', badgeKey);
+        dbg('[Badges] User already has badge:', badgeKey);
         return;
       }
       console.error('[Badges] Error awarding badge:', insertError);
@@ -5816,7 +5817,7 @@ async function awardBadge(badgeKey) {
       });
     }
     
-    console.log('[Badges] Awarded:', badgeKey, '-', badge.name);
+    dbg('[Badges] Awarded:', badgeKey, '-', badge.name);
     
   } catch (err) {
     console.error('[Badges] Error in awardBadge:', err);
@@ -6722,10 +6723,10 @@ async function loadSidebarNews() {
     return;
   }
   
-  console.log('[loadSidebarNews] Loading news...');
+  dbg('[loadSidebarNews] Loading news...');
   var res = await supabaseClient.from('news').select('*').eq('is_published',true).order('published_at',{ascending:false}).limit(3);
   
-  console.log('[loadSidebarNews] Result:', res);
+  dbg('[loadSidebarNews] Result:', res);
   
   if (res.error || !res.data || !res.data.length) {
     widget.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-light);">No news yet!</div>';
@@ -6742,19 +6743,28 @@ async function loadSidebarNews() {
 }
 
 async function loadNews() {
-  var container=el('news-container');
-  var res=await supabaseClient.from('news').select('*').eq('is_published',true).order('published_at',{ascending:false});
-  if(res.error||!res.data||!res.data.length){container.innerHTML='<div class="card" style="text-align:center;padding:56px 36px;"><div style="font-size:2.8rem;margin-bottom:14px;">&#128235;</div><h2 style="color:var(--purple-dark);margin-bottom:10px;">No news yet!</h2><p style="color:var(--text-light)">Check back soon!</p></div>';return;}
-  container.innerHTML='';
-  res.data.forEach(function(post){
-    var date=new Date(post.published_at||post.created_at).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
-    var div=makeEl('div',{class:'news-post news-card'});
-    div.appendChild(makeEl('div',{class:'news-post-date news-date'},date));
-    div.appendChild(makeEl('h3',{},post.title||'Untitled'));
-    div.appendChild(makeEl('p',{},post.content||''));
-    if(post.author)div.appendChild(makeEl('div',{class:'news-author'},'- '+post.author));
-    container.appendChild(div);
-  });
+  var container = el('news-container');
+  if (!container) return;
+  try {
+    var res = await supabaseClient.from('news').select('*').eq('is_published', true).order('published_at', { ascending: false });
+    if (res.error || !res.data || !res.data.length) {
+      container.innerHTML = '<div class="card" style="text-align:center;padding:56px 36px;"><div style="font-size:2.8rem;margin-bottom:14px;">&#128235;</div><h2 style="color:var(--purple-dark);margin-bottom:10px;">No news yet!</h2><p style="color:var(--text-light)">Check back soon!</p></div>';
+      return;
+    }
+    container.innerHTML = '';
+    res.data.forEach(function(post) {
+      var date = new Date(post.published_at || post.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      var div = makeEl('div', { class: 'news-post news-card' });
+      div.appendChild(makeEl('div', { class: 'news-post-date news-date' }, date));
+      div.appendChild(makeEl('h3', {}, post.title || 'Untitled'));
+      div.appendChild(makeEl('p', {}, post.content || ''));
+      if (post.author) div.appendChild(makeEl('div', { class: 'news-author' }, '- ' + post.author));
+      container.appendChild(div);
+    });
+  } catch(err) {
+    dbg('loadNews error:', err);
+    if (container) container.innerHTML = '<div class="empty-state"><p>Could not load news.</p></div>';
+  }
 }
 
 // ── TWITCH ───────────────────────────────
@@ -6872,7 +6882,7 @@ async function loadTeamShowcase() {
         }
       }
     }
-  } catch(e) { console.log('Could not check live status:', e); }
+  } catch(e) { dbg('Could not check live status:', e); }
 
   TEAM_MEMBERS.forEach(function(member) {
     var card = document.createElement('div');
@@ -7003,7 +7013,7 @@ function cleanupSpookyEffects() {
     }
   }
   
-  console.log('✨ Cleaned up spooky effects');
+  dbg('✨ Cleaned up spooky effects');
 }
 
 // Spooky effect for THEYWENTMISSING code
@@ -7054,11 +7064,11 @@ function triggerSpookyEffect() {
       var spookyAudio = audioCache[piperKey].cloneNode();
       spookyAudio.volume = 0.3;
       spookyAudio.play().catch(function(err) {
-        console.log('Spooky audio failed to play:', err);
+        dbg('Spooky audio failed to play:', err);
       });
     }
   } catch (err) {
-    console.log('Could not load spooky audio');
+    dbg('Could not load spooky audio');
   }
   
   // Remove effects after 3 seconds
@@ -7348,7 +7358,7 @@ async function loadLeaderboard(type) {
         .order('pawketpoints', { ascending: false })
         .limit(10);
       
-      console.log('Leaderboard points query result:', res);
+      dbg('Leaderboard points query result:', res);
       
       if (res.error) throw res.error;
       
@@ -7592,7 +7602,7 @@ async function loadProfile(username) {
     dbg('[loadProfile] RPC result:', profileRes);
     
     if (profileRes.error || !profileRes.data || profileRes.data.length === 0) {
-      console.log('Using fallback query, RPC error:', profileRes.error);
+      dbg('Using fallback query, RPC error:', profileRes.error);
       // Fallback if RPC doesn't exist
       var playerRes = await supabaseClient
         .from('players')
@@ -7600,7 +7610,7 @@ async function loadProfile(username) {
         .ilike('username', username)
         .single();
       
-      console.log('Player query result:', playerRes);
+      dbg('Player query result:', playerRes);
       
       if (playerRes.error) {
         console.error('Player query failed:', playerRes.error);
@@ -7619,7 +7629,7 @@ async function loadProfile(username) {
         .select('level')
         .eq('user_id', player.id);
       
-      console.log('Pets query result:', petsRes);
+      dbg('Pets query result:', petsRes);
       
       var totalPets = petsRes.data ? petsRes.data.length : 0;
       var totalLevels = petsRes.data ? petsRes.data.reduce(function(sum, p) { return sum + p.level; }, 0) : 0;
@@ -7638,17 +7648,17 @@ async function loadProfile(username) {
     }
     
     var profile = profileRes.data[0];
-    console.log('Final profile data:', profile);
+    dbg('Final profile data:', profile);
     
     // If RPC didn't include pet stats, calculate them
     if (profile.total_pets === undefined || profile.total_pets === null) {
-      console.log('Pet stats missing, calculating manually...');
+      dbg('Pet stats missing, calculating manually...');
       var petsRes = await supabaseClient
         .from('user_pets')
         .select('level')
         .eq('user_id', profile.id);
       
-      console.log('Manual pets query:', petsRes);
+      dbg('Manual pets query:', petsRes);
       
       profile.total_pets = petsRes.data ? petsRes.data.length : 0;
       profile.total_levels = petsRes.data ? petsRes.data.reduce(function(sum, p) { return sum + (p.level || 0); }, 0) : 0;
@@ -7785,14 +7795,14 @@ tabsLoaded.profile = function() {
 // ══════════════════════════════════════════════════════════════
 
 async function loadMyProfile() {
-  console.log('[loadMyProfile] Starting...');
+  dbg('[loadMyProfile] Starting...');
   if (!currentUser) {
     console.error('[loadMyProfile] No currentUser!');
     return;
   }
   
   try {
-    console.log('[loadMyProfile] Fetching player data for user:', currentUser.id);
+    dbg('[loadMyProfile] Fetching player data for user:', currentUser.id);
     // Get player data
     var res = await supabaseClient
       .from('players')
@@ -7800,7 +7810,7 @@ async function loadMyProfile() {
       .eq('id', currentUser.id)
       .single();
     
-    console.log('[loadMyProfile] Player data result:', res);
+    dbg('[loadMyProfile] Player data result:', res);
     
     if (res.error) throw res.error;
     var player = res.data;
@@ -7858,10 +7868,10 @@ async function loadMyProfile() {
     }
     
     // Load badges
-    console.log('[loadMyProfile] About to load badges...');
+    dbg('[loadMyProfile] About to load badges...');
     try {
       await loadMyProfileBadges();
-      console.log('[loadMyProfile] Badges loaded successfully');
+      dbg('[loadMyProfile] Badges loaded successfully');
     } catch (badgeErr) {
       console.error('[loadMyProfile] Error loading badges:', badgeErr);
     }
@@ -7878,9 +7888,9 @@ async function loadMyProfile() {
 }
 
 async function loadMyProfileBadges() {
-  console.log('[loadMyProfileBadges] Function called!');
+  dbg('[loadMyProfileBadges] Function called!');
   var badgesGrid = el('myprofile-badges-grid');
-  console.log('[loadMyProfileBadges] Badge grid element:', badgesGrid);
+  dbg('[loadMyProfileBadges] Badge grid element:', badgesGrid);
   
   if (!badgesGrid) {
     console.error('[loadMyProfileBadges] Grid element not found!');
@@ -8134,8 +8144,8 @@ async function loadProfileBadges(userId) {
     return;
   }
   
-  console.log('[loadProfileBadges] Loading badges for userId:', userId);
-  console.log('[loadProfileBadges] Found', earnedRes.data.length, 'badges');
+  dbg('[loadProfileBadges] Loading badges for userId:', userId);
+  dbg('[loadProfileBadges] Found', earnedRes.data.length, 'badges');
   
   el('profile-badge-count').textContent = earnedRes.data.length;
   
@@ -8595,7 +8605,7 @@ async function calculatePetStats(petId) {
   // Use current_hp if available (even if 0!), otherwise use maxHP for new pets
   var currentHP = (pet.current_hp !== null && pet.current_hp !== undefined) ? pet.current_hp : maxHP;
   
-  console.log('📊 Pet HP loaded:', {
+  dbg('📊 Pet HP loaded:', {
     petId: petId,
     current_hp_from_db: pet.current_hp,
     maxHP: maxHP,
@@ -8984,15 +8994,15 @@ async function executeBattle(playerStats, enemyStats, petId) {
     .eq('id', petId)
     .single();
   
-  console.log('=== ENERGY DEDUCTION DEBUG ===');
-  console.log('Pet ID:', petId);
-  console.log('Fresh pet query result:', freshPet);
+  dbg('=== ENERGY DEDUCTION DEBUG ===');
+  dbg('Pet ID:', petId);
+  dbg('Fresh pet query result:', freshPet);
   
   if (freshPet.data) {
     var currentEnergy = freshPet.data.energy || 100;
     var newEnergy = Math.max(0, currentEnergy - 5);
     
-    console.log('Energy deduction: ' + currentEnergy + ' -> ' + newEnergy);
+    dbg('Energy deduction: ' + currentEnergy + ' -> ' + newEnergy);
     showToast('⚡ Energy: ' + currentEnergy + ' → ' + newEnergy);
     
     var updateRes = await supabaseClient
@@ -9000,19 +9010,19 @@ async function executeBattle(playerStats, enemyStats, petId) {
       .update({ energy: newEnergy })
       .eq('id', petId);
     
-    console.log('Energy update result:', updateRes);
+    dbg('Energy update result:', updateRes);
     
     if (updateRes.error) {
       console.error('Energy update error:', updateRes.error);
       showToast('❌ Energy update failed!');
     } else {
-      console.log('Energy updated successfully!');
+      dbg('Energy updated successfully!');
       showToast('✅ Energy updated to ' + newEnergy);
     }
   } else {
     console.error('Failed to fetch pet energy!');
   }
-  console.log('=== END ENERGY DEBUG ===');
+  dbg('=== END ENERGY DEBUG ===');
   
   // Simulate the battle
   var battleResult = simulateBattle(playerStats, enemyStats);
@@ -9073,11 +9083,11 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
   
   // If enemyId is a number or string number, keep it as number (don't try to convert to UUID)
   if (typeof enemyId === 'number' || (typeof enemyId === 'string' && !isNaN(parseInt(enemyId)))) {
-    console.log('Enemy ID is numeric:', enemyId, '- using as integer');
+    dbg('Enemy ID is numeric:', enemyId, '- using as integer');
     actualEnemyId = parseInt(enemyId);
   }
   
-  console.log('Saving battle with enemy ID:', actualEnemyId, 'type:', typeof actualEnemyId);
+  dbg('Saving battle with enemy ID:', actualEnemyId, 'type:', typeof actualEnemyId);
   
   // ⚠️ IMPORTANT: Your RPC needs to accept INTEGER for p_enemy_id
   // See SQL file: create_save_battle_result_integer.sql
@@ -9105,7 +9115,7 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
   } else {
     expGained = result.exp_gained || 0;
     ppGained = result.pp_gained || 0;
-    console.log('✅ Battle saved securely. XP:', expGained, 'PP:', ppGained);
+    dbg('✅ Battle saved securely. XP:', expGained, 'PP:', ppGained);
   }
   
   // Apply guild XP boost perk
@@ -9124,7 +9134,7 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
     if (hpUpdate.error) {
       console.error('Failed to update pet HP directly:', hpUpdate.error);
     } else {
-      console.log('✅ Pet HP updated to:', battleResult.playerFinalHP);
+      dbg('✅ Pet HP updated to:', battleResult.playerFinalHP);
     }
   }
   
@@ -9135,7 +9145,7 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
   
   // BOSS DROP - Guaranteed item if you beat a boss!
   if (battleResult.victory && enemyStats.is_boss) {
-    console.log('🎁 Boss defeated! Rolling for exclusive drop...');
+    dbg('🎁 Boss defeated! Rolling for exclusive drop...');
     
     // Log boss defeat activity
     await logActivity('boss_defeated', {
@@ -9153,7 +9163,7 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
       // Random drop from this boss's loot table
       itemDropped = bossDropRes.data[Math.floor(Math.random() * bossDropRes.data.length)];
       
-      console.log('🎉 Boss dropped:', itemDropped.name);
+      dbg('🎉 Boss dropped:', itemDropped.name);
       
       // Check if player already has this item
       var existingItem = await supabaseClient
@@ -9463,7 +9473,7 @@ function showBattleUI(playerStats, enemyStats, battleResult) {
     enemySprite.style.transform = 'scale(1.5)';
     enemySprite.style.imageRendering = 'pixelated';
     
-    console.log('Sprite set to first frame only - width:', config.frameWidth, 'height:', config.frameHeight);
+    dbg('Sprite set to first frame only - width:', config.frameWidth, 'height:', config.frameHeight);
     
     // Apply special variant visual effect (if any)
     if (enemyStats.specialVariant) {
@@ -9587,7 +9597,7 @@ function getSpriteFile(species) {
 
 function startSpriteAnimation(spriteElement, species) {
   // No animation needed - static images only
-  console.log('Static sprite for:', species);
+  dbg('Static sprite for:', species);
   return;
 }
 
@@ -9693,10 +9703,10 @@ function playBattleTurn() {
     // Victory/defeat sounds temporarily disabled (missing MP3 files)
     if (entry.text.includes('Victory')) {
       // playBattleSound('victory', 0.40);  // Disabled - file missing
-      console.log('🎉 Victory! (sound disabled until MP3 added)');
+      dbg('🎉 Victory! (sound disabled until MP3 added)');
     } else {
       // playBattleSound('defeat', 0.35);  // Disabled - file missing
-      console.log('💀 Defeat! (sound disabled until MP3 added)');
+      dbg('💀 Defeat! (sound disabled until MP3 added)');
     }
   }
   
@@ -10689,7 +10699,7 @@ async function getRandomEnemy(zone, playerLevel) {
   // ═══════════════════════════════════════════════════════════════════════
   var bossRoll = Math.random();
   if (bossRoll < GAME_CONSTANTS.BOSS_ENCOUNTER_RATE && playerSettings.spooky_enabled) { // 3% chance + spooky enabled
-    console.log('🔥 BOSS ENCOUNTER! Shadow of Piper appears!');
+    dbg('🔥 BOSS ENCOUNTER! Shadow of Piper appears!');
     return await getBossEnemy(zone, playerLevel);
   }
   
@@ -10937,7 +10947,7 @@ async function getRandomEnemy(zone, playerLevel) {
     rewardMultiplier: rewardMultiplier
   };
   
-  console.log('Generated enemy:', scaledEnemy.name, 'Level', enemyLevel, 'Variant:', variant, 'Elemental:', elementalType, 'Special:', specialVariant, 'Stats:', {
+  dbg('Generated enemy:', scaledEnemy.name, 'Level', enemyLevel, 'Variant:', variant, 'Elemental:', elementalType, 'Special:', specialVariant, 'Stats:', {
     hp: scaledEnemy.base_hp,
     atk: scaledEnemy.base_attack,
     def: scaledEnemy.base_defense,
@@ -11001,7 +11011,7 @@ async function getBossEnemy(zone, playerLevel) {
 }
 
 function triggerBossEntrance() {
-  console.log('🔥 Triggering boss entrance sequence...');
+  dbg('🔥 Triggering boss entrance sequence...');
   
   // Add UI fragmentation effect to entire page
   document.body.classList.add('boss-ui-glitch');
@@ -11018,17 +11028,17 @@ function triggerBossEntrance() {
     window.bossThemeAudio.loop = true;
     window.bossThemeAudio.volume = 0.16;  // Reduced 20% (was 0.20)
     window.bossThemeAudio.onerror = function() {
-      console.log('⚠️ Boss music file not found: /boss-theme.mp3');
-      console.log('💡 Upload boss-theme.mp3 to your repo root to enable boss music!');
+      dbg('⚠️ Boss music file not found: /boss-theme.mp3');
+      dbg('💡 Upload boss-theme.mp3 to your repo root to enable boss music!');
     };
   }
   window.bossThemeAudio.currentTime = 0;
   window.bossThemeAudio.volume = 0.16;  // Reduced 20% (was 0.20)
   
   window.bossThemeAudio.play().then(function() {
-    console.log('🎵 Boss music playing!');
+    dbg('🎵 Boss music playing!');
   }).catch(function(err) {
-    console.log('⚠️ Boss music failed to play:', err.message);
+    dbg('⚠️ Boss music failed to play:', err.message);
   });
   
   // Add screen glitch effect - STAYS FOR ENTIRE FIGHT!
@@ -11189,7 +11199,7 @@ function stopBossWarningText() {
 }
 
 function triggerBossDeathScreen() {
-  console.log('💀 Boss death screen triggered...');
+  dbg('💀 Boss death screen triggered...');
   
   // Stop scrolling warnings
   stopBossWarningText();
@@ -11295,7 +11305,7 @@ function startBossMusicGlitchFade() {
     try {
       window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     } catch (e) {
-      console.log('Web Audio API not supported, falling back to simple fade');
+      dbg('Web Audio API not supported, falling back to simple fade');
       simpleMusicFade(audio, startVolume, fadeDuration);
       return;
     }
@@ -12690,13 +12700,13 @@ var dayNightCycle = {
   enableNightMode: function() {
     document.body.classList.add('night-mode');
     this.isNightMode = true;
-    console.log('🌙 Night mode enabled');
+    dbg('🌙 Night mode enabled');
   },
   
   enableDayMode: function() {
     document.body.classList.remove('night-mode');
     this.isNightMode = false;
-    console.log('☀️ Day mode enabled');
+    dbg('☀️ Day mode enabled');
   },
   
   // Manual toggle for testing
@@ -13551,7 +13561,7 @@ async function logActivity(activityType, activityData) {
         is_public: true
       }]);
     
-    console.log('📢 Activity logged:', activityType, activityData);
+    dbg('📢 Activity logged:', activityType, activityData);
   } catch (err) {
     console.error('Error logging activity:', err);
   }
@@ -15895,7 +15905,7 @@ async function checkDailyLogin() {
   var lastLogin = localStorage.getItem('lastLoginDate_' + currentUser.id);
   
   if (lastLogin === today) {
-    console.log('[DailyLogin] Already claimed today');
+    dbg('[DailyLogin] Already claimed today');
     return; // Already claimed today
   }
   
@@ -16097,7 +16107,7 @@ function applyDailyBuffs(streak) {
     });
   }
   
-  console.log('[Buffs] Active buffs:', dailyBuffsActive);
+  dbg('[Buffs] Active buffs:', dailyBuffsActive);
 }
 
 // Get active buff multiplier for effect type
@@ -16233,7 +16243,7 @@ async function awardShareBonus() {
   var lastShare = localStorage.getItem('lastShareBonus_' + currentUser.id);
   
   if (lastShare === today) {
-    console.log('[Share] Bonus already claimed today');
+    dbg('[Share] Bonus already claimed today');
     return;
   }
   
@@ -16419,7 +16429,7 @@ async function processReferral() {
     // Clear pending referral
     localStorage.removeItem('pendingReferralCode');
     
-    console.log('✅ Referral processed for:', referrer.username);
+    dbg('✅ Referral processed for:', referrer.username);
     showToast('Welcome! Your friend has been credited with a referral bonus! 🎉');
     
   } catch (err) {
@@ -16592,11 +16602,11 @@ showApp = async function(user) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function loadDailyTip() {
-  console.log('🎯 loadDailyTip called!');
+  dbg('🎯 loadDailyTip called!');
   var tipEl = document.getElementById('daily-tip-content');
-  console.log('📝 Tip element:', tipEl);
+  dbg('📝 Tip element:', tipEl);
   if (!tipEl) {
-    console.log('❌ Tip element not found!');
+    dbg('❌ Tip element not found!');
     return;
   }
   
@@ -16608,7 +16618,7 @@ function loadDailyTip() {
   var tipIndex = seed % dailyTips.length;
   var tip = dailyTips[tipIndex];
   
-  console.log('💡 Selected tip:', tip);
+  dbg('💡 Selected tip:', tip);
   tipEl.textContent = tip;
 }
 
@@ -17132,7 +17142,7 @@ function triggerRandomEvent() {
   
   modal.classList.add('show');
   
-  console.log('🎲 Random event triggered:', event.text, event.type === 'modifier' ? '(Modifier: ' + event.modifier + ')' : '');
+  dbg('🎲 Random event triggered:', event.text, event.type === 'modifier' ? '(Modifier: ' + event.modifier + ')' : '');
 }
 
 // Apply event modifiers with expiration
@@ -17143,7 +17153,7 @@ function applyEventModifier(modifier, durationMinutes) {
   // Store modifier in localStorage
   localStorage.setItem('event_modifier_' + modifier, expiration.toString());
   
-  console.log('✨ Event modifier applied:', modifier, 'expires in', durationMinutes, 'minutes');
+  dbg('✨ Event modifier applied:', modifier, 'expires in', durationMinutes, 'minutes');
 }
 
 // Check if an event modifier is active
@@ -17203,14 +17213,14 @@ showTab = function(tabName) {
  * - Display referral card
  */
 async function initReferralSystem(userId) {
-  console.log('🔗 Initializing referral system...');
+  dbg('🔗 Initializing referral system...');
   
   // Check if new user arrived via referral link
   var urlParams = new URLSearchParams(window.location.search);
   var referralCode = urlParams.get('ref');
   
   if (referralCode) {
-    console.log('🎁 User arrived via referral code:', referralCode);
+    dbg('🎁 User arrived via referral code:', referralCode);
     await processReferralOnSignup(userId, referralCode);
     
     // Clean URL (remove ref parameter)
@@ -17259,7 +17269,7 @@ async function loadReferralData(userId) {
     
     // If player doesn't exist yet, skip referral setup
     if (!player) {
-      console.log('⏳ Player not yet created, skipping referral data...');
+      dbg('⏳ Player not yet created, skipping referral data...');
       return;
     }
     
@@ -17339,7 +17349,7 @@ async function loadReferralData(userId) {
       }
     }
     
-    console.log('✅ Referral system loaded. Code:', player.referral_code);
+    dbg('✅ Referral system loaded. Code:', player.referral_code);
   } catch (err) {
     console.error('❌ Referral system error:', err);
   }
@@ -17350,7 +17360,7 @@ async function loadReferralData(userId) {
  */
 async function processReferralOnSignup(newUserId, referralCode) {
   try {
-    console.log('🎁 Processing referral for code:', referralCode);
+    dbg('🎁 Processing referral for code:', referralCode);
     
     // Find referrer by code
     var { data: referrer, error: findError } = await supabaseClient
@@ -17360,13 +17370,13 @@ async function processReferralOnSignup(newUserId, referralCode) {
       .single();
     
     if (findError || !referrer) {
-      console.log('⚠️ Referral code not found or invalid');
+      dbg('⚠️ Referral code not found or invalid');
       return;
     }
     
     // Don't let users refer themselves
     if (referrer.id === newUserId) {
-      console.log('⚠️ User tried to refer themselves');
+      dbg('⚠️ User tried to refer themselves');
       return;
     }
     
@@ -17378,7 +17388,7 @@ async function processReferralOnSignup(newUserId, referralCode) {
       .single();
     
     if (existingRef && existingRef.referred_by) {
-      console.log('⚠️ User already has a referrer');
+      dbg('⚠️ User already has a referrer');
       return;
     }
     
@@ -17396,7 +17406,7 @@ async function processReferralOnSignup(newUserId, referralCode) {
     // Award rewards
     await awardReferralRewards(referrer.id, newUserId, referrer.username);
     
-    console.log('✅ Referral processed successfully!');
+    dbg('✅ Referral processed successfully!');
   } catch (err) {
     console.error('❌ Error processing referral:', err);
   }
@@ -17445,7 +17455,7 @@ async function awardReferralRewards(referrerId, newUserId, referrerUsername) {
         })
         .eq('id', newUserId);
       
-      console.log('💰 Awarded 100 PP to new user');
+      dbg('💰 Awarded 100 PP to new user');
       
       // Show welcome message
       showPixelToast('🎁 Welcome! You earned 100 PP from ' + referrerUsername + '\'s referral!', 'success');
@@ -17852,14 +17862,14 @@ var isModerator = false;
  * Initialize forum - check if user is mod
  */
 async function initForum() {
-  console.log('🏛️ Initializing forum...');
+  dbg('🏛️ Initializing forum...');
   
   if (!currentUser) {
-    console.log('❌ No user logged in for forum');
+    dbg('❌ No user logged in for forum');
     return;
   }
   
-  console.log('✅ User logged in, checking moderator status...');
+  dbg('✅ User logged in, checking moderator status...');
   
   // Check if user is moderator
   try {
@@ -17874,13 +17884,13 @@ async function initForum() {
     }
     
     isModerator = !!data;
-    console.log('Moderator status:', isModerator);
+    dbg('Moderator status:', isModerator);
     
     if (isModerator) {
       var adminBtn = el('forum-admin-panel-btn');
       if (adminBtn) {
         adminBtn.style.display = 'block';
-        console.log('✅ Moderator panel button shown');
+        dbg('✅ Moderator panel button shown');
       } else {
         console.error('❌ Admin panel button element not found!');
       }
@@ -17889,7 +17899,7 @@ async function initForum() {
     console.error('Error in mod check:', err);
   }
   
-  console.log('Loading forum categories...');
+  dbg('Loading forum categories...');
   await loadForumCategories();
 }
 
@@ -17897,7 +17907,7 @@ async function initForum() {
  * Load forum categories
  */
 async function loadForumCategories() {
-  console.log('📂 Loading forum categories...');
+  dbg('📂 Loading forum categories...');
   
   var list = el('forum-categories-list');
   if (!list) {
@@ -17919,7 +17929,7 @@ async function loadForumCategories() {
       return;
     }
     
-    console.log('✅ Categories loaded:', categories.length);
+    dbg('✅ Categories loaded:', categories.length);
     
     if (!categories || categories.length === 0) {
       console.warn('⚠️ No categories found in database!');
@@ -17931,7 +17941,7 @@ async function loadForumCategories() {
     
     for (var i = 0; i < categories.length; i++) {
       var cat = categories[i];
-      console.log('Creating card for category:', cat.name);
+      dbg('Creating card for category:', cat.name);
       
       // Get thread count
       var { count } = await supabaseClient
@@ -17959,7 +17969,7 @@ async function loadForumCategories() {
       list.appendChild(card);
     }
     
-    console.log('✅ Forum categories displayed successfully!');
+    dbg('✅ Forum categories displayed successfully!');
   } catch (err) {
     console.error('❌ Exception in loadForumCategories:', err);
     list.innerHTML = '<div class="forum-empty-state"><div class="forum-empty-state-icon">😞</div><p>Error: ' + err.message + '</p></div>';
@@ -18792,7 +18802,7 @@ async function loadAllPetTitles() {
     
     if (res.data) {
       allPetTitles = res.data;
-      console.log('🏷️ Pet titles loaded:', allPetTitles.length, 'available');
+      dbg('🏷️ Pet titles loaded:', allPetTitles.length, 'available');
     }
   } catch (err) {
     console.error('[Pet Titles] Error loading titles:', err);
@@ -18834,7 +18844,7 @@ async function awardPetTitle(petId, titleKey, reason) {
   
   // Check if already has this title
   if (petHasTitle(petId, titleKey)) {
-    console.log('[Pet Title] Already unlocked:', titleKey, 'for pet', petId);
+    dbg('[Pet Title] Already unlocked:', titleKey, 'for pet', petId);
     return;
   }
   
@@ -18876,7 +18886,7 @@ async function awardPetTitle(petId, titleKey, reason) {
     // Show notification
     showPetTitleUnlockNotification(petId, title, reason);
     
-    console.log('🏷️✨ Pet title unlocked:', title.display_name, 'for pet', petId);
+    dbg('🏷️✨ Pet title unlocked:', title.display_name, 'for pet', petId);
     
   } catch (err) {
     console.error('[Pet Title] Error awarding title:', err);
@@ -19054,7 +19064,7 @@ async function checkVariantUnlock(petId, level) {
   
   // If pet already has a variant, don't unlock another one
   if (pet.variant) {
-    console.log('[Variant] Pet already has variant:', pet.variant);
+    dbg('[Variant] Pet already has variant:', pet.variant);
     return;
   }
   
@@ -19072,7 +19082,7 @@ async function checkVariantUnlock(petId, level) {
   }
   
   if (!variantToUnlock) {
-    console.log('[Variant] No variant unlocked at level', level);
+    dbg('[Variant] No variant unlocked at level', level);
     return;
   }
   
@@ -19102,7 +19112,7 @@ async function checkVariantUnlock(petId, level) {
       variantData.icon + ' ' + variantData.name + '</span>!',
       6000, variantData.color);
     
-    console.log('✨ Variant unlocked:', variantToUnlock, 'for pet', petId);
+    dbg('✨ Variant unlocked:', variantToUnlock, 'for pet', petId);
     
     // Award variant badge
     await awardBadge('variant_unlock');
@@ -19181,7 +19191,7 @@ async function unlockTwitchVariant(petId, variantKey, rewardInfo) {
     // Reload pet display
     tabsLoaded['mypets'] = false;
     
-    console.log('✨ Twitch variant unlocked:', variantKey, 'for pet', petId);
+    dbg('✨ Twitch variant unlocked:', variantKey, 'for pet', petId);
     return true;
     
   } catch (err) {
@@ -19255,7 +19265,7 @@ async function checkTwitchRewardRedemptions() {
   //   }
   // }
   
-  console.log('[TwitchVariant] Checked for pending redemptions');
+  dbg('[TwitchVariant] Checked for pending redemptions');
 }
 
 // Get list of available stream reward variants for a pet
@@ -19391,7 +19401,7 @@ async function loadAllPlayerTitles() {
     
     if (res.data) {
       allPlayerTitles = res.data;
-      console.log('👑 Player titles loaded:', allPlayerTitles.length, 'available');
+      dbg('👑 Player titles loaded:', allPlayerTitles.length, 'available');
     }
   } catch (err) {
     console.error('[Player Titles] Error loading titles:', err);
@@ -19410,7 +19420,7 @@ async function loadPlayerTitles() {
     
     if (res.data) {
       playerTitlesCache = res.data.map(function(upt) { return upt.player_titles; });
-      console.log('👑 User player titles loaded:', playerTitlesCache.length, 'unlocked');
+      dbg('👑 User player titles loaded:', playerTitlesCache.length, 'unlocked');
       return playerTitlesCache;
     }
     
@@ -19434,7 +19444,7 @@ async function loadActivePlayerTitle() {
     
     if (res.data && res.data.active_player_title_id) {
       activePlayerTitle = res.data.player_titles;
-      console.log('👑 Active player title:', activePlayerTitle?.display_name || 'None');
+      dbg('👑 Active player title:', activePlayerTitle?.display_name || 'None');
       return activePlayerTitle;
     }
     
@@ -19457,7 +19467,7 @@ async function awardPlayerTitle(titleKey, reason) {
   
   // Check if already has this title
   if (hasPlayerTitle(titleKey)) {
-    console.log('[Player Title] Already unlocked:', titleKey);
+    dbg('[Player Title] Already unlocked:', titleKey);
     return;
   }
   
@@ -19496,7 +19506,7 @@ async function awardPlayerTitle(titleKey, reason) {
     // Show notification
     showPlayerTitleUnlockNotification(title, reason);
     
-    console.log('👑✨ Player title unlocked:', title.display_name);
+    dbg('👑✨ Player title unlocked:', title.display_name);
     
   } catch (err) {
     console.error('[Player Title] Error awarding title:', err);
@@ -20579,7 +20589,7 @@ var weatherSystem = {
     // Update weather display if element exists
     this.updateWeatherDisplay();
     
-    console.log('🌤️ Weather changed to:', this.currentWeather.name);
+    dbg('🌤️ Weather changed to:', this.currentWeather.name);
   },
   
   updateWeatherDisplay: function() {
@@ -20860,7 +20870,7 @@ var worldEvents = {
     
     this.displayEvent();
     
-    console.log('🎪 New event:', event.name, '| Effects:', event.effects);
+    dbg('🎪 New event:', event.name, '| Effects:', event.effects);
   },
   
   displayEvent: function() {
@@ -21455,12 +21465,12 @@ async function checkTutorialStatus() {
       playerSettings.tutorial_completed = res.data.tutorial_completed || false;
       playerSettings.spooky_enabled = res.data.spooky_enabled || false;
       
-      console.log('Tutorial status:', playerSettings.tutorial_completed);
-      console.log('Spooky enabled:', playerSettings.spooky_enabled);
+      dbg('Tutorial status:', playerSettings.tutorial_completed);
+      dbg('Spooky enabled:', playerSettings.spooky_enabled);
       
       // Start tutorial if not completed
       if (!playerSettings.tutorial_completed) {
-        console.log('Starting tutorial for new player...');
+        dbg('Starting tutorial for new player...');
         setTimeout(function() {
           if (typeof Tutorial !== 'undefined') {
             Tutorial.start();
@@ -21478,7 +21488,7 @@ async function checkTutorialStatus() {
 // ═══════════════════════════════════════════════════════════════════════
 
 async function loadSettings() {
-  console.log('Loading settings page...');
+  dbg('Loading settings page...');
   
   if (!currentUser) return;
   
@@ -21582,7 +21592,7 @@ async function saveSettings() {
     // Apply settings immediately
     applySettings();
     
-    console.log('Settings saved!', playerSettings);
+    dbg('Settings saved!', playerSettings);
     showToast('Settings saved! ✅');
     
   } catch (err) {
@@ -21593,7 +21603,7 @@ async function saveSettings() {
 
 // Apply settings to the game
 function applySettings() {
-  console.log('Applying settings...', playerSettings);
+  dbg('Applying settings...', playerSettings);
   
   // Music toggle
   if (playerSettings.music_enabled) {
@@ -22436,7 +22446,7 @@ function onCompanionMessage() {
 // ══════════════════════════════════════════════════════════════════════════
 
 async function loadStatistics() {
-  console.log('📊 Loading statistics...');
+  dbg('📊 Loading statistics...');
   var container = el('stats-container');
   if (!container) return;
   
@@ -22530,7 +22540,7 @@ async function loadStatistics() {
       </div>
     `;
     
-    console.log('✅ Statistics loaded successfully');
+    dbg('✅ Statistics loaded successfully');
     
   } catch (error) {
     console.error('❌ Statistics loading error:', error);
@@ -22730,7 +22740,7 @@ async function scrapbook_addMemory(userPetId, memoryType, variables) {
             scrapbook_refreshMemories(userPetId);
         }
         
-        console.log('📖 Scrapbook: ' + memoryText);
+        dbg('📖 Scrapbook: ' + memoryText);
         return true;
         
     } catch(e) {
@@ -22798,7 +22808,7 @@ async function scrapbook_refreshMemories(userPetId) {
 // Initialize
 function scrapbook_init() {
     scrapbook_loadCooldowns();
-    console.log('📖 Scrapbook system initialized');
+    dbg('📖 Scrapbook system initialized');
 }
 
 
@@ -23056,7 +23066,7 @@ function community_showToast(message, type) {
   if (typeof showToast === 'function') {
     showToast(message);
   } else {
-    console.log('[Community] ' + message);
+    dbg('[Community] ' + message);
     var toast = document.createElement('div');
     toast.textContent = message;
     toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#333;color:white;padding:10px 20px;border-radius:8px;z-index:9999;';
@@ -23074,7 +23084,7 @@ function community_init() {
       community_syncToDatabase();
     }
   });
-  console.log('🌍 Community Goals system initialized');
+  dbg('🌍 Community Goals system initialized');
 }
 
 
@@ -23090,11 +23100,11 @@ function community_init() {
   
   // Exit immediately if desktop
   if (!isMobile()) {
-    console.log('Desktop mode - mobile menu disabled');
+    dbg('Desktop mode - mobile menu disabled');
     return;
   }
   
-  console.log('Mobile mode - initializing mobile menu');
+  dbg('Mobile mode - initializing mobile menu');
   
   // Initialize mobile menu on DOM ready
   function initMobileMenu() {
@@ -23206,7 +23216,7 @@ function community_init() {
       }
     });
     
-    console.log('Mobile menu initialized');
+    dbg('Mobile menu initialized');
   }
   
   // Initialize when DOM is ready
@@ -23217,7 +23227,11 @@ function community_init() {
   }
   
   // Handle window resize - reinitialize or cleanup
-  window.addEventListener('resize', function() {
+  // Store reference so it can be removed if needed (prevent duplicate listeners)
+  if (window._mobileResizeHandler) {
+    window.removeEventListener('resize', window._mobileResizeHandler);
+  }
+  window._mobileResizeHandler = function() {
     if (!isMobile()) {
       // Desktop mode - remove mobile elements
       var menu = document.getElementById('mobile-menu');
@@ -23237,7 +23251,8 @@ function community_init() {
       if (menu) menu.style.display = '';
       if (hamburger && window.innerWidth <= 768) hamburger.style.display = '';
     }
-  });
+  };
+  window.addEventListener('resize', window._mobileResizeHandler);
   
 })();
 
@@ -23290,14 +23305,14 @@ async function phase1_init() {
   }
   
   if (phase1_state.isInitialized) {
-    console.log('ℹ️ Phase 1: Already initialized');
+    dbg('ℹ️ Phase 1: Already initialized');
     return;
   }
   
-  console.log('📦 Phase 1: Initializing...');
+  dbg('📦 Phase 1: Initializing...');
   
   // DEBUG: Check table accessibility
-  console.log('🔍 Phase 1 Debug: Checking database tables...');
+  dbg('🔍 Phase 1 Debug: Checking database tables...');
   var tables = ['daily_featured_pet', 'unlocked_cosmetics', 'weekly_spotlight', 'player_milestones'];
   for (var i = 0; i < tables.length; i++) {
     var table = tables[i];
@@ -23306,7 +23321,7 @@ async function phase1_init() {
       if (error) {
         console.error('❌ Phase 1: Table', table, 'error:', error.message);
       } else {
-        console.log('✅ Phase 1: Table', table, 'accessible');
+        dbg('✅ Phase 1: Table', table, 'accessible');
       }
     } catch (e) {
       console.error('❌ Phase 1: Table', table, 'check failed:', e);
@@ -23317,10 +23332,10 @@ async function phase1_init() {
   try {
     var { data: samplePet } = await supabaseClient.from('user_pets').select('*').limit(1).single();
     if (samplePet) {
-      console.log('📊 Phase 1 Debug: user_pets columns:', Object.keys(samplePet));
+      dbg('📊 Phase 1 Debug: user_pets columns:', Object.keys(samplePet));
     }
   } catch (e) {
-    console.log('📊 Phase 1 Debug: Could not sample user_pets (may be empty)');
+    dbg('📊 Phase 1 Debug: Could not sample user_pets (may be empty)');
   }
   
   try {
@@ -23330,7 +23345,7 @@ async function phase1_init() {
     await phase1_checkAllUnlocks();
     
     phase1_state.isInitialized = true;
-    console.log('✅ Phase 1: Initialized successfully');
+    dbg('✅ Phase 1: Initialized successfully');
     
     // NEW FEATURES: Initialize wrapper features
     await newFeatures_init();
@@ -23380,7 +23395,7 @@ async function phase1_loadUnlockedCosmetics() {
       .filter(function(c) { return c.cosmetic_type === 'badge'; })
       .map(function(c) { return c.cosmetic_id; });
     
-    console.log('✅ Phase 1: Loaded cosmetics - Backgrounds:', phase1_state.unlockedBackgrounds.length, 
+    dbg('✅ Phase 1: Loaded cosmetics - Backgrounds:', phase1_state.unlockedBackgrounds.length, 
                 'Frames:', phase1_state.unlockedFrames.length, 
                 'Badges:', phase1_state.unlockedBadges.length);
   } catch (error) {
@@ -23400,7 +23415,7 @@ async function phase1_unlockCosmetic(type, cosmeticId) {
     // Check if already unlocked
     var unlocked = phase1_state['unlocked' + type.charAt(0).toUpperCase() + type.slice(1) + 's'];
     if (unlocked && unlocked.indexOf(cosmeticId) !== -1) {
-      console.log('ℹ️ Phase 1: Cosmetic already unlocked:', type, cosmeticId);
+      dbg('ℹ️ Phase 1: Cosmetic already unlocked:', type, cosmeticId);
       return false; // Already unlocked
     }
     
@@ -23422,7 +23437,7 @@ async function phase1_unlockCosmetic(type, cosmeticId) {
       showToast('🎨 New cosmetic unlocked!', 'success', true);
     }
     
-    console.log('✅ Phase 1: Unlocked cosmetic:', type, cosmeticId);
+    dbg('✅ Phase 1: Unlocked cosmetic:', type, cosmeticId);
     return true;
   } catch (error) {
     console.error('❌ Phase 1: Error unlocking cosmetic:', error);
@@ -23456,7 +23471,7 @@ async function phase1_applyCosmetic(type, cosmeticId) {
       showToast('✅ Cosmetic applied!', 'success');
     }
     
-    console.log('✅ Phase 1: Applied cosmetic:', type, cosmeticId);
+    dbg('✅ Phase 1: Applied cosmetic:', type, cosmeticId);
   } catch (error) {
     console.error('❌ Phase 1: Error applying cosmetic:', error);
     if (typeof showToast === 'function') {
@@ -23484,12 +23499,12 @@ async function phase1_loadPetOfTheDay() {
     }
     
     if (!data) {
-      console.log('ℹ️ Phase 1: No pet of the day yet - generating...');
+      dbg('ℹ️ Phase 1: No pet of the day yet - generating...');
       await phase1_generatePetOfTheDay();
     } else {
       phase1_state.petOfTheDay = data;
       phase1_displayPetOfTheDay();
-      console.log('✅ Phase 1: Loaded pet of the day:', data.pet_name);
+      dbg('✅ Phase 1: Loaded pet of the day:', data.pet_name);
     }
   } catch (error) {
     console.error('❌ Phase 1: Error loading pet of the day:', error);
@@ -23550,7 +23565,7 @@ async function phase1_generatePetOfTheDay() {
     
     if (insertError) throw insertError;
     
-    console.log('✅ Phase 1: Generated pet of the day:', selected.name);
+    dbg('✅ Phase 1: Generated pet of the day:', selected.name);
     await phase1_loadPetOfTheDay(); // Reload
   } catch (error) {
     console.error('❌ Phase 1: Error generating pet of the day:', error);
@@ -23585,7 +23600,7 @@ function phase1_displayPetOfTheDay() {
       '<div class="phase1-pet-of-day-quote">"' + escapeHtml(pet.featured_quote) + '"</div>' +
       '</div></div></div>';
     
-    console.log('✅ Phase 1: Displayed pet of the day');
+    dbg('✅ Phase 1: Displayed pet of the day');
   } catch (error) {
     console.error('❌ Phase 1: Error displaying pet of the day:', error);
   }
@@ -23610,12 +23625,12 @@ async function phase1_loadWeeklySpotlight() {
     }
     
     if (!data) {
-      console.log('ℹ️ Phase 1: No spotlight yet - generating...');
+      dbg('ℹ️ Phase 1: No spotlight yet - generating...');
       await phase1_generateWeeklySpotlight();
     } else {
       phase1_state.weeklySpotlight = data;
       phase1_displayWeeklySpotlight();
-      console.log('✅ Phase 1: Loaded weekly spotlight');
+      dbg('✅ Phase 1: Loaded weekly spotlight');
     }
   } catch (error) {
     console.error('❌ Phase 1: Error loading spotlight:', error);
@@ -23657,7 +23672,7 @@ async function phase1_generateWeeklySpotlight() {
     
     if (insertError) throw insertError;
     
-    console.log('✅ Phase 1: Generated weekly spotlight');
+    dbg('✅ Phase 1: Generated weekly spotlight');
     await phase1_loadWeeklySpotlight();
   } catch (error) {
     console.error('❌ Phase 1: Error generating spotlight:', error);
@@ -23687,7 +23702,7 @@ function phase1_displayWeeklySpotlight() {
       '<div class="phase1-spotlight-details">Featured Player of the Week!</div>' +
       '</div></div>';
     
-    console.log('✅ Phase 1: Displayed weekly spotlight');
+    dbg('✅ Phase 1: Displayed weekly spotlight');
   } catch (error) {
     console.error('❌ Phase 1: Error displaying spotlight:', error);
   }
@@ -23721,7 +23736,7 @@ async function phase1_checkMilestone(milestoneType, currentValue) {
       .single();
     
     if (existing) {
-      console.log('ℹ️ Phase 1: Milestone already achieved:', milestoneType);
+      dbg('ℹ️ Phase 1: Milestone already achieved:', milestoneType);
       return; // Already achieved
     }
     
@@ -23737,7 +23752,7 @@ async function phase1_checkMilestone(milestoneType, currentValue) {
     
     if (error) throw error;
     
-    console.log('✅ Phase 1: Milestone achieved:', milestoneType);
+    dbg('✅ Phase 1: Milestone achieved:', milestoneType);
     
     // Trigger celebration
     phase1_celebrateMilestone(milestoneType, currentValue);
@@ -23837,7 +23852,7 @@ async function phase1_unlockMilestoneRewards(milestoneType) {
     
     var rewardList = rewards[milestoneType];
     if (!rewardList) {
-      console.log('ℹ️ Phase 1: No rewards for milestone:', milestoneType);
+      dbg('ℹ️ Phase 1: No rewards for milestone:', milestoneType);
       return;
     }
     
@@ -23846,7 +23861,7 @@ async function phase1_unlockMilestoneRewards(milestoneType) {
       await phase1_unlockCosmetic(reward.type, reward.id);
     }
     
-    console.log('✅ Phase 1: Unlocked', rewardList.length, 'rewards for', milestoneType);
+    dbg('✅ Phase 1: Unlocked', rewardList.length, 'rewards for', milestoneType);
   } catch (error) {
     console.error('❌ Phase 1: Error unlocking milestone rewards:', error);
   }
@@ -23860,7 +23875,7 @@ async function phase1_checkAllUnlocks() {
   if (!currentUser) return;
   
   try {
-    console.log('🔍 Phase 1: Checking all milestone unlocks...');
+    dbg('🔍 Phase 1: Checking all milestone unlocks...');
     
     // Get player stats from existing data
     var totalBattles = currentUser.total_battles || 0;
@@ -23895,7 +23910,7 @@ async function phase1_checkAllUnlocks() {
     if (totalPets >= 10) await phase1_checkMilestone('pets_10', totalPets);
     if (totalPets >= 20) await phase1_checkMilestone('pets_20', totalPets);
     
-    console.log('✅ Phase 1: Milestone check complete');
+    dbg('✅ Phase 1: Milestone check complete');
   } catch (error) {
     console.error('❌ Phase 1: Error checking unlocks:', error);
   }
@@ -23954,7 +23969,7 @@ async function phase1_onPetAdopt() {
 
 // Test function - Run in console to verify Phase 1
 async function test_phase1() {
-  console.log('🧪 Testing Phase 1 features...');
+  dbg('🧪 Testing Phase 1 features...');
   
   var passed = 0;
   var failed = 0;
@@ -23980,7 +23995,7 @@ async function test_phase1() {
   for (var i = 0; i < requiredFunctions.length; i++) {
     var fn = requiredFunctions[i];
     if (typeof window[fn] === 'function') {
-      console.log('✅', fn, 'exists');
+      dbg('✅', fn, 'exists');
       passed++;
     } else {
       console.error('❌', fn, 'missing');
@@ -23997,7 +24012,7 @@ async function test_phase1() {
   for (var i = 0; i < requiredElements.length; i++) {
     var el = requiredElements[i];
     if (document.getElementById(el)) {
-      console.log('✅', el, 'exists in DOM');
+      dbg('✅', el, 'exists in DOM');
       passed++;
     } else {
       console.warn('⚠️', el, 'missing from DOM (may not be added yet)');
@@ -24006,11 +24021,11 @@ async function test_phase1() {
   
   // Test 3: Check state
   if (phase1_state) {
-    console.log('✅ phase1_state exists');
-    console.log('   isInitialized:', phase1_state.isInitialized);
-    console.log('   unlockedBackgrounds:', phase1_state.unlockedBackgrounds.length);
-    console.log('   unlockedFrames:', phase1_state.unlockedFrames.length);
-    console.log('   unlockedBadges:', phase1_state.unlockedBadges.length);
+    dbg('✅ phase1_state exists');
+    dbg('   isInitialized:', phase1_state.isInitialized);
+    dbg('   unlockedBackgrounds:', phase1_state.unlockedBackgrounds.length);
+    dbg('   unlockedFrames:', phase1_state.unlockedFrames.length);
+    dbg('   unlockedBadges:', phase1_state.unlockedBadges.length);
     passed++;
   } else {
     console.error('❌ phase1_state missing');
@@ -24019,30 +24034,30 @@ async function test_phase1() {
   
   // Test 4: Check if initialized
   if (phase1_state && phase1_state.isInitialized) {
-    console.log('✅ Phase 1 is initialized');
+    dbg('✅ Phase 1 is initialized');
     passed++;
   } else {
     console.warn('⚠️ Phase 1 not initialized yet (run phase1_init())');
   }
   
-  console.log('\n📈 Results:', passed, 'passed,', failed, 'failed');
+  dbg('\n📈 Results:', passed, 'passed,', failed, 'failed');
   
   if (failed === 0) {
-    console.log('🎉 Phase 1 verification PASSED!');
+    dbg('🎉 Phase 1 verification PASSED!');
   } else {
-    console.log('⚠️ Phase 1 needs fixes - check errors above');
+    dbg('⚠️ Phase 1 needs fixes - check errors above');
   }
   
-  console.log('\n📊 Manual checks needed:');
-  console.log('1. Run this in Supabase SQL Editor: SELECT * FROM daily_featured_pet;');
-  console.log('2. Run this in Supabase SQL Editor: SELECT * FROM unlocked_cosmetics WHERE user_id = \'', currentUser ? currentUser.id : 'YOUR_USER_ID', '\';');
-  console.log('3. Check browser console for "✅ Phase 1: Initialized successfully"');
-  console.log('4. Win 10 battles and watch for celebration popup');
+  dbg('\n📊 Manual checks needed:');
+  dbg('1. Run this in Supabase SQL Editor: SELECT * FROM daily_featured_pet;');
+  dbg('2. Run this in Supabase SQL Editor: SELECT * FROM unlocked_cosmetics WHERE user_id = \'', currentUser ? currentUser.id : 'YOUR_USER_ID', '\';');
+  dbg('3. Check browser console for "✅ Phase 1: Initialized successfully"');
+  dbg('4. Win 10 battles and watch for celebration popup');
 }
 
 // Quick test for milestone celebrations
 async function test_phase1_milestone() {
-  console.log('🧪 Testing milestone celebration...');
+  dbg('🧪 Testing milestone celebration...');
   
   if (!currentUser) {
     console.error('❌ No user logged in');
@@ -24052,13 +24067,13 @@ async function test_phase1_milestone() {
   // Force a celebration
   phase1_celebrateMilestone('battle_10', 10);
   
-  console.log('✅ Check if celebration popup appeared');
-  console.log('   (It should fade out after 4 seconds)');
+  dbg('✅ Check if celebration popup appeared');
+  dbg('   (It should fade out after 4 seconds)');
 }
 
 // Quick test for cosmetics unlock
 async function test_phase1_cosmetic() {
-  console.log('🧪 Testing cosmetic unlock...');
+  dbg('🧪 Testing cosmetic unlock...');
   
   if (!currentUser) {
     console.error('❌ No user logged in');
@@ -24069,10 +24084,10 @@ async function test_phase1_cosmetic() {
   var result = await phase1_unlockCosmetic('background', 'bg_forest');
   
   if (result) {
-    console.log('✅ Cosmetic unlocked successfully');
-    console.log('   Check if toast notification appeared');
+    dbg('✅ Cosmetic unlocked successfully');
+    dbg('   Check if toast notification appeared');
   } else {
-    console.log('ℹ️ Cosmetic was already unlocked or failed');
+    dbg('ℹ️ Cosmetic was already unlocked or failed');
   }
 }
 
@@ -24101,7 +24116,7 @@ function cleanupExpiredLocalStorage() {
   });
   
   if (keysToRemove.length > 0) {
-    console.log('🧹 Cleaned up', keysToRemove.length, 'expired localStorage items');
+    dbg('🧹 Cleaned up', keysToRemove.length, 'expired localStorage items');
   }
 }
 
@@ -24116,7 +24131,7 @@ function closeMobileMenu() {
   if (menu) menu.classList.remove('open');
   if (overlay) overlay.classList.remove('show');
   document.body.style.overflow = '';
-  console.log('📱 Mobile menu closed');
+  dbg('📱 Mobile menu closed');
 }
 
 
@@ -24152,11 +24167,11 @@ async function skinkey_loadUserData() {
     var { data: player } = await supabaseClient.from('players').select('skin_keys').eq('id', currentUser.id).single();
     if (player) {
       skinKeyState.keys = player.skin_keys || 0;
-      console.log('🔑 Skin Keys:', skinKeyState.keys);
+      dbg('🔑 Skin Keys:', skinKeyState.keys);
     }
     var petIds = Object.keys(petState || {});
     if (petIds.length === 0) {
-      console.log('✨ No pets yet, skipping variant load');
+      dbg('✨ No pets yet, skipping variant load');
       return;
     }
     var { data: unlocked } = await supabaseClient.from('unlocked_variants').select('user_pet_id, variant_id').in('user_pet_id', petIds);
@@ -24168,7 +24183,7 @@ async function skinkey_loadUserData() {
         }
         skinKeyState.unlockedVariants[row.user_pet_id].push(row.variant_id);
       });
-      console.log('✨ Unlocked variants loaded:', Object.keys(skinKeyState.unlockedVariants).length, 'pets');
+      dbg('✨ Unlocked variants loaded:', Object.keys(skinKeyState.unlockedVariants).length, 'pets');
     }
     var { data: pets } = await supabaseClient.from('user_pets').select('id, current_variant').eq('user_id', currentUser.id);
     if (pets) {
@@ -24228,7 +24243,7 @@ async function skinkey_unlockVariant(userPetId, variantId) {
     skinkey_updateDisplay();
     var variantName = BASIC_VARIANTS[variantId].name;
     showToast('✨ Unlocked ' + variantName + ' variant!', 'success', true);
-    console.log('🔑 Unlocked variant:', variantId, 'for pet', userPetId);
+    dbg('🔑 Unlocked variant:', variantId, 'for pet', userPetId);
     return true;
   } catch (error) {
     console.error('❌ Error unlocking variant:', error);
@@ -24266,7 +24281,7 @@ async function skinkey_applyVariant(userPetId, variantId) {
     } else {
       showToast('Removed variant', 'info');
     }
-    console.log('✨ Applied variant:', variantId, 'to pet', userPetId);
+    dbg('✨ Applied variant:', variantId, 'to pet', userPetId);
     return true;
   } catch (error) {
     console.error('❌ Error applying variant:', error);
@@ -24510,7 +24525,7 @@ async function skinkey_grantKeys(amount, reason) {
     // Refresh from DB to ensure displayed count is accurate
     await skinkey_loadUserData();
     showToast('🔑 Received ' + amount + ' Skin Key' + (amount > 1 ? 's' : '') + '!', 'success');
-    console.log('🔑 Granted', amount, 'skin keys:', reason);
+    dbg('🔑 Granted', amount, 'skin keys:', reason);
     return true;
   } catch (error) {
     console.error('❌ Error granting skin keys:', error);
@@ -24520,9 +24535,9 @@ async function skinkey_grantKeys(amount, reason) {
 
 async function skinkey_init() {
   if (!currentUser) return;
-  console.log('🔑 Initializing Skin Key system...');
+  dbg('🔑 Initializing Skin Key system...');
   await skinkey_loadUserData();
-  console.log('✅ Skin Key system ready');
+  dbg('✅ Skin Key system ready');
 }
 
 function skinkey_isVariantUnlocked(userPetId, variantId) {
@@ -24941,7 +24956,7 @@ function todayBanner_toggle() {
 
 function today_applyEffects() {
   // Effects applied automatically by checking todayFeatures.current
-  console.log('✅ Today features loaded:', todayFeatures.current);
+  dbg('✅ Today features loaded:', todayFeatures.current);
 }
 
 function today_getMultiplier(type) {
@@ -25746,7 +25761,7 @@ async function pass_grantXP(amount, source) {
       });
     
     if (result && result.success) {
-      console.log('✅ Pass XP granted:', result);
+      dbg('✅ Pass XP granted:', result);
       
       if (result.leveled_up) {
         pass_showLevelUpNotification(result.new_level);
@@ -26091,7 +26106,7 @@ loadPassProgress = async function() {
   pass_updateNavbar();
 };
 
-console.log('✅ PawketPass UI system loaded (wrapper pattern)');
+dbg('✅ PawketPass UI system loaded (wrapper pattern)');
 // ═══════════════════════════════════════════════════════════════════════════
 // CENTERED MODAL NOTIFICATION SYSTEM
 // Completely standalone - does NOT modify any existing functions
@@ -26543,7 +26558,7 @@ function showRareDropModal(title, message, onConfirm) {
   return showCenteredModal(title, message, '✨', onConfirm);
 }
 
-console.log('✅ Centered modal notification system loaded');
+dbg('✅ Centered modal notification system loaded');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FRIENDSHIP GIFTING SYSTEM
@@ -27117,7 +27132,7 @@ async function polls_loadPastResults(mountId) {
   }
 }
 
-console.log('✅ Gifting & Polls systems loaded');
+dbg('✅ Gifting & Polls systems loaded');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN PANEL — Poll Management (Embertail only)
