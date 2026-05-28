@@ -280,6 +280,7 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
           👥 Friends
           <span class="friend-request-badge" id="friend-request-badge" style="display:none;">0</span>
         </button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-guild" onclick="showTab('guild')">🏛️ Guild</button>
         <button class="sidebar-nav-btn" id="sidebar-btn-leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</button>
         <button class="sidebar-nav-btn" id="sidebar-btn-stats" onclick="showTab('stats')">📊 Statistics</button>
         <button class="sidebar-nav-btn" id="sidebar-btn-team" onclick="showTab('team')">👥 Team</button>
@@ -307,6 +308,7 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
             👥 Friends
             <span class="friend-request-badge" id="friend-request-badge" style="display:none;">0</span>
           </button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-guild" onclick="showTab('guild')">🏛️ Guild</button>
           <button class="sidebar-nav-btn" id="sidebar-btn-leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</button>
           <button class="sidebar-nav-btn" id="sidebar-btn-stats" onclick="showTab('stats')">📊 Statistics</button>
           <button class="sidebar-nav-btn" id="sidebar-btn-team" onclick="showTab('team')">👥 Team</button>
@@ -1211,6 +1213,20 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
   <!-- ═══════════════════════════════════════════════════════════
        LEADERBOARDS
        ═══════════════════════════════════════════════════════════ -->
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       GUILD SECTION
+       ═══════════════════════════════════════════════════════════════ -->
+  <div class="page-section" id="section-guild">
+    <div class="section-inner">
+      <div class="section-header">
+        <h2 class="section-title">🏛️ Guild</h2>
+      </div>
+      <!-- Guild content injected by loadGuildPage() -->
+      <div id="guild-content"><div class="spinner"></div></div>
+    </div>
+  </div>
+
   <div class="page-section" id="section-leaderboard">
     <div class="page-wrap">
       <div class="page-hero">

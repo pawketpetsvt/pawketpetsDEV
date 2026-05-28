@@ -16513,3 +16513,24 @@ body.night-mode .item-icon-img {
   }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GUILD SYSTEM
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#section-guild .section-inner {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+#guild-content > div {
+  animation: fadeIn 0.2s ease;
+}
+
+/* Dungeon cards row */
+#guild-content [id^="dungeon-card-"]:hover {
+  border-color: var(--purple) !important;
+  background: rgba(153,102,255,0.08) !important;
+  transform: translateY(-2px);
+}
+
