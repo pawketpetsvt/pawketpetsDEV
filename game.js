@@ -1134,7 +1134,7 @@ function calendar_render(days) {
 function initEventStatusWidget() {
   updateEventStatusWidget();
   // Refresh every minute
-  setInterval(updateEventStatusWidget, 60000);
+  safeSetInterval(updateEventStatusWidget, 60000);
   // Hover tooltip
   var widget = document.getElementById('event-status-widget');
   if (widget) {
@@ -1684,7 +1684,7 @@ async function showApp(user) {
   await updateNotificationBadge(); // Update notification count
   
   // Refresh notifications every 60 seconds
-  setInterval(updateNotificationBadge, 60000);
+  safeSetInterval(updateNotificationBadge, 60000);
 
   var bonus = await checkDailyBonus(user.id);
   if (bonus.awarded) {
@@ -1766,7 +1766,7 @@ async function showApp(user) {
   // CLEANUP: Remove expired localStorage items
   cleanupExpiredLocalStorage();
   // Also clean up every hour for long sessions
-  setInterval(cleanupExpiredLocalStorage, 3600000);
+  safeSetInterval(cleanupExpiredLocalStorage, 3600000);
 }
 
 function showAuth() {
@@ -1929,8 +1929,12 @@ async function awardStreakReward(streak) {
   }
 }
 
-async function handleLogout() { 
-  await supabaseClient.auth.signOut(); 
+async function handleLogout() {
+  cleanupAllTimers();
+  if (typeof CompanionBuddy !== 'undefined' && CompanionBuddy.destroy) {
+    CompanionBuddy.destroy();
+  }
+  await supabaseClient.auth.signOut();
   location.reload();
 }
 function closeBonusModal() { el('bonus-modal').classList.remove('show'); }
@@ -3641,6 +3645,8 @@ function expedition_updateStartBtn() {
 }
 
 async function expedition_start() {
+  if (raceState && raceState.racing) return; // belt-and-braces
+  if (!canPerformAction('expedition_start', 5000)) return;
   if (!_expeditionPetId || !_expeditionZoneKey || !currentUser) return;
   var btn = document.getElementById('expedition-start-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
@@ -3957,6 +3963,7 @@ function race_setBet(amount) {
 // ── Race start ────────────────────────────────────────────────────────────
 async function race_start() {
   if (raceState.racing) return;
+  if (!canPerformAction('race_start', 3000)) return;
   if (raceState.racesLeft <= 0) { showToast('No races left today!', 3000); return; }
   if (raceState.selectedPets.length < 1) { showToast('Select at least 1 pet!', 2000); return; }
   if (currentPoints < raceState.bet) { showToast('Not enough PP!', 2500); return; }
@@ -4599,17 +4606,17 @@ async function feedWithItem(petId, itemId, itemName) {
   var reactionMsg = '';
   
   if (reactionType === 'loved') {
-    reactionMsg = '💖 ' + itemName + '! (1.75x bonus!)';
+    reactionMsg = '💖 ' + escapeHtml(itemName) + '! (1.75x bonus!)';
     // SCRAPBOOK: Favorite food discovered
     scrapbook_addMemory(petId, 'favorite_food', { food: itemName });
   } else if (reactionType === 'liked') {
-    reactionMsg = '😊 ' + itemName + '! (1.25x bonus)';
+    reactionMsg = '😊 ' + escapeHtml(itemName) + '! (1.25x bonus)';
   } else if (reactionType === 'disliked') {
-    reactionMsg = '😐 ' + itemName + '... (0.75x effect)';
+    reactionMsg = '😐 ' + escapeHtml(itemName) + '... (0.75x effect)';
   } else if (reactionType === 'hated') {
-    reactionMsg = '😖 Ew, ' + itemName + '! (0.5x effect)';
+    reactionMsg = '😖 Ew, ' + escapeHtml(itemName) + '! (0.5x effect)';
   } else {
-    reactionMsg = '🍽️ Ate ' + itemName + '!';
+    reactionMsg = '🍽️ Ate ' + escapeHtml(itemName) + '!';
   }
   
   if (feedResult.hunger_gained || feedResult.happiness_gained || feedResult.xp_gained) {
@@ -4894,7 +4901,7 @@ async function playWithToy(petId, toyId, toyName) {
     updateLvl(petId, result.new_level, pet.max_hunger);
     tabsLoaded['mypets'] = false;
   } else {
-    showFlash(petId, '🎮 Played with ' + toyName + '! +20 Happiness +10 XP', '#5dde7a');
+    showFlash(petId, '🎮 Played with ' + escapeHtml(toyName) + '! +20 Happiness +10 XP', '#5dde7a');
   }
 }
 
@@ -12493,6 +12500,16 @@ var CompanionBuddy = {
       this.messageInterval = null;
     }
   },
+
+  destroy: function() {
+    this.stopMessageRotation();
+    if (this.bubbleTimeout) {
+      clearTimeout(this.bubbleTimeout);
+      this.bubbleTimeout = null;
+    }
+    this.currentCompanionId = null;
+    this.hide();
+  },
   
   setCompanion: async function(petId) {
     if (!currentUser) return;
@@ -12887,7 +12904,7 @@ tabsLoaded.friends = function() {
 };
 
 // Poll for friend requests every 30 seconds
-setInterval(updateFriendRequestBadge, 30000);
+safeSetInterval(updateFriendRequestBadge, 30000);
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -12906,7 +12923,7 @@ async function startActivityFeed() {
   await loadFriendActivities();
   
   // Rotate through activities every 5 seconds
-  activityFeedInterval = setInterval(rotateActivity, 5000);
+  activityFeedInterval = safeSetInterval(rotateActivity, 5000);
 }
 
 // Stop the activity feed rotation
@@ -13058,7 +13075,7 @@ async function refreshActivityFeed() {
 setTimeout(function() {
   startActivityFeed();
   // Refresh activity feed every 2 minutes
-  setInterval(refreshActivityFeed, 120000);
+  safeSetInterval(refreshActivityFeed, 120000);
 }, 2000);
 
 
@@ -14305,7 +14322,7 @@ showApp = async function(user) {
   await updateNotificationBadge();
   
   // Poll for new notifications every 30 seconds
-  setInterval(updateNotificationBadge, 30000);
+  safeSetInterval(updateNotificationBadge, 30000);
 };
 
 
@@ -18546,7 +18563,7 @@ var worldEvents = {
     
     this.displayEvent();
     
-    setInterval(function() {
+    safeSetInterval(function() {
       if (worldEvents.eventEndDate && new Date() > worldEvents.eventEndDate) {
         worldEvents.generateEvent();
       }
@@ -19125,7 +19142,7 @@ async function loadEquipmentShop() {
     
     container.innerHTML = html;
     
-    setInterval(updateRotationCountdown, 60000);
+    safeSetInterval(updateRotationCountdown, 60000);
     
   } catch (err) {
     container.innerHTML = '<div class="error-state"><p>Failed to load shop.</p></div>';
