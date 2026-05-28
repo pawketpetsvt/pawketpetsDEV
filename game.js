@@ -3393,7 +3393,311 @@ function calculateLevelUp(newXp, currentLevel, currentMaxHunger, currentMaxEnerg
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PET PERSONALITIES — Daily Moods & Wishes
+// TREASURE HUNTING — Expedition System
+// ═══════════════════════════════════════════════════════════════════════════
+
+var EXPEDITION_ZONES = [
+  { key:'outskirts',  label:'Outskirts',     emoji:'🌾', duration:30,  minPP:50,  maxPP:100, rarity:'common',   desc:'Quick scout of the nearby fields.',  energyCost:10 },
+  { key:'forest',     label:'Forest Glade',  emoji:'🌲', duration:45,  minPP:100, maxPP:200, rarity:'uncommon', desc:'Wander through the shady forest.',    energyCost:10 },
+  { key:'deepwoods',  label:'Deep Woods',    emoji:'🍄', duration:60,  minPP:200, maxPP:400, rarity:'rare',     desc:'Brave the dangerous deep woods.',    energyCost:10 },
+  { key:'ruins',      label:'Ancient Ruins', emoji:'🏚️', duration:90,  minPP:400, maxPP:800, rarity:'epic',     desc:'Explore the mysterious old ruins.',   energyCost:10 }
+];
+
+var expeditionState = {
+  active: null,      // current active expedition row from DB
+  timer:  null       // setInterval id for countdown
+};
+
+// Called when minigames tab loads
+async function expedition_init() {
+  var area = document.getElementById('expedition-area');
+  if (!area) return;
+  if (!currentUser) { area.innerHTML = '<p style="color:var(--text-light);text-align:center;">Log in to go exploring!</p>'; return; }
+
+  area.innerHTML = '<div class="spinner"></div>';
+
+  // Check for active or unclaimed expedition
+  var { data: active } = await supabaseClient
+    .from('expeditions')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .eq('claimed', false)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .single()
+    .catch(function() { return { data: null }; });
+
+  expeditionState.active = active || null;
+
+  if (active && !active.completed && new Date(active.ends_at) > new Date()) {
+    expedition_renderCountdown(active);
+  } else if (active && (!active.completed || new Date(active.ends_at) <= new Date())) {
+    // Mark complete if time is up
+    if (!active.completed) {
+      await supabaseClient.from('expeditions').update({ completed: true }).eq('id', active.id);
+      active.completed = true;
+    }
+    expedition_renderClaim(active);
+  } else {
+    expedition_renderSelector();
+  }
+}
+
+// ── Pet + Zone selector UI ──
+function expedition_renderSelector() {
+  var area = document.getElementById('expedition-area');
+  if (!area) return;
+
+  // Eligible pets: level 5+, energy >= 10, not on expedition
+  var eligiblePets = Object.values(petState).filter(function(p) {
+    return (p.level || 1) >= 5 && (p.energy || 0) >= 10;
+  });
+
+  var petOptions = eligiblePets.length === 0
+    ? '<p style="color:#ff6b6b;text-align:center;font-size:0.88rem;">No eligible pets — need level 5+ and 10+ energy.</p>'
+    : '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px;">' +
+      eligiblePets.map(function(p) {
+        return '<button class="btn btn-outline expedition-pet-btn" data-pet-id="' + p.id + '" onclick="expedition_selectPet(\'' + p.id + '\')" style="padding:8px 14px;font-size:0.82rem;">' +
+          (p.nickname || p.pet_type || 'Pet') + ' Lv.' + (p.level || 1) + ' ⚡' + Math.floor(p.energy || 0) +
+          '</button>';
+      }).join('') +
+      '</div>';
+
+  var zoneOptions = EXPEDITION_ZONES.map(function(z) {
+    return '<div class="expedition-zone-card" data-zone="' + z.key + '" onclick="expedition_selectZone(\'' + z.key + '\')" style="cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:8px;transition:all 0.2s;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<span style="font-size:1.1rem;">' + z.emoji + ' <strong>' + z.label + '</strong></span>' +
+        '<span style="font-size:0.78rem;color:var(--text-light);">⏱️ ' + z.duration + ' min | 💰 ' + z.minPP + '-' + z.maxPP + ' PP</span>' +
+      '</div>' +
+      '<div style="font-size:0.78rem;color:var(--text-light);margin-top:4px;">' + z.desc + ' <em>(' + z.rarity + ' drops)</em></div>' +
+    '</div>';
+  }).join('');
+
+  area.innerHTML =
+    '<div id="expedition-selector">' +
+      '<div style="font-weight:700;color:var(--purple-dark);margin-bottom:8px;font-size:0.9rem;">1️⃣ Choose a Pet:</div>' +
+      petOptions +
+      '<div id="expedition-pet-selected" style="margin-bottom:12px;font-size:0.82rem;color:var(--text-light);text-align:center;">No pet selected</div>' +
+      '<div style="font-weight:700;color:var(--purple-dark);margin-bottom:8px;font-size:0.9rem;">2️⃣ Choose a Zone:</div>' +
+      zoneOptions +
+      '<button id="expedition-start-btn" class="btn btn-primary" onclick="expedition_start()" disabled style="width:100%;margin-top:14px;opacity:0.5;">⚡ 10 energy — Send on Expedition!</button>' +
+    '</div>';
+}
+
+var _expeditionPetId  = null;
+var _expeditionZoneKey = null;
+
+function expedition_selectPet(petId) {
+  _expeditionPetId = petId;
+  document.querySelectorAll('.expedition-pet-btn').forEach(function(b) {
+    b.style.background = b.getAttribute('data-pet-id') === petId ? 'var(--purple)' : '';
+    b.style.color      = b.getAttribute('data-pet-id') === petId ? 'white' : '';
+  });
+  var pet = petState[petId];
+  var nameEl = document.getElementById('expedition-pet-selected');
+  if (nameEl && pet) nameEl.textContent = '✅ ' + (pet.nickname || pet.pet_type || 'Pet') + ' selected';
+  expedition_updateStartBtn();
+}
+
+function expedition_selectZone(zoneKey) {
+  _expeditionZoneKey = zoneKey;
+  document.querySelectorAll('.expedition-zone-card').forEach(function(card) {
+    var selected = card.getAttribute('data-zone') === zoneKey;
+    card.style.borderColor  = selected ? 'var(--purple)' : 'var(--border)';
+    card.style.background   = selected ? 'rgba(153,102,255,0.08)' : '';
+  });
+  expedition_updateStartBtn();
+}
+
+function expedition_updateStartBtn() {
+  var btn = document.getElementById('expedition-start-btn');
+  if (!btn) return;
+  var zone = EXPEDITION_ZONES.find(function(z) { return z.key === _expeditionZoneKey; });
+  var ready = _expeditionPetId && _expeditionZoneKey;
+  btn.disabled = !ready;
+  btn.style.opacity = ready ? '1' : '0.5';
+  if (zone && ready) btn.textContent = '⚡ 10 energy — Send to ' + zone.label + '!';
+}
+
+async function expedition_start() {
+  if (!_expeditionPetId || !_expeditionZoneKey || !currentUser) return;
+  var btn = document.getElementById('expedition-start-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+
+  var zone = EXPEDITION_ZONES.find(function(z) { return z.key === _expeditionZoneKey; });
+  var pet  = petState[_expeditionPetId];
+  if (!zone || !pet) return;
+
+  // Final energy check
+  if ((pet.energy || 0) < 10) {
+    showToast('Not enough energy! (need 10)', 3000);
+    if (btn) { btn.disabled = false; expedition_updateStartBtn(); }
+    return;
+  }
+
+  var endsAt = new Date(Date.now() + zone.duration * 60000).toISOString();
+
+  // Pre-calculate rewards (stored on row, revealed at claim time)
+  var rewardPP = Math.floor(zone.minPP + Math.random() * (zone.maxPP - zone.minPP));
+  var petLevelBonus = 1 + ((pet.level || 1) / 100);
+  rewardPP = Math.floor(rewardPP * petLevelBonus);
+
+  // Insert expedition row
+  var { data: row, error } = await supabaseClient.from('expeditions').insert({
+    user_id:      currentUser.id,
+    pet_id:       _expeditionPetId,
+    zone:         _expeditionZoneKey,
+    ends_at:      endsAt,
+    completed:    false,
+    claimed:      false,
+    reward_pp:    rewardPP,
+    reward_items: []
+  }).select().single();
+
+  if (error) { showToast('Failed to start expedition: ' + error.message, 4000); if (btn) { btn.disabled = false; expedition_updateStartBtn(); } return; }
+
+  // Deduct energy AFTER successful DB insert
+  await supabaseClient.from('user_pets')
+    .update({ energy: Math.max(0, (pet.energy || 0) - 10) })
+    .eq('id', _expeditionPetId);
+  if (petState[_expeditionPetId]) petState[_expeditionPetId].energy = Math.max(0, (pet.energy || 0) - 10);
+
+  expeditionState.active = row;
+  showToast('🏴‍☠️ ' + (pet.nickname || 'Your pet') + ' set off for the ' + zone.label + '!', 3000);
+  expedition_renderCountdown(row);
+}
+
+// ── Active expedition countdown ──
+function expedition_renderCountdown(row) {
+  var area = document.getElementById('expedition-area');
+  if (!area) return;
+  var zone = EXPEDITION_ZONES.find(function(z) { return z.key === row.zone; }) || EXPEDITION_ZONES[0];
+  var pet  = petState[row.pet_id] || {};
+
+  area.innerHTML =
+    '<div style="text-align:center;padding:20px 10px;">' +
+      '<div style="font-size:2.5rem;margin-bottom:8px;">' + zone.emoji + '</div>' +
+      '<div style="font-weight:700;font-size:1.05rem;color:var(--purple-dark);margin-bottom:4px;">' +
+        (pet.nickname || 'Your pet') + ' is exploring the ' + zone.label + '!' +
+      '</div>' +
+      '<div style="color:var(--text-light);font-size:0.85rem;margin-bottom:16px;">' + zone.desc + '</div>' +
+      '<div style="background:rgba(153,102,255,0.1);border-radius:16px;padding:16px;display:inline-block;min-width:180px;">' +
+        '<div style="font-size:0.78rem;color:var(--text-light);margin-bottom:4px;">Returns in</div>' +
+        '<div id="expedition-countdown" style="font-size:2rem;font-weight:800;color:var(--purple);font-family:monospace;">--:--</div>' +
+      '</div>' +
+      '<div style="margin-top:16px;font-size:0.8rem;color:var(--text-light);">Expected loot: 💰 ' + (row.reward_pp || '?') + ' PP</div>' +
+    '</div>';
+
+  // Start countdown ticker
+  if (expeditionState.timer) safeClearInterval(expeditionState.timer);
+  function tick() {
+    var remaining = new Date(row.ends_at) - new Date();
+    var el = document.getElementById('expedition-countdown');
+    if (!el) { safeClearInterval(expeditionState.timer); return; }
+    if (remaining <= 0) {
+      safeClearInterval(expeditionState.timer);
+      supabaseClient.from('expeditions').update({ completed: true }).eq('id', row.id).then(function() {
+        row.completed = true;
+        expedition_renderClaim(row);
+      });
+      return;
+    }
+    var mins = Math.floor(remaining / 60000);
+    var secs = Math.floor((remaining % 60000) / 1000);
+    el.textContent = String(mins).padStart(2,'0') + ':' + String(secs).padStart(2,'0');
+  }
+  tick();
+  expeditionState.timer = safeSetInterval(tick, 1000);
+}
+
+// ── Claim UI ──
+function expedition_renderClaim(row) {
+  var area = document.getElementById('expedition-area');
+  if (!area) return;
+  var zone = EXPEDITION_ZONES.find(function(z) { return z.key === row.zone; }) || EXPEDITION_ZONES[0];
+  var pet  = petState[row.pet_id] || {};
+
+  area.innerHTML =
+    '<div style="text-align:center;padding:20px 10px;">' +
+      '<div style="font-size:2.5rem;margin-bottom:8px;animation:bounce 0.6s ease infinite alternate;">🎉</div>' +
+      '<div style="font-weight:700;font-size:1.1rem;color:var(--purple-dark);margin-bottom:6px;">' +
+        (pet.nickname || 'Your pet') + ' returned from the ' + zone.label + '!' +
+      '</div>' +
+      '<div style="background:linear-gradient(135deg,rgba(255,215,0,0.15),rgba(153,102,255,0.1));border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:18px;margin:14px auto;max-width:260px;">' +
+        '<div style="font-size:0.8rem;color:var(--text-light);margin-bottom:6px;">Expedition Haul</div>' +
+        '<div style="font-size:2rem;font-weight:800;color:#e6a800;">💰 ' + (row.reward_pp || 0) + ' PP</div>' +
+        '<div style="font-size:0.78rem;color:var(--text-light);margin-top:4px;">' + zone.emoji + ' ' + zone.label + ' · ' + zone.rarity + ' loot</div>' +
+      '</div>' +
+      '<button class="btn btn-primary" onclick="expedition_claim(\'' + row.id + '\')" style="padding:12px 32px;font-size:1rem;">🎁 Claim Rewards!</button>' +
+    '</div>';
+}
+
+async function expedition_claim(expeditionId) {
+  var claimBtn = document.querySelector('#expedition-area .btn-primary');
+  if (claimBtn) { claimBtn.disabled = true; claimBtn.textContent = 'Claiming…'; }
+
+  var { data: row } = await supabaseClient.from('expeditions').select('*').eq('id', expeditionId).single();
+  if (!row) { showToast('Expedition not found', 3000); return; }
+
+  // Mark claimed
+  await supabaseClient.from('expeditions').update({ claimed: true }).eq('id', expeditionId);
+
+  // Award PP
+  await awardPP(row.reward_pp || 0, 'expedition_' + row.zone);
+
+  // Integrations
+  addPassXP(10, 'expedition').catch(function(){});
+  checkPetWishes('expedition', row.pet_id).catch(function(){});
+  community_increment('expeditions_week1', 1);
+
+  showToast('🏴‍☠️ Claimed ' + (row.reward_pp || 0) + ' PP from your expedition!', 4000);
+
+  expeditionState.active = null;
+  _expeditionPetId  = null;
+  _expeditionZoneKey = null;
+
+  // Show history then selector
+  await expedition_renderHistory();
+}
+
+async function expedition_renderHistory() {
+  var area = document.getElementById('expedition-area');
+  if (!area) return;
+
+  var { data: history } = await supabaseClient
+    .from('expeditions')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .eq('claimed', true)
+    .order('started_at', { ascending: false })
+    .limit(5);
+
+  var histHtml = '';
+  if (history && history.length > 0) {
+    histHtml = '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:14px;">' +
+      '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:8px;">📜 Recent Expeditions</div>' +
+      history.map(function(r) {
+        var zone = EXPEDITION_ZONES.find(function(z) { return z.key === r.zone; });
+        var pet  = petState[r.pet_id];
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(153,102,255,0.08);font-size:0.8rem;">' +
+          '<span>' + (zone ? zone.emoji : '🗺️') + ' ' + (zone ? zone.label : r.zone) + ' · ' + (pet ? (pet.nickname || 'Pet') : 'Pet') + '</span>' +
+          '<span style="color:#e6a800;font-weight:700;">+' + (r.reward_pp || 0) + ' PP</span>' +
+        '</div>';
+      }).join('') +
+      '</div>';
+  }
+
+  area.innerHTML = '<div id="expedition-post-claim">' + histHtml + '</div>';
+  // Reload selector after 800ms
+  setTimeout(function() { expedition_renderSelector(); }, 800);
+}
+
+// Hook into minigames tab load
+var _origTabsLoadedMinigames = tabsLoaded['minigames'];
+tabsLoaded['minigames'] = function() {
+  if (_origTabsLoadedMinigames) _origTabsLoadedMinigames();
+  expedition_init();
+};
 // ═══════════════════════════════════════════════════════════════════════════
 
 var PERSONALITIES = [

@@ -16408,3 +16408,32 @@ body.night-mode .item-icon-img {
   position: relative;
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TREASURE HUNTING / EXPEDITION SYSTEM
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#expedition-game-card .game-area {
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.expedition-zone-card:hover {
+  border-color: var(--purple) !important;
+  background: rgba(153,102,255,0.06) !important;
+  transform: translateX(3px);
+}
+
+.expedition-pet-btn.active,
+.expedition-pet-btn:focus {
+  background: var(--purple) !important;
+  color: white !important;
+}
+
+@keyframes bounce {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-8px); }
+}
+
