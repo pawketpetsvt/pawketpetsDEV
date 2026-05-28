@@ -3697,7 +3697,345 @@ var _origTabsLoadedMinigames = tabsLoaded['minigames'];
 tabsLoaded['minigames'] = function() {
   if (_origTabsLoadedMinigames) _origTabsLoadedMinigames();
   expedition_init();
+  race_init();
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PET RACING MINI-GAME
+// ═══════════════════════════════════════════════════════════════════════════
+
+var RACE_BETS       = [10, 50, 100];
+var RACE_DAILY_MAX  = 5;
+var RACE_ENERGY_COST = 5;
+
+var CPU_PETS = [
+  { id:'cpu1', nickname:'Zippy',   base_speed:6,  emoji:'🐇', isCpu:true },
+  { id:'cpu2', nickname:'Sludge',  base_speed:3,  emoji:'🐌', isCpu:true },
+  { id:'cpu3', nickname:'Blaze',   base_speed:8,  emoji:'🦊', isCpu:true },
+  { id:'cpu4', nickname:'Pebble',  base_speed:4,  emoji:'🐢', isCpu:true }
+];
+
+var raceState = {
+  selectedPets: [],   // up to 4 pet objects (mix of player + CPU)
+  bet:          10,
+  racing:       false,
+  racesLeft:    RACE_DAILY_MAX,
+  animFrame:    null
+};
+
+// ── Init ──────────────────────────────────────────────────────────────────
+async function race_init() {
+  var area = document.getElementById('race-area');
+  if (!area) return;
+  if (!currentUser) {
+    area.innerHTML = '<p style="color:var(--text-light);text-align:center;">Log in to race!</p>';
+    return;
+  }
+  area.innerHTML = '<div class="spinner"></div>';
+
+  // Check daily race count
+  var today = new Date().toISOString().slice(0, 10);
+  var { count } = await supabaseClient
+    .from('race_history')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', currentUser.id)
+    .gte('created_at', today + 'T00:00:00Z');
+
+  raceState.racesLeft = Math.max(0, RACE_DAILY_MAX - (count || 0));
+  raceState.selectedPets = [];
+  raceState.bet = 10;
+
+  race_renderSetup();
+}
+
+// ── Setup UI ─────────────────────────────────────────────────────────────
+function race_renderSetup() {
+  var area = document.getElementById('race-area');
+  if (!area) return;
+
+  // Eligible player pets: level 5+, energy >= RACE_ENERGY_COST
+  var myPets = Object.values(petState).filter(function(p) {
+    return (p.level || 1) >= 5 && (p.energy || 0) >= RACE_ENERGY_COST;
+  });
+
+  var petsHtml = myPets.length === 0
+    ? '<div style="color:#ff6b6b;font-size:0.85rem;text-align:center;">No eligible pets (need level 5+, ' + RACE_ENERGY_COST + '+ energy)</div>'
+    : myPets.map(function(p) {
+        var spd = p.base_speed || 4;
+        var selected = raceState.selectedPets.some(function(s) { return s.id === p.id; });
+        return '<div class="race-pet-option ' + (selected ? 'race-pet-selected' : '') + '" ' +
+          'onclick="race_togglePet(\'' + p.id + '\')" ' +
+          'data-pet-id="' + p.id + '" ' +
+          'style="cursor:pointer;border:2px solid ' + (selected ? 'var(--purple)' : 'var(--border)') + ';' +
+          'border-radius:10px;padding:8px 12px;text-align:center;transition:all 0.2s;' +
+          'background:' + (selected ? 'rgba(153,102,255,0.1)' : 'transparent') + ';">' +
+          '<div style="font-size:1.4rem;">' + race_petAvatar(p) + '</div>' +
+          '<div style="font-size:0.78rem;font-weight:700;color:var(--purple-dark);">' + escapeHtml(p.nickname || p.pet_type || 'Pet') + '</div>' +
+          '<div style="font-size:0.72rem;color:var(--text-light);">Lv.' + (p.level||1) + ' · ⚡' + Math.floor(p.energy||0) + ' · 💨' + spd + '</div>' +
+        '</div>';
+      }).join('');
+
+  var betBtns = RACE_BETS.map(function(b) {
+    var active = raceState.bet === b;
+    return '<button class="btn ' + (active ? 'btn-primary' : 'btn-outline') + ' btn-sm" ' +
+      'onclick="race_setBet(' + b + ')" style="padding:6px 14px;">' + b + ' PP</button>';
+  }).join('');
+
+  var canRace = raceState.selectedPets.length >= 1 && raceState.racesLeft > 0 && currentPoints >= raceState.bet;
+
+  area.innerHTML =
+    '<div id="race-setup">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+        '<div style="font-size:0.82rem;color:var(--text-light);">Races left today: ' +
+          '<strong style="color:' + (raceState.racesLeft > 0 ? 'var(--purple)' : '#ff6b6b') + ';">' + raceState.racesLeft + '/' + RACE_DAILY_MAX + '</strong>' +
+        '</div>' +
+        '<div style="font-size:0.82rem;color:var(--text-light);">Your PP: <strong>🪙' + (currentPoints||0) + '</strong></div>' +
+      '</div>' +
+      '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:8px;">Select up to 2 pets to race (CPU fills the rest):</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:14px;">' + petsHtml + '</div>' +
+      '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:8px;">Your Bet:</div>' +
+      '<div style="display:flex;gap:8px;margin-bottom:16px;">' + betBtns + '</div>' +
+      '<div style="font-size:0.78rem;color:var(--text-light);margin-bottom:12px;">' +
+        '⚡ Costs ' + RACE_ENERGY_COST + ' energy from racing pets · Max 2× your bet · CPU fills empty lanes' +
+      '</div>' +
+      '<button id="race-start-btn" class="btn btn-primary" onclick="race_start()" ' +
+        (canRace ? '' : 'disabled ') +
+        'style="width:100%;' + (canRace ? '' : 'opacity:0.5;') + '">' +
+        (raceState.racesLeft === 0 ? '🏁 Come back tomorrow!' :
+         currentPoints < raceState.bet ? '❌ Not enough PP' :
+         '🏁 Start Race! (Bet ' + raceState.bet + ' PP)') +
+      '</button>' +
+    '</div>';
+}
+
+function race_petAvatar(p) {
+  if (p.isCpu) return p.emoji || '🐾';
+  if (p.image_file) return '<img src="images/' + p.image_file + '" style="width:28px;height:28px;object-fit:contain;" onerror="this.outerHTML=\'🐾\';">';
+  return '🐾';
+}
+
+function race_togglePet(petId) {
+  var idx = raceState.selectedPets.findIndex(function(p) { return p.id === petId; });
+  if (idx !== -1) {
+    raceState.selectedPets.splice(idx, 1);
+  } else {
+    if (raceState.selectedPets.length >= 2) {
+      showToast('Max 2 of your pets per race!', 2000);
+      return;
+    }
+    raceState.selectedPets.push(petState[petId]);
+  }
+  race_renderSetup();
+}
+
+function race_setBet(amount) {
+  raceState.bet = amount;
+  race_renderSetup();
+}
+
+// ── Race start ────────────────────────────────────────────────────────────
+async function race_start() {
+  if (raceState.racing) return;
+  if (raceState.racesLeft <= 0) { showToast('No races left today!', 3000); return; }
+  if (raceState.selectedPets.length < 1) { showToast('Select at least 1 pet!', 2000); return; }
+  if (currentPoints < raceState.bet) { showToast('Not enough PP!', 2500); return; }
+
+  // Validate energy
+  for (var i = 0; i < raceState.selectedPets.length; i++) {
+    var p = raceState.selectedPets[i];
+    if (!p.isCpu && (p.energy || 0) < RACE_ENERGY_COST) {
+      showToast((p.nickname || 'Your pet') + ' is too tired!', 2500);
+      return;
+    }
+  }
+
+  raceState.racing = true;
+
+  // Build full lane lineup: player pets + CPU fill to 4
+  var lanes = raceState.selectedPets.slice();
+  var cpuPool = CPU_PETS.slice().sort(function() { return Math.random() - 0.5; });
+  while (lanes.length < 4) { lanes.push(cpuPool[lanes.length - raceState.selectedPets.length] || CPU_PETS[0]); }
+
+  // Compute race speeds with RNG
+  var racerunners = lanes.map(function(pet) {
+    var base = pet.base_speed || 4;
+    var speed = base * (0.7 + Math.random() * 0.6);
+    return { pet: pet, speed: speed, progress: 0, finished: false, finishOrder: null };
+  });
+
+  // Render track
+  race_renderTrack(racerunners);
+
+  // Deduct bet from player (before race — refunded if race errors out)
+  await awardPP(-raceState.bet, 'race_bet');
+
+  // Animate
+  await race_animate(racerunners);
+
+  // Sort by finish order
+  racerunners.sort(function(a, b) { return a.finishOrder - b.finishOrder; });
+
+  var winner = racerunners[0];
+  var playerRunners = racerunners.filter(function(r) { return !r.pet.isCpu; });
+  var playerWon = playerRunners.length > 0 && playerRunners[0].finishOrder === 1;
+  var playerBest = playerRunners.length > 0 ? playerRunners[0] : null;
+
+  // Calculate payout
+  var payout = 0;
+  if (playerBest) {
+    var avgSpeed = racerunners.reduce(function(s, r) { return s + r.speed; }, 0) / racerunners.length;
+    var multiplier = Math.min(3, Math.max(1, avgSpeed / playerBest.speed));
+    if (playerBest.finishOrder === 1) payout = Math.round(raceState.bet * multiplier);
+    else if (playerBest.finishOrder === 2) payout = Math.round(raceState.bet * 0.5);
+    // 3rd/4th: no payout (already deducted bet)
+  }
+
+  // Deduct energy from player pets (AFTER race)
+  for (var j = 0; j < raceState.selectedPets.length; j++) {
+    var rp = raceState.selectedPets[j];
+    if (!rp.isCpu) {
+      var newEnergy = Math.max(0, (petState[rp.id] ? petState[rp.id].energy : rp.energy) - RACE_ENERGY_COST);
+      await supabaseClient.from('user_pets').update({ energy: newEnergy }).eq('id', rp.id);
+      if (petState[rp.id]) petState[rp.id].energy = newEnergy;
+    }
+  }
+
+  // Save to race_history
+  await supabaseClient.from('race_history').insert({
+    user_id:   currentUser.id,
+    winner_pet_id: winner.pet.isCpu ? null : winner.pet.id,
+    bet_amount: raceState.bet,
+    payout:    payout,
+    placement: playerBest ? playerBest.finishOrder : null,
+    zone:      null
+  }).catch(function(){});
+
+  // Award payout if any
+  if (payout > 0) await awardPP(payout, 'race_win');
+
+  // Integrations
+  raceState.racesLeft = Math.max(0, raceState.racesLeft - 1);
+  addPassXP(5, 'race').catch(function(){});
+  if (playerWon) {
+    checkPetWishes('race', winner.pet.id).catch(function(){});
+    awardBadge('speed_demon').catch(function(){});
+  }
+  community_increment('races_week1', 1);
+
+  // Show results
+  race_renderResults(racerunners, payout, playerBest);
+  raceState.racing = false;
+}
+
+// ── Track render ──────────────────────────────────────────────────────────
+function race_renderTrack(runners) {
+  var area = document.getElementById('race-area');
+  if (!area) return;
+
+  var lanesHtml = runners.map(function(r, i) {
+    var isPlayer = !r.pet.isCpu;
+    return '<div class="race-lane" id="race-lane-' + i + '" style="' +
+      'display:flex;align-items:center;gap:10px;margin-bottom:10px;' +
+      'background:' + (isPlayer ? 'rgba(153,102,255,0.06)' : 'rgba(0,0,0,0.02)') + ';' +
+      'border-radius:10px;padding:8px 10px;border:1px solid ' + (isPlayer ? 'rgba(153,102,255,0.2)' : 'var(--border)') + ';">' +
+      '<div style="width:28px;text-align:center;font-size:1.1rem;" id="race-avatar-' + i + '">' + race_petAvatar(r.pet) + '</div>' +
+      '<div style="width:70px;font-size:0.72rem;color:var(--purple-dark);font-weight:' + (isPlayer ? '700' : '500') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+        escapeHtml(r.pet.nickname || r.pet.pet_type || 'CPU') +
+      '</div>' +
+      '<div style="flex:1;background:rgba(0,0,0,0.08);border-radius:20px;height:18px;overflow:hidden;">' +
+        '<div id="race-bar-' + i + '" style="height:100%;width:0%;background:' + (isPlayer ? 'linear-gradient(90deg,#9966ff,#ff66cc)' : 'linear-gradient(90deg,#aaa,#ccc)') + ';border-radius:20px;transition:width 0.05s linear;"></div>' +
+      '</div>' +
+      '<div id="race-pos-' + i + '" style="width:24px;font-size:0.78rem;color:var(--text-light);text-align:right;"></div>' +
+    '</div>';
+  }).join('');
+
+  area.innerHTML =
+    '<div id="race-track" style="padding:8px 0;">' +
+      '<div style="text-align:center;font-weight:700;font-size:0.9rem;color:var(--purple-dark);margin-bottom:12px;animation:pulse 0.5s ease infinite alternate;">🏁 RACE IN PROGRESS…</div>' +
+      lanesHtml +
+    '</div>';
+}
+
+// ── Animation engine ──────────────────────────────────────────────────────
+function race_animate(runners) {
+  return new Promise(function(resolve) {
+    var finishCount = 0;
+    var order = 1;
+    var TICK = 50; // ms per frame
+
+    function frame() {
+      var allDone = true;
+      runners.forEach(function(r, i) {
+        if (r.finished) return;
+        allDone = false;
+        r.progress += r.speed * (0.8 + Math.random() * 0.4);
+        if (r.progress >= 100) {
+          r.progress = 100;
+          r.finished = true;
+          r.finishOrder = order++;
+          var posEl = document.getElementById('race-pos-' + i);
+          if (posEl) posEl.textContent = r.finishOrder === 1 ? '🥇' : r.finishOrder === 2 ? '🥈' : r.finishOrder === 3 ? '🥉' : '4️⃣';
+        }
+        var bar = document.getElementById('race-bar-' + i);
+        if (bar) bar.style.width = Math.min(100, r.progress) + '%';
+      });
+      if (allDone) { resolve(); return; }
+      // Fill in finishOrder for any still at progress<100 that should be last
+      runners.forEach(function(r) { if (!r.finished) r.finishOrder = order; });
+      setTimeout(frame, TICK);
+    }
+    frame();
+  });
+}
+
+// ── Results UI ────────────────────────────────────────────────────────────
+function race_renderResults(runners, payout, playerBest) {
+  var area = document.getElementById('race-area');
+  if (!area) return;
+
+  var winner = runners[0];
+  var playerWon = playerBest && playerBest.finishOrder === 1;
+  var playerPlace = playerBest ? playerBest.finishOrder : null;
+
+  var placeText = playerPlace === 1 ? '🥇 1st Place!' :
+                  playerPlace === 2 ? '🥈 2nd Place' :
+                  playerPlace === 3 ? '🥉 3rd Place' :
+                  playerPlace === 4 ? '4️⃣ 4th Place' : 'No player entry';
+
+  var outcomeColor = payout > raceState.bet ? '#5dde7a' : payout > 0 ? '#fbbf24' : '#ff6b6b';
+  var netChange = payout - raceState.bet;
+  var netText = netChange > 0 ? '+' + netChange + ' PP' : netChange === 0 ? 'Break even' : netChange + ' PP';
+
+  var resultRows = runners.map(function(r, i) {
+    var medals = ['🥇','🥈','🥉','4️⃣'];
+    var isPlayer = !r.pet.isCpu;
+    return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(153,102,255,0.08);' +
+      (isPlayer ? 'font-weight:700;' : '') + '">' +
+      '<span style="font-size:1.1rem;">' + (medals[i] || (i+1)+'.') + '</span>' +
+      '<span style="font-size:0.9rem;flex:1;color:' + (isPlayer ? 'var(--purple-dark)' : 'var(--text-light)') + ';">' +
+        escapeHtml(r.pet.nickname || r.pet.pet_type || 'CPU') + (isPlayer ? ' (You)' : '') +
+      '</span>' +
+      '<span style="font-size:0.78rem;color:var(--text-light);">💨 ' + r.speed.toFixed(1) + '</span>' +
+    '</div>';
+  }).join('');
+
+  area.innerHTML =
+    '<div style="padding:10px 4px;">' +
+      '<div style="text-align:center;margin-bottom:14px;">' +
+        '<div style="font-size:2rem;">' + (playerWon ? '🎉' : '😤') + '</div>' +
+        '<div style="font-weight:800;font-size:1.05rem;color:var(--purple-dark);">' + placeText + '</div>' +
+        '<div style="font-size:1.5rem;font-weight:800;color:' + outcomeColor + ';margin:6px 0;">' + netText + '</div>' +
+        (payout > 0 ? '<div style="font-size:0.8rem;color:var(--text-light);">Payout: ' + payout + ' PP</div>' : '') +
+      '</div>' +
+      '<div style="margin-bottom:14px;">' + resultRows + '</div>' +
+      '<div style="display:flex;gap:8px;">' +
+        '<button class="btn btn-primary" onclick="race_init()" style="flex:1;">' +
+          (raceState.racesLeft > 0 ? '🏁 Race Again! (' + raceState.racesLeft + ' left)' : '🏁 Come back tomorrow!') +
+        '</button>' +
+      '</div>' +
+    '</div>';
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 
 var PERSONALITIES = [
