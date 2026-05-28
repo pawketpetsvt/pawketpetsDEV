@@ -3531,14 +3531,14 @@ function calculateLevelUp(newXp, currentLevel, currentMaxHunger, currentMaxEnerg
 // ═══════════════════════════════════════════════════════════════════════════
 
 var EXPEDITION_ZONES = [
-  { key:'outskirts',  label:'Outskirts',     emoji:'🏘️', duration:30,  minPP:50,  maxPP:100, rarity:'common',   desc:'Quick scout of the nearby fields.',  energyCost:20, xpReward:50,
-    itemPool:[{id:'basic_food',name:'Basic Food',icon:'🍞',dropChance:.6},{id:'apple',name:'Apple',icon:'🍎',dropChance:.3},{id:'berry',name:'Berry',icon:'🫐',dropChance:.2}], minItems:0, maxItems:2 },
-  { key:'forest',     label:'Forest Glade',  emoji:'🌳', duration:45,  minPP:100, maxPP:200, rarity:'uncommon', desc:'Wander through the shady forest.',    energyCost:35, xpReward:100,
-    itemPool:[{id:'treat',name:'Treat',icon:'🍪',dropChance:.5},{id:'premium_treat',name:'Premium Treat',icon:'🍰',dropChance:.15},{id:'basic_food',name:'Basic Food',icon:'🍞',dropChance:.4},{id:'sweet_berry',name:'Sweet Berry',icon:'🍓',dropChance:.25}], minItems:1, maxItems:3 },
-  { key:'deepwoods',  label:'Deep Woods',    emoji:'🌲', duration:60,  minPP:200, maxPP:400, rarity:'rare',     desc:'Brave the dangerous deep woods.',    energyCost:50, xpReward:200,
-    itemPool:[{id:'squeaky_toy',name:'Squeaky Toy',icon:'🧸',dropChance:.4},{id:'rubber_ball',name:'Rubber Ball',icon:'⚽',dropChance:.35},{id:'rope_toy',name:'Rope Toy',icon:'🪢',dropChance:.3},{id:'premium_treat',name:'Premium Treat',icon:'🍰',dropChance:.3}], minItems:1, maxItems:3 },
-  { key:'ruins',      label:'Ancient Ruins', emoji:'🏛️', duration:90,  minPP:400, maxPP:800, rarity:'epic',     desc:'Explore the mysterious old ruins.',   energyCost:75, xpReward:400,
-    itemPool:[{id:'wooden_spoon',name:'Wooden Spoon',icon:'🥄',dropChance:.05},{id:'leather_armor',name:'Leather Armor',icon:'🛡️',dropChance:.03},{id:'iron_spoon',name:'Iron Spoon',icon:'🥄',dropChance:.02},{id:'rubber_ball',name:'Rubber Ball',icon:'⚽',dropChance:.35},{id:'premium_treat',name:'Premium Treat',icon:'🍰',dropChance:.3},{id:'squeaky_toy',name:'Squeaky Toy',icon:'🧸',dropChance:.25}], minItems:0, maxItems:2 }
+  { key:'outskirts',  label:'Outskirts',     emoji:'🏘️', duration:30, minPP:15,  maxPP:30,  rarity:'common',   desc:'Quick scout of the nearby fields.',  energyCost:15, xpReward:25,
+    itemPool:[{id:'basic_food',name:'Basic Food',icon:'🍞',type:'food'}], itemChance:0.30, minItems:0, maxItems:1 },
+  { key:'forest',     label:'Forest Glade',  emoji:'🌳', duration:45, minPP:30,  maxPP:60,  rarity:'uncommon', desc:'Wander through the shady forest.',    energyCost:25, xpReward:50,
+    itemPool:[{id:'treat',name:'Treat',icon:'🍪',type:'treat'}], itemChance:0.40, minItems:0, maxItems:1 },
+  { key:'deepwoods',  label:'Deep Woods',    emoji:'🌲', duration:60, minPP:50,  maxPP:100, rarity:'rare',     desc:'Brave the dangerous deep woods.',    energyCost:40, xpReward:100,
+    itemPool:[{id:'squeaky_toy',name:'Squeaky Toy',icon:'🧸',type:'toy'},{id:'rubber_ball',name:'Rubber Ball',icon:'⚽',type:'toy'},{id:'rope_toy',name:'Rope Toy',icon:'🪢',type:'toy'}], itemChance:0.50, minItems:0, maxItems:1 },
+  { key:'ruins',      label:'Ancient Ruins', emoji:'🏛️', duration:90, minPP:75,  maxPP:150, rarity:'epic',     desc:'Explore the mysterious old ruins.',   energyCost:60, xpReward:200,
+    itemPool:[{id:'wooden_spoon',name:'Wooden Spoon',icon:'🥄',type:'equipment'},{id:'squeaky_toy',name:'Squeaky Toy',icon:'🧸',type:'toy'}], itemChance:0.60, equipmentChance:0.10, minItems:0, maxItems:1 }
 ];
 
 var expeditionState = {
@@ -3618,7 +3618,7 @@ function expedition_renderSelector() {
       '<div id="expedition-pet-selected" style="margin-bottom:12px;font-size:0.82rem;color:var(--text-light);text-align:center;">No pet selected</div>' +
       '<div style="font-weight:700;color:var(--purple-dark);margin-bottom:8px;font-size:0.9rem;">2️⃣ Choose a Zone:</div>' +
       zoneOptions +
-      '<button id="expedition-start-btn" class="btn btn-primary" onclick="expedition_start()" disabled style="width:100%;margin-top:14px;opacity:0.5;">⚡ 10 energy — Send on Expedition!</button>' +
+      '<button id="expedition-start-btn" class="btn btn-primary" onclick="expedition_start()" disabled style="width:100%;margin-top:14px;opacity:0.5;">Select a pet and zone</button>' +
     '</div>';
 }
 
@@ -3654,7 +3654,7 @@ function expedition_updateStartBtn() {
   var ready = _expeditionPetId && _expeditionZoneKey;
   btn.disabled = !ready;
   btn.style.opacity = ready ? '1' : '0.5';
-  if (zone && ready) btn.textContent = '⚡ 10 energy — Send to ' + zone.label + '!';
+  if (zone && ready) btn.textContent = '⚡ ' + zone.energyCost + ' energy — Send to ' + zone.label + '!';
 }
 
 async function expedition_start() {
@@ -3669,18 +3669,34 @@ async function expedition_start() {
   if (!zone || !pet) return;
 
   // Final energy check
-  if ((pet.energy || 0) < 10) {
-    showToast('Not enough energy! (need 10)', 3000);
+  if ((pet.energy || 0) < zone.energyCost) {
+    showToast('Not enough energy! (need ' + zone.energyCost + ')', 3000);
     if (btn) { btn.disabled = false; expedition_updateStartBtn(); }
     return;
   }
 
   var endsAt = new Date(Date.now() + zone.duration * 60000).toISOString();
 
-  // Pre-calculate rewards (stored on row, revealed at claim time)
-  var rewardPP = Math.floor(zone.minPP + Math.random() * (zone.maxPP - zone.minPP));
-  var petLevelBonus = 1 + ((pet.level || 1) / 100);
-  rewardPP = Math.floor(rewardPP * petLevelBonus);
+  // Pre-calculate rewards with balanced economy
+  var levelBonus2 = Math.min(1.5, 1 + ((pet.level || 1) / 100));
+  var rewardPP = Math.floor((zone.minPP + Math.floor(Math.random() * (zone.maxPP - zone.minPP + 1))) * levelBonus2);
+
+  // Single item drop
+  var droppedItemsMG = [];
+  if (Math.random() < (zone.itemChance || 0)) {
+    var mgPool = zone.itemPool || [];
+    var mgDropped = null;
+    if (zone.key === 'ruins') {
+      var mgEquip = mgPool.filter(function(it) { return it.type === 'equipment'; });
+      var mgToy   = mgPool.filter(function(it) { return it.type !== 'equipment'; });
+      mgDropped = Math.random() < (zone.equipmentChance || 0.10)
+        ? mgEquip[Math.floor(Math.random() * mgEquip.length)]
+        : mgToy[Math.floor(Math.random() * mgToy.length)];
+    } else {
+      mgDropped = mgPool[Math.floor(Math.random() * mgPool.length)];
+    }
+    if (mgDropped) droppedItemsMG.push(mgDropped);
+  }
 
   // Insert expedition row
   var { data: row, error } = await supabaseClient.from('expeditions').insert({
@@ -3691,16 +3707,16 @@ async function expedition_start() {
     completed:    false,
     claimed:      false,
     reward_pp:    rewardPP,
-    reward_items: []
+    reward_items: droppedItemsMG
   }).select().single();
 
   if (error) { showToast('Failed to start expedition: ' + error.message, 4000); if (btn) { btn.disabled = false; expedition_updateStartBtn(); } return; }
 
-  // Deduct energy AFTER successful DB insert
+  // Deduct energy AFTER successful DB insert (use zone's actual energyCost)
   await supabaseClient.from('user_pets')
-    .update({ energy: Math.max(0, (pet.energy || 0) - 10) })
+    .update({ energy: Math.max(0, (pet.energy || 0) - zone.energyCost) })
     .eq('id', _expeditionPetId);
-  if (petState[_expeditionPetId]) petState[_expeditionPetId].energy = Math.max(0, (pet.energy || 0) - 10);
+  if (petState[_expeditionPetId]) petState[_expeditionPetId].energy = Math.max(0, (pet.energy || 0) - zone.energyCost);
 
   expeditionState.active = row;
   showToast('🏴‍☠️ ' + (pet.nickname || 'Your pet') + ' set off for the ' + zone.label + '!', 3000);
@@ -9981,18 +9997,25 @@ async function battleExp_start() {
   var btn = document.getElementById('battle-exp-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
 
-  var rewardPP = Math.floor((zone.minPP + Math.random() * (zone.maxPP - zone.minPP)) * (1 + (pet.level||1) / 100));
-  var rewardXP = Math.floor(zone.xpReward * (1 + (pet.level||1) / 100));
+  var levelBonus = Math.min(1.5, 1 + (pet.level||1) / 100);
+  var rewardPP  = Math.floor((zone.minPP + Math.floor(Math.random() * (zone.maxPP - zone.minPP + 1))) * levelBonus);
+  var rewardXP  = Math.floor(zone.xpReward * levelBonus);
 
-  // Roll item drops
+  // Single item drop using itemChance + ruins equipment split
   var droppedItems = [];
-  var itemCount = zone.minItems + Math.floor(Math.random() * (zone.maxItems - zone.minItems + 1));
-  for (var i = 0; i < itemCount; i++) {
-    var roll = Math.random(), cumulative = 0;
-    for (var j = 0; j < zone.itemPool.length; j++) {
-      cumulative += zone.itemPool[j].dropChance;
-      if (roll <= cumulative) { droppedItems.push(zone.itemPool[j]); break; }
+  if (Math.random() < (zone.itemChance || 0)) {
+    var pool = zone.itemPool || [];
+    var dropped = null;
+    if (zone.key === 'ruins') {
+      var equipPool = pool.filter(function(it) { return it.type === 'equipment'; });
+      var toyPool   = pool.filter(function(it) { return it.type !== 'equipment'; });
+      dropped = Math.random() < (zone.equipmentChance || 0.10)
+        ? equipPool[Math.floor(Math.random() * equipPool.length)]
+        : toyPool[Math.floor(Math.random() * toyPool.length)];
+    } else {
+      dropped = pool[Math.floor(Math.random() * pool.length)];
     }
+    if (dropped) droppedItems.push(dropped);
   }
 
   var endsAt = new Date(Date.now() + zone.duration * 60000).toISOString();
