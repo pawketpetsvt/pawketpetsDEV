@@ -13735,6 +13735,11 @@ function getNotificationIcon(type) {
     case 'daily_reward': return '🎁';
     case 'event_started': return '🎉';
     case 'referral_reward': return '💰';
+    case 'grand_prix_results':  return '🏁';
+    case 'grand_prix_claimed':  return '🏆';
+    case 'grand_prix_overtaken':return '📉';
+    case 'guild_vote_passed':   return '✅';
+    case 'guild_vote_failed':   return '📋';
     default: return '🔔';
   }
 }
@@ -15950,6 +15955,14 @@ async function gp_load() {
   if (!currentUser) { mount.innerHTML = '<div class="empty-state"><p>Log in to enter the Grand Prix!</p></div>'; return; }
   mount.innerHTML = '<div class="spinner"></div>';
 
+  // Ping the edge function to trigger any pending status transitions
+  // (open registration, close registration, score entries, etc.)
+  // Fire-and-forget — don't block the UI on it
+  fetch('https://hqzugbxutgefjilgmxqu.supabase.co/functions/v1/process-grand-prix', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  }).catch(function(e) { dbg('GP auto-check failed:', e); });
+
   try {
     // Fetch current event
     var { data: events } = await supabaseClient.rpc('get_current_grand_prix');
@@ -15987,15 +16000,15 @@ async function gp_load() {
 }
 
 // ── Render router ─────────────────────────────────────────────────────────
-function gp_render(mount) {
-  if (!gpState.event) { gp_renderNoEvent(mount); return; }
+async function gp_render(mount) {
+  if (!gpState.event) { await gp_renderNoEvent(mount); return; }
   var s = gpState.event.status;
-  if (s === 'registration')   gp_renderRegistration(mount);
-  else if (s === 'racing')    gp_renderRacing(mount);
-  else                        gp_renderResults(mount);
+  if (s === 'registration')   await gp_renderRegistration(mount);
+  else if (s === 'racing')    await gp_renderRacing(mount);
+  else                        await gp_renderResults(mount);
 }
 
-function gp_renderNoEvent(mount) {
+async function gp_renderNoEvent(mount) {
   mount.innerHTML =
     '<div style="text-align:center;padding:40px 20px;">' +
       '<div style="font-size:3rem;margin-bottom:12px;">🏆</div>' +
@@ -16011,12 +16024,17 @@ function gp_renderNoEvent(mount) {
           '🎖️ All participants: 25 PP consolation' +
         '</div>' +
       '</div>' +
-    '</div>' +
-    gp_renderHistoricalLeaderboard();
+      '<div id="gp-history-mount" style="margin-top:24px;"></div>' +
+    '</div>';
+
+  // Load historical leaderboard async and inject into mount point
+  var histHtml = await gp_renderHistoricalLeaderboard();
+  var histMount = document.getElementById('gp-history-mount');
+  if (histMount && histHtml) histMount.innerHTML = histHtml;
 }
 
 // ── Registration phase ────────────────────────────────────────────────────
-function gp_renderRegistration(mount) {
+async function gp_renderRegistration(mount) {
   var ev = gpState.event;
   var regEnd = new Date(ev.registration_end);
   var minsLeft = Math.max(0, Math.floor((regEnd - new Date()) / 60000));
@@ -16027,7 +16045,7 @@ function gp_renderRegistration(mount) {
         '<div style="font-weight:700;color:#2d8a4e;margin-bottom:4px;">✅ You\'re entered!</div>' +
         '<div style="font-size:0.82rem;color:var(--text-light);">Your champion is ready. Racing begins soon.</div>' +
       '</div>'
-    : gp_renderEntryForm();
+    : await gp_renderEntryForm();
 
   mount.innerHTML =
     '<div style="max-width:560px;">' +
@@ -16051,28 +16069,36 @@ function gp_renderRegistration(mount) {
     '</div>';
 }
 
-function gp_renderEntryForm() {
+async function gp_renderEntryForm() {
   // Eligible pets: level 10+
   var eligiblePets = Object.values(petState).filter(function(p) { return (p.level||1) >= 10; });
 
-  var petOptions = eligiblePets.length === 0
-    ? '<div style="color:#ff6b6b;font-size:0.82rem;">No eligible pets — need level 10+ to enter the Grand Prix.</div>'
-    : eligiblePets.map(function(p) {
-        var varBonus = GP_VARIANT_BONUS[p.current_variant||''] || 0;
-        return '<div class="gp-pet-option" data-pet-id="' + p.id + '" onclick="gp_selectPet(\'' + p.id + '\')" ' +
-          'style="cursor:pointer;border:2px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;margin-bottom:8px;transition:all 0.2s;">' +
-          '<div style="font-size:1.4rem;">🐾</div>' +
-          '<div style="flex:1;">' +
-            '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);">' + escapeHtml(p.nickname||p.pet_type||'Pet') + '</div>' +
-            '<div style="font-size:0.75rem;color:var(--text-light);">Lv.' + (p.level||1) + ' · ⚡' + Math.floor(p.energy||0) + ' · 💨' + (p.base_speed||4) + (varBonus?' · ✨+'+varBonus+' variant':'') + '</div>' +
-          '</div>' +
-          '<div style="font-size:0.7rem;color:var(--text-light);">Score ≈ ' + gp_estimateScore(p) + '</div>' +
-        '</div>';
-      }).join('');
+  if (eligiblePets.length === 0) {
+    return '<div style="border:2px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;">' +
+      '<div style="color:#ff6b6b;font-size:0.82rem;">No eligible pets — need level 10+ to enter the Grand Prix.</div>' +
+    '</div>';
+  }
+
+  // Fetch equipment bonuses for each eligible pet
+  var petRows = await Promise.all(eligiblePets.map(async function(p) {
+    var equipBonus = await gp_getEquipmentBonus(p.id);
+    var score      = gp_estimateScore(p, equipBonus);
+    var varBonus   = GP_VARIANT_BONUS[p.current_variant||''] || 0;
+    return '<div class="gp-pet-option" data-pet-id="' + p.id + '" onclick="gp_selectPet(\'' + p.id + '\')" ' +
+      'style="cursor:pointer;border:2px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;margin-bottom:8px;transition:all 0.2s;">' +
+      '<div style="font-size:1.4rem;">🐾</div>' +
+      '<div style="flex:1;">' +
+        '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);">' + escapeHtml(p.nickname||p.pet_type||'Pet') + '</div>' +
+        '<div style="font-size:0.75rem;color:var(--text-light);">Lv.' + (p.level||1) + ' · ⚡' + Math.floor(p.energy||0) + ' · 💨' + (p.base_speed||4) +
+          (varBonus?' · ✨+'+varBonus+' variant':'') + (equipBonus?' · ⚔️+'+equipBonus+' equip':'') + '</div>' +
+      '</div>' +
+      '<div style="font-size:0.7rem;color:var(--text-light);">Score ≈ ' + score + '</div>' +
+    '</div>';
+  }));
 
   return '<div style="border:2px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;">' +
     '<div style="font-weight:700;font-size:0.88rem;color:var(--purple-dark);margin-bottom:12px;">🏁 Select Your Champion</div>' +
-    petOptions +
+    petRows.join('') +
     '<div style="margin-top:12px;font-size:0.78rem;color:var(--text-light);">⚠️ Entry fee: 100 PP · Must be level 10+ · One entry per week</div>' +
     '<button id="gp-enter-btn" class="btn btn-primary" onclick="gp_enter()" disabled style="width:100%;margin-top:12px;opacity:0.5;">Select a pet to enter</button>' +
   '</div>';
@@ -16090,12 +16116,34 @@ function gp_selectPet(petId) {
   if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '🏁 Enter Grand Prix (100 PP)'; }
 }
 
-function gp_estimateScore(p) {
-  var spd = Math.min(50, (p.base_speed||4) * 5);
-  var lvl = Math.min(100, (p.level||1) * 2);
-  var hap = ((p.happiness||50) / (p.max_happiness||100)) * 20;
+function gp_estimateScore(p, equipBonus) {
+  equipBonus = equipBonus || 0;
+  var spd  = Math.min(50, ((p.base_speed||4) + Math.floor(equipBonus / 3)) * 5);
+  var lvl  = Math.min(100, (p.level||1) * 2);
+  var hap  = ((p.happiness||50) / (p.max_happiness||100)) * 20;
+  var equip = Math.min(30, equipBonus);
   var vrnt = GP_VARIANT_BONUS[p.current_variant||''] || 0;
-  return Math.round(spd + lvl + hap + vrnt);
+  return Math.round(spd + lvl + hap + equip + vrnt);
+}
+
+async function gp_getEquipmentBonus(petId) {
+  try {
+    var { data } = await supabaseClient
+      .from('player_equipment')
+      .select('equipment(attack_bonus, defense_bonus, speed_bonus)')
+      .eq('user_id', currentUser.id)
+      .eq('pet_id', petId)
+      .eq('is_equipped', true);
+    var total = 0;
+    (data || []).forEach(function(item) {
+      if (item.equipment) {
+        total += (item.equipment.speed_bonus || 0) * 2;
+        total += (item.equipment.attack_bonus || 0);
+        total += (item.equipment.defense_bonus || 0);
+      }
+    });
+    return Math.min(30, total);
+  } catch(e) { return 0; }
 }
 
 async function gp_enter() {
@@ -16371,9 +16419,110 @@ async function gp_renderResults(mount) {
     '</div>';
 }
 
+// ── Admin / server-side simulation ───────────────────────────────────────
+// Called by admin or when event end_time has passed.
+// Scores all entries, assigns ranks, generates replays, sends notifications.
+async function simulateGrandPrix(eventId) {
+  if (!currentUser) return;
+  try {
+    // Fetch all entries with pet and player data
+    var { data: entries, error } = await supabaseClient
+      .from('grand_prix_entries')
+      .select('id, user_id, pet_id, training_bonus, players(username), user_pets(nickname, level, base_speed, happiness, max_happiness, current_variant, pet_id)')
+      .eq('event_id', eventId);
+    if (error) throw error;
+    if (!entries || entries.length === 0) return;
+
+    // Calculate score for each entry
+    for (var i = 0; i < entries.length; i++) {
+      var e   = entries[i];
+      var pet = e.user_pets || {};
+      var spd  = Math.min(50, (pet.base_speed||4) * 5);
+      var lvl  = Math.min(100, (pet.level||1) * 2);
+      var hap  = ((pet.happiness||50) / (pet.max_happiness||100)) * 20;
+      var vrnt = GP_VARIANT_BONUS[pet.current_variant||''] || 0;
+      var trn  = Math.min(15, e.training_bonus || 0);
+      var rnd  = Math.random() * 15;
+      e._score = Math.min(200, spd + lvl + hap + vrnt + trn + rnd);
+    }
+
+    // Sort descending by score
+    entries.sort(function(a, b) { return b._score - a._score; });
+
+    // Assign ranks and persist scores
+    for (var r = 0; r < entries.length; r++) {
+      var rank = r + 1;
+      entries[r]._rank = rank;
+      await supabaseClient.from('grand_prix_entries')
+        .update({ race_score: entries[r]._score, final_rank: rank })
+        .eq('id', entries[r].id);
+    }
+
+    // Generate replay text for top 10
+    var replayTemplates = {
+      first: [
+        '🏁 {name} launches out of the gate! The crowd erupts as they take an early lead. No one can catch them — {name} crosses the finish line FIRST! 🏆',
+        '{name} races with pure determination, pulling ahead at every turn. An unforgettable champion performance! 👑'
+      ],
+      top3: [
+        '{name} battles fiercely for position and earns a well-deserved podium finish! 🥉',
+        'What heart from {name}! A strong push on the final lap secures a podium spot! 🌟'
+      ],
+      top10: [
+        '{name} holds their own against fierce competition. A solid top 10 finish! 💪',
+        '{name} pushes hard every lap and earns a spot in the top 10! 🎉'
+      ]
+    };
+
+    for (var ti = 0; ti < Math.min(10, entries.length); ti++) {
+      var te   = entries[ti];
+      var trnk = te._rank;
+      var petName = escapeHtml((te.user_pets && te.user_pets.nickname) || 'Your pet');
+      var pool = trnk === 1 ? replayTemplates.first : trnk <= 3 ? replayTemplates.top3 : replayTemplates.top10;
+      var text = pool[Math.floor(Math.random() * pool.length)].replace(/\{name\}/g, petName);
+      var finishMs = Math.floor((80 + (trnk-1) * 0.3 + Math.random() * 2) * 1000);
+
+      await supabaseClient.from('grand_prix_replays').upsert({
+        event_id: eventId, user_id: te.user_id,
+        replay_text: text, finish_time_ms: finishMs, rank: trnk
+      }, { onConflict: 'event_id,user_id' }).catch(function(){});
+    }
+
+    // Mark event complete
+    await supabaseClient.from('grand_prix_events')
+      .update({ status: 'reward_claim' })
+      .eq('id', eventId);
+
+    // Send notifications to all participants
+    for (var ni = 0; ni < entries.length; ni++) {
+      var ne = entries[ni];
+      var uname = (ne.user_pets && ne.user_pets.nickname) || 'Your pet';
+      createNotification(
+        ne.user_id,
+        'grand_prix_results',
+        '🏁 Grand Prix Results Ready!',
+        uname + ' placed #' + ne._rank + '! Claim your rewards now!',
+        'tab:racing'
+      ).catch(function(){});
+    }
+
+    showToast('🏆 Grand Prix simulation complete! ' + entries.length + ' entries ranked.', 5000);
+    gp_load();
+  } catch(err) {
+    showToast('Simulation failed: ' + err.message, 4000);
+  }
+}
+
+// Admin helper — only admin can trigger this
+async function gp_adminSimulate() {
+  if (!gpState.event) { showToast('No active event', 2000); return; }
+  if (!confirm('Simulate Grand Prix for event ' + gpState.event.week_number + '? This assigns all ranks.')) return;
+  await simulateGrandPrix(gpState.event.id);
+}
+
 async function gp_simulateMyScore() {
   if (!gpState.entry || !gpState.event) return;
-  // Calculate and store this user's score
+  // Only used as a fallback display when admin hasn't run full simulation
   var pet = petState[gpState.entry.pet_id] || {};
   var score = gp_estimateScore(pet) + (gpState.entry.training_bonus || 0) + (Math.random() * 15);
   score = Math.min(200, score);
@@ -16383,7 +16532,6 @@ async function gp_simulateMyScore() {
     .catch(function(){});
   gpState.entry.race_score = score;
 
-  // Generate replay flavor text if none
   if (!gpState.replay) {
     var petName = (pet.nickname || pet.pet_type || 'Your pet');
     var templates = [
@@ -16408,9 +16556,17 @@ async function gp_claimRewards() {
   if (btn) { btn.disabled = true; btn.textContent = 'Claiming…'; }
 
   try {
-    var ev   = gpState.event;
+    var ev    = gpState.event;
     var entry = gpState.entry;
     var rank  = entry.final_rank;
+
+    // Fetch fresh prize_pool (may have grown since page load as more entries arrived)
+    var { data: freshEvent } = await supabaseClient
+      .from('grand_prix_events')
+      .select('prize_pool')
+      .eq('id', ev.id)
+      .single();
+    var prizePoolFresh = (freshEvent && freshEvent.prize_pool) || ev.prize_pool || 0;
 
     // Fetch reward tier
     var { data: rewardRows } = await supabaseClient
@@ -16425,7 +16581,7 @@ async function gp_claimRewards() {
       });
     }
 
-    var prizePool = ev.prize_pool || 0;
+    var prizePool = prizePoolFresh;
     var ppReward  = rewardTier
       ? (rewardTier.pp_reward_percentage ? Math.floor(prizePool * rewardTier.pp_reward_percentage / 100) :
          rewardTier.pp_reward_fixed || 25)
@@ -16455,6 +16611,10 @@ async function gp_claimRewards() {
     }, { onConflict: 'user_id,week_number,year' }).catch(function(){});
 
     showToast('🎉 Grand Prix rewards claimed! +' + ppReward + ' PP!', 5000);
+    createNotification(
+      currentUser.id, 'grand_prix_claimed', '🏆 Grand Prix Rewards Claimed!',
+      'You placed #' + rank + ' and earned ' + ppReward + ' PP!', 'tab:racing'
+    ).catch(function(){});
     gp_load();
   } catch(err) {
     showToast('Failed: ' + err.message, 3000);
