@@ -280,6 +280,7 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
           👥 Friends
           <span class="friend-request-badge" id="friend-request-badge" style="display:none;">0</span>
         </button>
+        <button class="sidebar-nav-btn" id="sidebar-btn-racing" onclick="showTab('racing')">🏁 Racing</button>
         <button class="sidebar-nav-btn" id="sidebar-btn-guild" onclick="showTab('guild')">🏛️ Guild</button>
         <button class="sidebar-nav-btn" id="sidebar-btn-leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</button>
         <button class="sidebar-nav-btn" id="sidebar-btn-stats" onclick="showTab('stats')">📊 Statistics</button>
@@ -308,6 +309,7 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
             👥 Friends
             <span class="friend-request-badge" id="friend-request-badge" style="display:none;">0</span>
           </button>
+          <button class="sidebar-nav-btn" id="sidebar-btn-racing" onclick="showTab('racing')">🏁 Racing</button>
           <button class="sidebar-nav-btn" id="sidebar-btn-guild" onclick="showTab('guild')">🏛️ Guild</button>
           <button class="sidebar-nav-btn" id="sidebar-btn-leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</button>
           <button class="sidebar-nav-btn" id="sidebar-btn-stats" onclick="showTab('stats')">📊 Statistics</button>
@@ -1208,6 +1210,31 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
   <!-- ═══════════════════════════════════════════════════════════════════
        GUILD SECTION
        ═══════════════════════════════════════════════════════════════ -->
+
+  <!-- ═══════════════════════════════════════════════
+       RACING PAGE — Quick Race + Grand Prix
+       ═══════════════════════════════════════════ -->
+  <div class="page-section" id="section-racing">
+    <div class="section-inner">
+      <div class="section-header">
+        <h2 class="section-title">🏁 Racing</h2>
+      </div>
+      <!-- Sub-tabs -->
+      <div class="shop-tabs" style="margin-bottom:20px;">
+        <button class="shop-tab active" id="racing-tab-quickrace" onclick="racing_showTab('quickrace')">🏎️ Quick Race</button>
+        <button class="shop-tab"        id="racing-tab-grandprix"  onclick="racing_showTab('grandprix')">🏆 Grand Prix</button>
+      </div>
+      <!-- Quick Race panel -->
+      <div id="racing-panel-quickrace">
+        <div id="race-area"><div class="spinner"></div></div>
+      </div>
+      <!-- Grand Prix panel -->
+      <div id="racing-panel-grandprix" style="display:none;">
+        <div id="grand-prix-content"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
   <div class="page-section" id="section-guild">
     <div class="section-inner">
       <div class="section-header">

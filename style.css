@@ -16632,3 +16632,22 @@ body.night-mode .item-icon-img {
   .guild-enemies-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GRAND PRIX WEEKLY TOURNAMENT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#section-racing .section-inner { max-width: 640px; margin: 0 auto; }
+
+.gp-pet-option:hover {
+  border-color: var(--purple) !important;
+  background: rgba(153,102,255,0.06) !important;
+  transform: translateX(2px);
+}
+
+#grand-prix-content > div { animation: fadeIn 0.2s ease; }
+
+@media (max-width: 500px) {
+  #section-racing .section-inner { padding: 0 8px; }
+}
+

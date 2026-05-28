@@ -1523,6 +1523,7 @@ function loadTab(tab) {
   else if (tab === 'redeem') { loadRedeemHistory(); }
   else if (tab === 'stats') loadStatistics();
   else if (tab === 'guild') loadGuildPage();
+  else if (tab === 'racing') racing_init();
   // Note: leaderboard and myprofile handled in showTab()
 }
 
@@ -15896,6 +15897,619 @@ async function race_renderWeeklyLeaderboard() {
   } catch(e) {
     area.innerHTML = '<div style="color:var(--text-light);font-size:0.82rem;">Could not load leaderboard.</div><button class="btn btn-outline" onclick="race_init()" style="width:100%;">← Back</button>';
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RACING PAGE — Quick Race + Grand Prix Weekly Tournament
+// ═══════════════════════════════════════════════════════════════════════════
+
+var _racingActiveTab = 'quickrace';
+
+function racing_showTab(tab) {
+  _racingActiveTab = tab;
+  document.getElementById('racing-tab-quickrace').classList.toggle('active', tab === 'quickrace');
+  document.getElementById('racing-tab-grandprix').classList.toggle('active', tab === 'grandprix');
+  document.getElementById('racing-panel-quickrace').style.display = tab === 'quickrace' ? '' : 'none';
+  document.getElementById('racing-panel-grandprix').style.display = tab === 'grandprix' ? '' : 'none';
+
+  if (tab === 'quickrace') {
+    race_init(); // reuse existing race system
+  } else {
+    gp_load();
+  }
+}
+
+function racing_init() {
+  // Default to quick race on first open
+  racing_showTab(_racingActiveTab || 'quickrace');
+}
+
+// ── Grand Prix state ──────────────────────────────────────────────────────
+var gpState = {
+  event:   null,  // current grand_prix_events row
+  entry:   null,  // current user's grand_prix_entries row
+  replay:  null   // grand_prix_replays row
+};
+
+var GP_TRAINING_TYPES = {
+  speed:   { label: '💨 Speed Training',   bonus: 3,  energyCost: 10, ppCost: 0,  happinessCost: 0, desc: '+3 race score · Costs 10 energy' },
+  stamina: { label: '💪 Stamina Training', bonus: 2,  energyCost: 5,  ppCost: 0,  happinessCost: 0, desc: '+2 race score · Costs 5 energy, grants +10 energy' },
+  focus:   { label: '🎯 Focus Training',   bonus: 4,  energyCost: 15, ppCost: 0,  happinessCost: 5, desc: '+4 race score · Costs 15 energy & 5 happiness' },
+  lucky:   { label: '🍀 Lucky Training',   bonus: -1, energyCost: 0,  ppCost: 20, happinessCost: 0, desc: '+1-8 random bonus · Costs 20 PP · Once per week' }
+};
+
+var GP_VARIANT_BONUS = {
+  golden:   12, shiny: 10, cosmic: 15, shadow: 5,
+  fire: 8,  ice: 8, electric: 10, nature: 5, crystal: 8, ghost: 3
+};
+
+// ── Entry point ───────────────────────────────────────────────────────────
+async function gp_load() {
+  var mount = document.getElementById('grand-prix-content');
+  if (!mount) return;
+  if (!currentUser) { mount.innerHTML = '<div class="empty-state"><p>Log in to enter the Grand Prix!</p></div>'; return; }
+  mount.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    // Fetch current event
+    var { data: events } = await supabaseClient.rpc('get_current_grand_prix');
+    gpState.event = (events && events.length > 0) ? events[0] : null;
+
+    // Fetch user's entry if event exists
+    gpState.entry = null;
+    gpState.replay = null;
+    if (gpState.event) {
+      var { data: entries } = await supabaseClient
+        .from('grand_prix_entries')
+        .select('*')
+        .eq('event_id', gpState.event.id)
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+      gpState.entry = entries || null;
+
+      // If event is complete, check for replay and results
+      if (gpState.event.status === 'complete' || gpState.event.status === 'reward_claim') {
+        var { data: replay } = await supabaseClient
+          .from('grand_prix_replays')
+          .select('*')
+          .eq('event_id', gpState.event.id)
+          .eq('user_id', currentUser.id)
+          .maybeSingle();
+        gpState.replay = replay || null;
+      }
+    }
+
+    gp_render(mount);
+  } catch(err) {
+    mount.innerHTML = '<div class="empty-state"><p>Could not load Grand Prix: ' + escapeHtml(err.message) + '</p>' +
+      '<button class="btn btn-primary" onclick="gp_load()">Retry</button></div>';
+  }
+}
+
+// ── Render router ─────────────────────────────────────────────────────────
+function gp_render(mount) {
+  if (!gpState.event) { gp_renderNoEvent(mount); return; }
+  var s = gpState.event.status;
+  if (s === 'registration')   gp_renderRegistration(mount);
+  else if (s === 'racing')    gp_renderRacing(mount);
+  else                        gp_renderResults(mount);
+}
+
+function gp_renderNoEvent(mount) {
+  mount.innerHTML =
+    '<div style="text-align:center;padding:40px 20px;">' +
+      '<div style="font-size:3rem;margin-bottom:12px;">🏆</div>' +
+      '<div style="font-weight:700;font-size:1.1rem;color:var(--purple-dark);margin-bottom:8px;">No Active Grand Prix</div>' +
+      '<div style="color:var(--text-light);font-size:0.85rem;margin-bottom:20px;">Grand Prix events run every week Friday–Monday.<br>Check back when the next event opens!</div>' +
+      '<div style="background:rgba(153,102,255,0.08);border-radius:14px;padding:16px;max-width:400px;margin:0 auto;">' +
+        '<div style="font-weight:700;font-size:0.82rem;color:var(--purple-dark);margin-bottom:10px;">🏆 Prize Structure</div>' +
+        '<div style="font-size:0.8rem;color:var(--text-light);line-height:1.8;">' +
+          '🥇 1st: 30% of prize pool + Grand Champion title<br>' +
+          '🥈 2nd: 15% of prize pool + Speed Demon title<br>' +
+          '🥉 3rd: 10% of prize pool + Racer title<br>' +
+          '🏅 4th–10th: Top 10 Finisher badge<br>' +
+          '🎖️ All participants: 25 PP consolation' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    gp_renderHistoricalLeaderboard();
+}
+
+// ── Registration phase ────────────────────────────────────────────────────
+function gp_renderRegistration(mount) {
+  var ev = gpState.event;
+  var regEnd = new Date(ev.registration_end);
+  var minsLeft = Math.max(0, Math.floor((regEnd - new Date()) / 60000));
+  var timeStr  = minsLeft > 60 ? Math.floor(minsLeft/60) + 'h ' + (minsLeft%60) + 'm' : minsLeft + 'm';
+
+  var entrySection = gpState.entry
+    ? '<div style="background:rgba(93,222,122,0.1);border:1px solid rgba(93,222,122,0.3);border-radius:12px;padding:14px 16px;margin-bottom:16px;">' +
+        '<div style="font-weight:700;color:#2d8a4e;margin-bottom:4px;">✅ You\'re entered!</div>' +
+        '<div style="font-size:0.82rem;color:var(--text-light);">Your champion is ready. Racing begins soon.</div>' +
+      '</div>'
+    : gp_renderEntryForm();
+
+  mount.innerHTML =
+    '<div style="max-width:560px;">' +
+      gp_headerHtml(ev) +
+      '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">' +
+        '<div style="flex:1;background:rgba(153,102,255,0.08);border-radius:10px;padding:12px;text-align:center;">' +
+          '<div style="font-size:0.72rem;color:var(--text-light);margin-bottom:2px;">REGISTRATION CLOSES</div>' +
+          '<div style="font-weight:700;color:var(--purple);">⏰ ' + timeStr + '</div>' +
+        '</div>' +
+        '<div style="flex:1;background:rgba(255,215,0,0.1);border-radius:10px;padding:12px;text-align:center;">' +
+          '<div style="font-size:0.72rem;color:var(--text-light);margin-bottom:2px;">PRIZE POOL</div>' +
+          '<div style="font-weight:700;color:#e6a800;">🪙 ' + (ev.prize_pool||0).toLocaleString() + ' PP</div>' +
+        '</div>' +
+        '<div style="flex:1;background:rgba(153,102,255,0.08);border-radius:10px;padding:12px;text-align:center;">' +
+          '<div style="font-size:0.72rem;color:var(--text-light);margin-bottom:2px;">ENTRIES</div>' +
+          '<div style="font-weight:700;color:var(--purple);">👥 ' + (ev.total_entries||0) + '</div>' +
+        '</div>' +
+      '</div>' +
+      entrySection +
+      gp_prizeTable() +
+    '</div>';
+}
+
+function gp_renderEntryForm() {
+  // Eligible pets: level 10+
+  var eligiblePets = Object.values(petState).filter(function(p) { return (p.level||1) >= 10; });
+
+  var petOptions = eligiblePets.length === 0
+    ? '<div style="color:#ff6b6b;font-size:0.82rem;">No eligible pets — need level 10+ to enter the Grand Prix.</div>'
+    : eligiblePets.map(function(p) {
+        var varBonus = GP_VARIANT_BONUS[p.current_variant||''] || 0;
+        return '<div class="gp-pet-option" data-pet-id="' + p.id + '" onclick="gp_selectPet(\'' + p.id + '\')" ' +
+          'style="cursor:pointer;border:2px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;margin-bottom:8px;transition:all 0.2s;">' +
+          '<div style="font-size:1.4rem;">🐾</div>' +
+          '<div style="flex:1;">' +
+            '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);">' + escapeHtml(p.nickname||p.pet_type||'Pet') + '</div>' +
+            '<div style="font-size:0.75rem;color:var(--text-light);">Lv.' + (p.level||1) + ' · ⚡' + Math.floor(p.energy||0) + ' · 💨' + (p.base_speed||4) + (varBonus?' · ✨+'+varBonus+' variant':'') + '</div>' +
+          '</div>' +
+          '<div style="font-size:0.7rem;color:var(--text-light);">Score ≈ ' + gp_estimateScore(p) + '</div>' +
+        '</div>';
+      }).join('');
+
+  return '<div style="border:2px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;">' +
+    '<div style="font-weight:700;font-size:0.88rem;color:var(--purple-dark);margin-bottom:12px;">🏁 Select Your Champion</div>' +
+    petOptions +
+    '<div style="margin-top:12px;font-size:0.78rem;color:var(--text-light);">⚠️ Entry fee: 100 PP · Must be level 10+ · One entry per week</div>' +
+    '<button id="gp-enter-btn" class="btn btn-primary" onclick="gp_enter()" disabled style="width:100%;margin-top:12px;opacity:0.5;">Select a pet to enter</button>' +
+  '</div>';
+}
+
+var _gpSelectedPetId = null;
+function gp_selectPet(petId) {
+  _gpSelectedPetId = petId;
+  document.querySelectorAll('.gp-pet-option').forEach(function(el) {
+    var selected = el.getAttribute('data-pet-id') === petId;
+    el.style.borderColor = selected ? 'var(--purple)' : 'var(--border)';
+    el.style.background  = selected ? 'rgba(153,102,255,0.08)' : '';
+  });
+  var btn = document.getElementById('gp-enter-btn');
+  if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '🏁 Enter Grand Prix (100 PP)'; }
+}
+
+function gp_estimateScore(p) {
+  var spd = Math.min(50, (p.base_speed||4) * 5);
+  var lvl = Math.min(100, (p.level||1) * 2);
+  var hap = ((p.happiness||50) / (p.max_happiness||100)) * 20;
+  var vrnt = GP_VARIANT_BONUS[p.current_variant||''] || 0;
+  return Math.round(spd + lvl + hap + vrnt);
+}
+
+async function gp_enter() {
+  if (!_gpSelectedPetId || !currentUser) return;
+  if ((currentPoints||0) < 100) { showToast('Need 100 PP to enter!', 2500); return; }
+  if (!canPerformAction('gp_enter', 5000)) return;
+
+  var btn = document.getElementById('gp-enter-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Entering…'; }
+
+  try {
+    var { data: result, error } = await supabaseClient.rpc('enter_grand_prix', {
+      p_user_id: currentUser.id,
+      p_pet_id:  _gpSelectedPetId,
+      p_entry_fee: 100
+    });
+    if (error) throw error;
+    if (result && result.success === false) throw new Error(result.error || 'Failed');
+
+    updateAllPoints((currentPoints||0) - 100);
+    addPassXP(25, 'grand_prix_entry').catch(function(){});
+    updateBingoProgress('enter_grand_prix', 1);
+    showToast('🏁 Entered the Grand Prix! Train your pet to boost your score!', 5000);
+    gp_load();
+  } catch(err) {
+    showToast('Entry failed: ' + err.message, 3500);
+    if (btn) { btn.disabled = false; btn.textContent = '🏁 Enter Grand Prix (100 PP)'; }
+  }
+}
+
+// ── Racing / Training phase ───────────────────────────────────────────────
+async function gp_renderRacing(mount) {
+  var ev = gpState.event;
+  var endTime = new Date(ev.end_time);
+  var minsLeft = Math.max(0, Math.floor((endTime - new Date()) / 60000));
+  var daysLeft = Math.floor(minsLeft / 1440);
+  var hrsLeft  = Math.floor((minsLeft % 1440) / 60);
+  var timeStr  = daysLeft > 0 ? daysLeft + 'd ' + hrsLeft + 'h' : hrsLeft + 'h ' + (minsLeft%60) + 'm';
+
+  // Fetch standings
+  var { data: topEntries } = await supabaseClient
+    .from('grand_prix_entries')
+    .select('user_id, race_score, training_bonus, players(username), user_pets(nickname, pets(name))')
+    .eq('event_id', ev.id)
+    .order('race_score', { ascending: false })
+    .limit(15);
+
+  var myRank = null;
+  var myScore = 0;
+  if (topEntries && gpState.entry) {
+    topEntries.forEach(function(e, i) {
+      if (e.user_id === currentUser.id) { myRank = i + 1; myScore = e.race_score || 0; }
+    });
+  }
+
+  // Training section
+  var trainingSection = '';
+  if (gpState.entry) {
+    var trainingBonus = gpState.entry.training_bonus || 0;
+    var bonusPct = Math.round((trainingBonus / 15) * 100);
+
+    // Check if trained today
+    var { data: todayTraining } = await supabaseClient
+      .from('grand_prix_training')
+      .select('id')
+      .eq('user_id', currentUser.id)
+      .eq('event_id', ev.id)
+      .eq('training_day', new Date().toISOString().slice(0,10))
+      .maybeSingle();
+
+    var alreadyTrained = !!todayTraining;
+
+    var trainBtns = Object.keys(GP_TRAINING_TYPES).map(function(key) {
+      var t = GP_TRAINING_TYPES[key];
+      return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;' +
+        (alreadyTrained?'opacity:0.5;':'') + '">' +
+        '<div style="flex:1;">' +
+          '<div style="font-weight:700;font-size:0.82rem;color:var(--purple-dark);">' + t.label + '</div>' +
+          '<div style="font-size:0.72rem;color:var(--text-light);">' + t.desc + '</div>' +
+        '</div>' +
+        '<button class="btn btn-primary btn-sm" onclick="gp_train(\'' + key + '\')" ' + (alreadyTrained?'disabled':'') + ' style="font-size:0.75rem;white-space:nowrap;">' +
+          '+' + (key==='lucky'?'1-8':t.bonus) + ' pts' +
+        '</button>' +
+      '</div>';
+    }).join('');
+
+    trainingSection =
+      '<div style="border:2px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:16px;">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">' +
+          '<div style="font-weight:700;font-size:0.88rem;color:var(--purple-dark);">🎯 Daily Training</div>' +
+          (alreadyTrained
+            ? '<div style="font-size:0.75rem;color:#5dde7a;font-weight:600;">✅ Trained today!</div>'
+            : '<div style="font-size:0.75rem;color:var(--text-light);">Available now</div>') +
+        '</div>' +
+        '<div style="margin-bottom:10px;">' +
+          '<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-light);margin-bottom:4px;">' +
+            '<span>Weekly training bonus</span><span>' + trainingBonus + '/15</span>' +
+          '</div>' +
+          '<div style="background:rgba(153,102,255,0.12);border-radius:20px;height:8px;overflow:hidden;">' +
+            '<div style="width:' + bonusPct + '%;height:100%;background:linear-gradient(90deg,#9966ff,#ff66cc);border-radius:20px;"></div>' +
+          '</div>' +
+        '</div>' +
+        (trainingBonus >= 15
+          ? '<div style="font-size:0.8rem;color:#5dde7a;font-weight:600;">🎉 Max training bonus reached!</div>'
+          : trainBtns) +
+      '</div>';
+  } else {
+    trainingSection = '<div style="background:rgba(255,107,107,0.1);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:0.82rem;color:#cc3333;">You didn\'t register for this Grand Prix. Enter next week!</div>';
+  }
+
+  // Standings
+  var standingsHtml = (topEntries && topEntries.length > 0)
+    ? topEntries.slice(0,10).map(function(e, i) {
+        var medals = ['🥇','🥈','🥉'];
+        var isMe = e.user_id === currentUser.id;
+        var name = e.players ? escapeHtml(e.players.username) : 'Player';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(153,102,255,0.08);font-size:0.8rem;' + (isMe?'font-weight:700;':'') + '">' +
+          '<span>' + (medals[i]||(i+1)+'.') + '</span>' +
+          '<span style="flex:1;color:' + (isMe?'var(--purple)':'var(--purple-dark)') + ';">' + name + (isMe?' (You)':'') + '</span>' +
+          '<span style="color:var(--text-light);">' + Math.round(e.race_score||0) + ' pts</span>' +
+        '</div>';
+      }).join('')
+    : '<div style="color:var(--text-light);font-size:0.82rem;">No standings yet.</div>';
+
+  mount.innerHTML =
+    '<div style="max-width:560px;">' +
+      gp_headerHtml(ev) +
+      '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">' +
+        '<div style="flex:1;background:rgba(153,102,255,0.08);border-radius:10px;padding:12px;text-align:center;">' +
+          '<div style="font-size:0.72rem;color:var(--text-light);margin-bottom:2px;">RESULTS IN</div>' +
+          '<div style="font-weight:700;color:var(--purple);">⏰ ' + timeStr + '</div>' +
+        '</div>' +
+        (myRank ? '<div style="flex:1;background:rgba(255,215,0,0.1);border-radius:10px;padding:12px;text-align:center;">' +
+          '<div style="font-size:0.72rem;color:var(--text-light);margin-bottom:2px;">YOUR RANK</div>' +
+          '<div style="font-weight:700;color:#e6a800;">#' + myRank + ' · ' + Math.round(myScore) + ' pts</div>' +
+        '</div>' : '') +
+        '<div style="flex:1;background:rgba(255,215,0,0.1);border-radius:10px;padding:12px;text-align:center;">' +
+          '<div style="font-size:0.72rem;color:var(--text-light);margin-bottom:2px;">PRIZE POOL</div>' +
+          '<div style="font-weight:700;color:#e6a800;">🪙 ' + (ev.prize_pool||0).toLocaleString() + ' PP</div>' +
+        '</div>' +
+      '</div>' +
+      trainingSection +
+      '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:10px;">📊 Current Standings</div>' +
+      '<div style="margin-bottom:16px;">' + standingsHtml + '</div>' +
+    '</div>';
+}
+
+async function gp_train(trainingType) {
+  if (!gpState.entry || !currentUser || !canPerformAction('gp_train', 3000)) return;
+
+  var t = GP_TRAINING_TYPES[trainingType];
+  if (!t) return;
+
+  var petId = gpState.entry.pet_id;
+  var pet   = petState[petId] || {};
+
+  // Validate costs
+  if (t.energyCost > 0 && (pet.energy||0) < t.energyCost) { showToast('Not enough energy! (need ' + t.energyCost + ')', 2500); return; }
+  if (t.happinessCost > 0 && (pet.happiness||0) < t.happinessCost + 20) { showToast('Pet needs to be happier for Focus Training!', 2500); return; }
+  if (t.ppCost > 0 && (currentPoints||0) < t.ppCost) { showToast('Need ' + t.ppCost + ' PP for Lucky Training!', 2500); return; }
+
+  // Training cap
+  if ((gpState.entry.training_bonus||0) >= 15) { showToast('Max training bonus (15) already reached!', 2500); return; }
+
+  // Calculate bonus
+  var bonus = trainingType === 'lucky' ? Math.floor(Math.random() * 8) + 1 : t.bonus;
+
+  try {
+    var { data: result, error } = await supabaseClient.rpc('train_grand_prix_pet', {
+      p_user_id:      currentUser.id,
+      p_pet_id:       petId,
+      p_training_type:trainingType,
+      p_bonus_amount: bonus
+    });
+    if (error) throw error;
+    if (result && result.success === false) throw new Error(result.error || 'Failed');
+
+    // Apply energy/happiness/PP costs client-side
+    if (t.energyCost > 0 && petState[petId]) petState[petId].energy = Math.max(0, (petState[petId].energy||0) - t.energyCost);
+    if (trainingType === 'stamina' && petState[petId]) petState[petId].energy = Math.min(petState[petId].max_energy||100, (petState[petId].energy||0) + 10);
+    if (t.happinessCost > 0 && petState[petId]) petState[petId].happiness = Math.max(0, (petState[petId].happiness||0) - t.happinessCost);
+    if (t.ppCost > 0) { await awardPP(-t.ppCost, 'gp_lucky_training'); }
+
+    // Also update DB energy/happiness
+    var energyUpdate = (petState[petId] || {}).energy;
+    if (energyUpdate !== undefined) await supabaseClient.from('user_pets').update({ energy: energyUpdate }).eq('id', petId).catch(function(){});
+
+    addPassXP(10, 'grand_prix_training').catch(function(){});
+    updateBingoProgress('train_grand_prix', 1);
+    showToast('🎯 Training complete! +' + bonus + ' race score!', 3000);
+    gp_load();
+  } catch(err) {
+    showToast('Training failed: ' + err.message, 3000);
+  }
+}
+
+// ── Results phase ─────────────────────────────────────────────────────────
+async function gp_renderResults(mount) {
+  var ev = gpState.event;
+
+  // Fetch full results
+  var { data: entries } = await supabaseClient
+    .from('grand_prix_entries')
+    .select('user_id, final_rank, race_score, reward_claimed, players(username), user_pets(nickname, pets(name))')
+    .eq('event_id', ev.id)
+    .order('final_rank', { ascending: true })
+    .limit(20);
+
+  var myEntry = gpState.entry;
+  var myRank  = myEntry ? myEntry.final_rank : null;
+
+  // Simulate results if scores are 0 (admin hasn't run simulation)
+  if (myEntry && !myEntry.race_score && !myEntry.final_rank) {
+    await gp_simulateMyScore();
+    await gp_load();
+    return;
+  }
+
+  // Replay text
+  var replayHtml = '';
+  if (gpState.replay) {
+    var r = gpState.replay;
+    var mins = Math.floor((r.finish_time_ms||0) / 60000);
+    var secs = (((r.finish_time_ms||0) % 60000) / 1000).toFixed(2);
+    replayHtml =
+      '<div style="background:rgba(153,102,255,0.08);border-radius:12px;padding:14px 16px;margin-bottom:16px;">' +
+        '<div style="font-weight:700;font-size:0.82rem;color:var(--purple-dark);margin-bottom:8px;">🎬 Race Replay</div>' +
+        '<div style="font-size:0.85rem;color:var(--text-light);line-height:1.6;margin-bottom:10px;">' + escapeHtml(r.replay_text || '') + '</div>' +
+        '<div style="font-size:0.78rem;color:var(--text-light);">⏱️ Final time: ' + mins + ':' + secs + '</div>' +
+      '</div>';
+  }
+
+  // Reward display for my entry
+  var myRewardHtml = '';
+  if (myEntry) {
+    var rewardDesc = myRank === 1 ? '30% of prize pool + Grand Champion title! 👑' :
+                     myRank === 2 ? '15% of prize pool + Speed Demon title! 💨' :
+                     myRank === 3 ? '10% of prize pool + Racer title! 🏆' :
+                     myRank <= 10 ? 'Top 10 Finisher badge! 🏅' :
+                     '25 PP consolation prize 🎖️';
+    myRewardHtml =
+      '<div style="background:linear-gradient(135deg,rgba(255,215,0,0.12),rgba(153,102,255,0.08));border:2px solid rgba(255,215,0,0.3);border-radius:14px;padding:14px 16px;margin-bottom:16px;">' +
+        '<div style="text-align:center;">' +
+          '<div style="font-size:2rem;margin-bottom:6px;">' + (myRank===1?'👑':myRank===2?'🥈':myRank===3?'🥉':myRank<=10?'🏅':'🎖️') + '</div>' +
+          '<div style="font-weight:800;font-size:1.1rem;color:var(--purple-dark);margin-bottom:4px;">Your Rank: #' + (myRank||'?') + '</div>' +
+          '<div style="font-size:0.82rem;color:var(--text-light);margin-bottom:12px;">' + rewardDesc + '</div>' +
+          (myEntry.reward_claimed
+            ? '<div style="font-size:0.8rem;color:#5dde7a;font-weight:600;">✅ Rewards claimed!</div>'
+            : '<button class="btn btn-primary" onclick="gp_claimRewards()" style="width:100%;">🎁 Claim Rewards</button>') +
+        '</div>' +
+      '</div>';
+  }
+
+  // Top 10 list
+  var top10Html = (entries||[]).slice(0,10).map(function(e, i) {
+    var medals = ['🥇','🥈','🥉'];
+    var isMe = e.user_id === currentUser.id;
+    var name = e.players ? escapeHtml(e.players.username) : 'Player';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(153,102,255,0.08);font-size:0.8rem;' + (isMe?'font-weight:700;':'') + '">' +
+      '<span>' + (medals[i]||(i+1)+'.') + '</span>' +
+      '<span style="flex:1;color:' + (isMe?'var(--purple)':'var(--purple-dark)') + ';">' + name + (isMe?' (You)':'') + '</span>' +
+      '<span style="color:var(--text-light);">' + Math.round(e.race_score||0) + ' pts</span>' +
+    '</div>';
+  }).join('');
+
+  mount.innerHTML =
+    '<div style="max-width:560px;">' +
+      '<div style="font-weight:800;font-size:1.1rem;color:var(--purple-dark);margin-bottom:16px;text-align:center;">🏆 Week ' + ev.week_number + ' Results</div>' +
+      myRewardHtml +
+      replayHtml +
+      '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:10px;">🏆 Top 10 Finishers</div>' +
+      '<div style="margin-bottom:20px;">' + (top10Html || '<div style="color:var(--text-light);font-size:0.82rem;">No results yet.</div>') + '</div>' +
+    '</div>';
+}
+
+async function gp_simulateMyScore() {
+  if (!gpState.entry || !gpState.event) return;
+  // Calculate and store this user's score
+  var pet = petState[gpState.entry.pet_id] || {};
+  var score = gp_estimateScore(pet) + (gpState.entry.training_bonus || 0) + (Math.random() * 15);
+  score = Math.min(200, score);
+  await supabaseClient.from('grand_prix_entries')
+    .update({ race_score: score })
+    .eq('id', gpState.entry.id)
+    .catch(function(){});
+  gpState.entry.race_score = score;
+
+  // Generate replay flavor text if none
+  if (!gpState.replay) {
+    var petName = (pet.nickname || pet.pet_type || 'Your pet');
+    var templates = [
+      petName + ' charges out of the gate! The crowd roars. A fierce race unfolds — ' + petName + ' gives everything they have!',
+      petName + ' weaves through the competition with incredible focus. What an incredible performance!',
+      petName + ' pushes hard every lap. The finish line approaches... and they give one final burst of speed!'
+    ];
+    var replay_text = templates[Math.floor(Math.random() * templates.length)];
+    var finishMs = Math.floor((80 + Math.random() * 10) * 1000);
+    await supabaseClient.from('grand_prix_replays').upsert({
+      event_id: gpState.event.id, user_id: currentUser.id,
+      replay_text: replay_text, finish_time_ms: finishMs, rank: 1
+    }, { onConflict: 'event_id,user_id' }).catch(function(){});
+  }
+}
+
+async function gp_claimRewards() {
+  if (!gpState.entry || !gpState.event || !currentUser) return;
+  if (!canPerformAction('gp_claim', 5000)) return;
+
+  var btn = document.querySelector('#grand-prix-content .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Claiming…'; }
+
+  try {
+    var ev   = gpState.event;
+    var entry = gpState.entry;
+    var rank  = entry.final_rank;
+
+    // Fetch reward tier
+    var { data: rewardRows } = await supabaseClient
+      .from('grand_prix_rewards')
+      .select('*')
+      .lte('rank_min', rank);
+
+    var rewardTier = null;
+    if (rewardRows) {
+      rewardRows.forEach(function(r) {
+        if (rank >= r.rank_min && (!r.rank_max || rank <= r.rank_max)) rewardTier = r;
+      });
+    }
+
+    var prizePool = ev.prize_pool || 0;
+    var ppReward  = rewardTier
+      ? (rewardTier.pp_reward_percentage ? Math.floor(prizePool * rewardTier.pp_reward_percentage / 100) :
+         rewardTier.pp_reward_fixed || 25)
+      : 25;
+
+    await awardPP(ppReward, 'grand_prix_reward');
+    if (rewardTier && rewardTier.title_key)  await awardPlayerTitle(rewardTier.title_key).catch(function(){});
+    if (rewardTier && rewardTier.badge_key)  await awardBadge(rewardTier.badge_key).catch(function(){});
+
+    // Pass XP
+    if (rank === 1)     addPassXP(250, 'grand_prix_winner').catch(function(){});
+    else if (rank <= 10) addPassXP(100, 'grand_prix_top_10').catch(function(){});
+    else                 addPassXP(25, 'grand_prix_entry').catch(function(){});
+
+    // Bingo
+    updateBingoProgress('grand_prix_top_10', rank <= 10 ? 1 : 0);
+    if (rank === 1) updateBingoProgress('grand_prix_winner', 1);
+
+    // Mark claimed
+    await supabaseClient.from('grand_prix_entries').update({ reward_claimed: true }).eq('id', entry.id);
+    gpState.entry.reward_claimed = true;
+
+    // Save to historical leaderboard
+    await supabaseClient.from('grand_prix_leaderboard').upsert({
+      user_id: currentUser.id, week_number: ev.week_number, year: ev.year,
+      rank: rank, pet_level: (petState[entry.pet_id]||{}).level || 1
+    }, { onConflict: 'user_id,week_number,year' }).catch(function(){});
+
+    showToast('🎉 Grand Prix rewards claimed! +' + ppReward + ' PP!', 5000);
+    gp_load();
+  } catch(err) {
+    showToast('Failed: ' + err.message, 3000);
+    if (btn) { btn.disabled = false; btn.textContent = '🎁 Claim Rewards'; }
+  }
+}
+
+// ── Shared helpers ────────────────────────────────────────────────────────
+function gp_headerHtml(ev) {
+  var statusLabels = { registration:'🟢 REGISTRATION OPEN', racing:'🏁 RACING IN PROGRESS', complete:'✅ COMPLETE', reward_claim:'🎁 CLAIM REWARDS' };
+  return '<div style="text-align:center;margin-bottom:16px;">' +
+    '<div style="font-size:0.72rem;font-weight:700;letter-spacing:2px;color:var(--text-light);margin-bottom:4px;">GRAND PRIX</div>' +
+    '<div style="font-weight:800;font-size:1.2rem;color:var(--purple-dark);">Week ' + ev.week_number + ' · ' + ev.year + '</div>' +
+    '<div style="margin-top:6px;font-size:0.78rem;font-weight:600;color:var(--purple);">' + (statusLabels[ev.status]||ev.status) + '</div>' +
+  '</div>';
+}
+
+function gp_prizeTable() {
+  return '<div style="background:rgba(153,102,255,0.06);border-radius:12px;padding:12px 14px;">' +
+    '<div style="font-weight:700;font-size:0.82rem;color:var(--purple-dark);margin-bottom:8px;">🏆 Prize Structure</div>' +
+    '<div style="font-size:0.78rem;color:var(--text-light);line-height:2;">' +
+      '🥇 1st: 30% of prize pool + Grand Champion title<br>' +
+      '🥈 2nd: 15% of prize pool + Speed Demon title<br>' +
+      '🥉 3rd: 10% of prize pool + Racer title<br>' +
+      '🏅 4th–10th: Top 10 Finisher badge<br>' +
+      '🎖️ 11th+: 25 PP consolation' +
+    '</div>' +
+  '</div>';
+}
+
+async function gp_renderHistoricalLeaderboard() {
+  try {
+    var { data: history } = await supabaseClient
+      .from('grand_prix_leaderboard')
+      .select('*, players(username)')
+      .order('week_number', { ascending: false })
+      .order('rank', { ascending: true })
+      .limit(20);
+
+    if (!history || history.length === 0) return '';
+
+    var rows = history.map(function(r) {
+      var medals = { 1:'🥇', 2:'🥈', 3:'🥉' };
+      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(153,102,255,0.08);font-size:0.78rem;">' +
+        '<span style="width:30px;">' + (medals[r.rank]||('#'+r.rank)) + '</span>' +
+        '<span style="flex:1;">' + escapeHtml(r.players?r.players.username:'Player') + '</span>' +
+        '<span style="color:var(--text-light);">Wk ' + r.week_number + '</span>' +
+      '</div>';
+    }).join('');
+
+    return '<div style="margin-top:24px;">' +
+      '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:10px;">📜 Past Champions</div>' +
+      rows +
+    '</div>';
+  } catch(e) { return ''; }
 }
 
 async function checkDailyLogin() {
