@@ -626,6 +626,7 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
       <div class="shop-tabs">
         <button class="shop-tab active" id="shop-tab-btn" onclick="showShopTab('items')">Items</button>
         <button class="shop-tab" id="equip-tab-btn" onclick="showShopTab('equipment')">⚔️ Equipment</button>
+        <button class="shop-tab" id="furn-tab-btn" onclick="showShopTab('furniture')">🪑 Furniture</button>
         <button class="shop-tab" id="inv-tab-btn" onclick="showShopTab('inventory')">My Inventory</button>
       </div>
       <div id="shop-items-panel"><div id="shop-grid" class="shop-grid"><div class="spinner"></div></div></div>
@@ -638,6 +639,11 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
           <button class="filter-tab" onclick="filterEquipment('armor', event)">🛡️ Armor</button>
         </div>
         <div id="equipment-shop-grid" class="shop-grid"><div class="spinner"></div></div>
+      </div>
+
+      <!-- FURNITURE SHOP PANEL -->
+      <div id="shop-furniture-panel" style="display:none">
+        <div id="furniture-shop-grid" class="shop-grid"><div class="spinner"></div></div>
       </div>
       
       <div id="shop-inv-panel" style="display:none"><div id="inventory-grid" class="inventory-grid"><div class="spinner"></div></div></div>

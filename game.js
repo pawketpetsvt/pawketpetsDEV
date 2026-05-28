@@ -3148,6 +3148,13 @@ function makeMyPetCard(pet) {
   var feedBtn = makeEl('button', {class:'btn-action btn-feed', id:'feed-'+pet.id}, 'Feed');
   feedBtn.setAttribute('data-pet-id', pet.id);
   feedBtn.style.cssText = 'flex:1;min-width:60px;padding:7px 10px;font-size:0.82rem;';
+
+  // 🏠 Room button
+  var roomBtn = makeEl('button', {class:'btn-action'});
+  roomBtn.textContent = '🏠 Room';
+  roomBtn.title = 'Decorate your pet\'s room!';
+  roomBtn.style.cssText = 'flex:1;min-width:60px;padding:7px 10px;font-size:0.82rem;background:linear-gradient(135deg,#5cb85c,#3a9a3a);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:600;';
+  roomBtn.onclick = (function(id) { return function() { furniture_openRoom(id); }; })(pet.id);
   
   var playBtn = makeEl('button', {class:'btn-action btn-play', id:'play-'+pet.id}, pet.energy >= 10 ? 'Play' : 'Tired!');
   playBtn.setAttribute('data-pet-id', pet.id);
@@ -3156,6 +3163,7 @@ function makeMyPetCard(pet) {
   
   actions.appendChild(feedBtn); 
   actions.appendChild(playBtn);
+  actions.appendChild(roomBtn);
 
   // Snapshot button — compact icon only
   var snapBtn = makeEl('button', {class:'btn-action btn-snapshot', id:'snap-'+pet.id});
@@ -4920,11 +4928,13 @@ function showShopTab(tab) {
   // Update tab buttons
   el('shop-tab-btn').classList.remove('active');
   el('equip-tab-btn').classList.remove('active');
+  el('furn-tab-btn').classList.remove('active');
   el('inv-tab-btn').classList.remove('active');
   
   // Hide all panels
   el('shop-items-panel').style.display = 'none';
   el('shop-equipment-panel').style.display = 'none';
+  el('shop-furniture-panel').style.display = 'none';
   el('shop-inv-panel').style.display = 'none';
   
   if (tab === 'items') {
@@ -4934,6 +4944,10 @@ function showShopTab(tab) {
     el('equip-tab-btn').classList.add('active');
     el('shop-equipment-panel').style.display = 'block';
     loadEquipmentShop();
+  } else if (tab === 'furniture') {
+    el('furn-tab-btn').classList.add('active');
+    el('shop-furniture-panel').style.display = 'block';
+    furniture_loadShop();
   } else if (tab === 'inventory') {
     el('inv-tab-btn').classList.add('active');
     el('shop-inv-panel').style.display = 'block';
@@ -13285,6 +13299,319 @@ var dailyLoginStreak = 0;
 var dailyBuffsActive = [];
 
 // Check daily login and award rewards
+// ═══════════════════════════════════════════════════════════════════════════
+// PET HOUSING — Emoji-based room decoration
+// ═══════════════════════════════════════════════════════════════════════════
+
+var furnitureCache   = null;  // all furniture_items rows
+var userFurnCache    = null;  // user_furniture rows for current user
+var petRoomCache     = {};    // { petId: { equipped_furniture:[], last_bonus_date } }
+
+var ROOM_MAX_ITEMS = 8;
+
+// ── Furniture shop ────────────────────────────────────────────────────────
+async function furniture_loadShop() {
+  var grid = document.getElementById('furniture-shop-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    // Load catalog
+    if (!furnitureCache) {
+      var { data, error } = await supabaseClient.from('furniture_items').select('*').order('cost', { ascending: true });
+      if (error) throw error;
+      furnitureCache = data || [];
+    }
+
+    // Load what user already owns (so we can show "Owned" badge)
+    await furniture_loadUserInventory();
+
+    if (furnitureCache.length === 0) {
+      grid.innerHTML = '<div class="empty-state"><p>No furniture available yet!</p></div>';
+      return;
+    }
+
+    var ownedIds = (userFurnCache || []).map(function(r) { return r.furniture_id; });
+
+    var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;padding:8px 0;">';
+    furnitureCache.forEach(function(item) {
+      var owned = ownedIds.indexOf(item.id) !== -1;
+      var canAfford = (currentPoints || 0) >= item.cost;
+      html +=
+        '<div style="border:2px solid var(--border);border-radius:14px;padding:14px 10px;text-align:center;background:' + (owned ? 'rgba(93,222,122,0.06)' : 'var(--white)') + ';">' +
+          '<div style="font-size:2.2rem;margin-bottom:6px;">' + escapeHtml(item.emoji) + '</div>' +
+          '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:2px;">' + escapeHtml(item.name) + '</div>' +
+          '<div style="font-size:0.74rem;color:var(--text-light);margin-bottom:6px;">' + escapeHtml(item.description || '') + '</div>' +
+          '<div style="font-size:0.78rem;color:#5dde7a;font-weight:600;margin-bottom:8px;">+' + item.happiness_bonus + ' happiness/day</div>' +
+          (owned
+            ? '<div style="font-size:0.75rem;color:#5dde7a;font-weight:700;">✅ Owned</div>'
+            : canAfford
+              ? '<button class="btn btn-primary btn-sm" onclick="furniture_buy(\'' + item.furniture_key + '\',' + item.cost + ')" style="width:100%;font-size:0.8rem;">🪙 ' + item.cost + ' PP — Buy</button>'
+              : '<button class="btn btn-outline btn-sm" disabled style="width:100%;font-size:0.8rem;opacity:0.5;">🪙 ' + item.cost + ' PP</button>'
+          ) +
+        '</div>';
+    });
+    html += '</div>';
+    grid.innerHTML = html;
+  } catch(err) {
+    grid.innerHTML = '<div class="empty-state"><p>Could not load furniture shop: ' + escapeHtml(err.message) + '</p></div>';
+  }
+}
+
+async function furniture_buy(furnitureKey, cost) {
+  if (!currentUser) { showToast('Log in first!', 2000); return; }
+  if ((currentPoints || 0) < cost) { showToast('Not enough PP!', 2500); return; }
+  if (!canPerformAction('buy_furniture', 1500)) return;
+
+  try {
+    var { data, error } = await supabaseClient.rpc('buy_furniture_secure', {
+      p_user_id: currentUser.id,
+      p_furniture_key: furnitureKey,
+      p_cost: cost
+    });
+    if (error) throw error;
+
+    updateAllPoints(data.new_pp !== undefined ? data.new_pp : (currentPoints - cost));
+    userFurnCache = null; // invalidate cache
+    furnitureCache = null;
+    showToast('🪑 Furniture purchased!', 2500);
+    furniture_loadShop();
+  } catch(err) {
+    showToast('Purchase failed: ' + err.message, 3000);
+  }
+}
+
+async function furniture_loadUserInventory() {
+  if (!currentUser) return;
+  var { data } = await supabaseClient
+    .from('user_furniture')
+    .select('id, furniture_id, quantity, furniture_items(furniture_key, name, emoji, description, happiness_bonus, category)')
+    .eq('user_id', currentUser.id);
+  userFurnCache = data || [];
+}
+
+// ── Room modal ────────────────────────────────────────────────────────────
+async function furniture_openRoom(petId) {
+  var modal = makeModal();
+  modal.innerHTML = '<div style="text-align:center;padding:20px;"><div class="spinner"></div></div>';
+  openModal(modal);
+
+  try {
+    await furniture_loadUserInventory();
+    if (!furnitureCache) {
+      var { data } = await supabaseClient.from('furniture_items').select('*');
+      furnitureCache = data || [];
+    }
+
+    // Load or create pet_rooms row
+    var { data: roomRow } = await supabaseClient
+      .from('pet_rooms')
+      .select('*')
+      .eq('pet_id', petId)
+      .single()
+      .catch(function() { return { data: null }; });
+
+    if (!roomRow) {
+      var { data: newRoom } = await supabaseClient
+        .from('pet_rooms')
+        .insert({ pet_id: petId, equipped_furniture: [] })
+        .select()
+        .single()
+        .catch(function() { return { data: { pet_id: petId, equipped_furniture: [] } }; });
+      roomRow = newRoom || { pet_id: petId, equipped_furniture: [] };
+    }
+
+    petRoomCache[petId] = roomRow;
+    modal.innerHTML = furniture_renderRoomModal(petId);
+  } catch(err) {
+    modal.innerHTML = '<div style="padding:20px;"><p>Could not load room: ' + escapeHtml(err.message) + '</p><button class="btn btn-outline" onclick="closeModal()">Close</button></div>';
+  }
+}
+
+function furniture_renderRoomModal(petId) {
+  var room  = petRoomCache[petId] || { equipped_furniture: [] };
+  var pet   = petState[petId] || {};
+  var petName = pet.nickname || pet.pet_type || 'Your pet';
+  var equipped = room.equipped_furniture || [];
+
+  // Resolve full furniture objects for equipped items
+  var equippedItems = equipped.map(function(fkey) {
+    return (furnitureCache || []).find(function(f) { return f.furniture_key === fkey; });
+  }).filter(Boolean);
+
+  // Owned furniture not yet equipped
+  var unequipped = (userFurnCache || []).filter(function(uf) {
+    var f = uf.furniture_items;
+    return f && equipped.indexOf(f.furniture_key) === -1;
+  });
+
+  var totalBonus = equippedItems.reduce(function(s, f) { return s + (f.happiness_bonus || 0); }, 0);
+
+  // Auto-generate room description
+  var desc = generateRoomDescription(petName, equippedItems);
+
+  // Equipped list
+  var equippedHtml = equippedItems.length === 0
+    ? '<div style="color:var(--text-light);font-style:italic;font-size:0.85rem;">Nothing here yet — equip some furniture!</div>'
+    : equippedItems.map(function(f) {
+        return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(153,102,255,0.08);">' +
+          '<span style="font-size:1.2rem;">' + f.emoji + '</span>' +
+          '<span style="flex:1;font-size:0.82rem;color:var(--purple-dark);">' + escapeHtml(f.name) + '</span>' +
+          '<span style="font-size:0.75rem;color:#5dde7a;font-weight:600;">+' + f.happiness_bonus + '/day</span>' +
+          '<button class="btn btn-sm btn-outline" onclick="furniture_unequip(\'' + petId + '\',\'' + f.furniture_key + '\')" style="font-size:0.72rem;padding:3px 8px;margin-left:6px;">Unequip</button>' +
+        '</div>';
+      }).join('');
+
+  // Unequipped (owned but not in room)
+  var unequippedHtml = unequipped.length === 0
+    ? '<div style="color:var(--text-light);font-style:italic;font-size:0.82rem;">No furniture in storage.</div>'
+    : unequipped.map(function(uf) {
+        var f = uf.furniture_items;
+        var full = equipped.length >= ROOM_MAX_ITEMS;
+        return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(153,102,255,0.08);">' +
+          '<span style="font-size:1.2rem;">' + f.emoji + '</span>' +
+          '<span style="flex:1;font-size:0.82rem;color:var(--text-light);">' + escapeHtml(f.name) + '</span>' +
+          '<span style="font-size:0.75rem;color:#5dde7a;font-weight:600;">+' + f.happiness_bonus + '/day</span>' +
+          (full
+            ? '<span style="font-size:0.72rem;color:#ff6b6b;margin-left:6px;">Room full</span>'
+            : '<button class="btn btn-sm btn-primary" onclick="furniture_equip(\'' + petId + '\',\'' + f.furniture_key + '\')" style="font-size:0.72rem;padding:3px 8px;margin-left:6px;">Equip</button>'
+          ) +
+        '</div>';
+      }).join('');
+
+  return '<div style="max-width:480px;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">' +
+      '<h2 style="margin:0;color:var(--purple);font-size:1.1rem;">🏠 ' + escapeHtml(petName) + '\'s Room</h2>' +
+      '<button onclick="closeModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text-light);">×</button>' +
+    '</div>' +
+
+    // Room description
+    '<div style="background:rgba(153,102,255,0.06);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:0.85rem;color:var(--purple-dark);line-height:1.6;font-style:italic;">' +
+      '📝 ' + escapeHtml(desc) +
+    '</div>' +
+
+    // Daily bonus banner
+    '<div style="display:flex;align-items:center;justify-content:space-between;background:rgba(93,222,122,0.1);border-radius:10px;padding:8px 14px;margin-bottom:14px;">' +
+      '<span style="font-size:0.82rem;font-weight:600;color:var(--purple-dark);">✨ Daily Happiness Bonus</span>' +
+      '<span style="font-size:1.1rem;font-weight:800;color:#5dde7a;">+' + totalBonus + ' happiness</span>' +
+    '</div>' +
+
+    // Equipped section
+    '<div style="font-weight:700;font-size:0.82rem;color:var(--purple-dark);margin-bottom:8px;">🪑 In Room (' + equipped.length + '/' + ROOM_MAX_ITEMS + '):</div>' +
+    '<div style="margin-bottom:14px;">' + equippedHtml + '</div>' +
+
+    // Storage section
+    '<div style="font-weight:700;font-size:0.82rem;color:var(--purple-dark);margin-bottom:8px;">📦 In Storage:</div>' +
+    '<div style="margin-bottom:16px;">' + unequippedHtml + '</div>' +
+
+    // Buy more button
+    '<button class="btn btn-outline" onclick="closeModal();showTab(\'shop\');setTimeout(function(){showShopTab(\'furniture\');},100);" style="width:100%;font-size:0.85rem;">🛒 Buy More Furniture</button>' +
+  '</div>';
+}
+
+function generateRoomDescription(petName, items) {
+  if (!items || items.length === 0) {
+    return petName + '\'s room is bare. Buy some furniture to make it cozy!';
+  }
+  var names = items.map(function(f) { return 'a ' + f.name.toLowerCase(); });
+  var list = names.length === 1
+    ? names[0]
+    : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+
+  var vibes = ['It feels warm and inviting.', 'It\'s a cozy little space!', 'Very homey!', 'Quite the snug hideaway.', 'A perfect retreat.'];
+  var vibe = vibes[Math.floor(Math.random() * vibes.length)];
+
+  return petName + '\'s room features ' + list + '. ' + vibe;
+}
+
+async function furniture_equip(petId, furnitureKey) {
+  var room = petRoomCache[petId] || { equipped_furniture: [] };
+  var equipped = (room.equipped_furniture || []).slice();
+  if (equipped.length >= ROOM_MAX_ITEMS) { showToast('Room is full! (max ' + ROOM_MAX_ITEMS + ' items)', 2500); return; }
+  if (equipped.indexOf(furnitureKey) !== -1) return;
+
+  equipped.push(furnitureKey);
+  await supabaseClient.from('pet_rooms')
+    .upsert({ pet_id: petId, equipped_furniture: equipped }, { onConflict: 'pet_id' });
+  petRoomCache[petId] = Object.assign({}, room, { equipped_furniture: equipped });
+
+  // Re-render modal content in place
+  var modal = document.querySelector('.modal-content');
+  if (modal) modal.innerHTML = furniture_renderRoomModal(petId);
+}
+
+async function furniture_unequip(petId, furnitureKey) {
+  var room = petRoomCache[petId] || { equipped_furniture: [] };
+  var equipped = (room.equipped_furniture || []).filter(function(k) { return k !== furnitureKey; });
+
+  await supabaseClient.from('pet_rooms')
+    .upsert({ pet_id: petId, equipped_furniture: equipped }, { onConflict: 'pet_id' });
+  petRoomCache[petId] = Object.assign({}, room, { equipped_furniture: equipped });
+
+  var modal = document.querySelector('.modal-content');
+  if (modal) modal.innerHTML = furniture_renderRoomModal(petId);
+}
+
+// ── Daily happiness bonus ─────────────────────────────────────────────────
+async function furniture_applyDailyBonus() {
+  if (!currentUser) return;
+  var today = new Date().toISOString().slice(0, 10);
+
+  try {
+    // Load all pet rooms for this user's pets
+    var petIds = Object.keys(petState);
+    if (petIds.length === 0) return;
+
+    var { data: rooms } = await supabaseClient
+      .from('pet_rooms')
+      .select('pet_id, equipped_furniture, last_bonus_date')
+      .in('pet_id', petIds);
+
+    if (!rooms || rooms.length === 0) return;
+
+    if (!furnitureCache) {
+      var { data: fc } = await supabaseClient.from('furniture_items').select('*');
+      furnitureCache = fc || [];
+    }
+
+    for (var i = 0; i < rooms.length; i++) {
+      var room = rooms[i];
+      if (room.last_bonus_date === today) continue; // already applied today
+      if (!room.equipped_furniture || room.equipped_furniture.length === 0) continue;
+
+      // Sum bonus
+      var bonus = room.equipped_furniture.reduce(function(sum, fkey) {
+        var f = furnitureCache.find(function(fc) { return fc.furniture_key === fkey; });
+        return sum + (f ? (f.happiness_bonus || 0) : 0);
+      }, 0);
+
+      if (bonus <= 0) continue;
+
+      var pet = petState[room.pet_id];
+      if (!pet) continue;
+
+      var newHappiness = Math.min(pet.max_happiness || 100, (pet.happiness || 0) + bonus);
+
+      // Update pet happiness
+      await supabaseClient.from('user_pets')
+        .update({ happiness: newHappiness })
+        .eq('id', room.pet_id);
+
+      if (petState[room.pet_id]) petState[room.pet_id].happiness = newHappiness;
+
+      // Mark bonus applied
+      await supabaseClient.from('pet_rooms')
+        .update({ last_bonus_date: today })
+        .eq('pet_id', room.pet_id);
+
+      var petName = pet.nickname || pet.pet_type || 'Your pet';
+      showToast('🏠 ' + petName + ' loved their room! +' + bonus + ' happiness!', 3500);
+    }
+  } catch(err) {
+    dbg('furniture_applyDailyBonus error:', err);
+  }
+}
+
 async function checkDailyLogin() {
   if (!currentUser) return;
   
@@ -13378,8 +13705,11 @@ async function checkDailyLogin() {
       scrapbook_addRandomMemory(randomPetId);
     }
     
-    console.log('✅ Daily login checked - Streak:', streak, 'Reward:', ppReward);
-    
+    dbg('✅ Daily login checked - Streak:', streak, 'Reward:', ppReward);
+
+    // Apply furniture room happiness bonuses (non-blocking)
+    furniture_applyDailyBonus().catch(function(){});
+
   } catch (err) {
     console.error('[DailyLogin] Error:', err);
   }

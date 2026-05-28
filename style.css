@@ -16468,3 +16468,19 @@ body.night-mode .item-icon-img {
   #race-game-card .game-area { padding: 8px 0; }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PET HOUSING — Furniture shop & room modal
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#furniture-shop-grid > div > div:hover {
+  border-color: var(--purple) !important;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(153,102,255,0.15);
+  transition: all 0.2s;
+}
+
+#furniture-shop-grid > div > div {
+  transition: all 0.2s;
+}
+
