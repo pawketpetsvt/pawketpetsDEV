@@ -9901,24 +9901,34 @@ function battleExp_renderActive(rows) {
 
 async function battleExp_renderForm() {
   var form = document.getElementById('battle-expedition-form');
-  if (!form) return;
+  if (!form || !currentUser) return;
 
-  // Build eligible pet options (not already exploring, level 5+)
-  var myPets = Object.values(petState);
-  if (myPets.length === 0) {
-    form.innerHTML = '<div style="color:var(--text-light);font-size:0.82rem;">Adopt a pet first!</div>';
-    return;
-  }
+  form.innerHTML = '<div id="battle-exp-loading" style="color:var(--text-light);font-size:0.82rem;">Loading pets…</div>';
 
-  var petOptions = myPets.map(function(p) {
-    var exploring = _battleExpeditionPetIds.indexOf(p.id) !== -1;
-    var tooLow = (p.level || 1) < 5;
-    var disabled = exploring || tooLow;
-    return '<option value="' + p.id + '"' + (disabled ? ' disabled' : '') + '>' +
-      escapeHtml(p.nickname || p.pet_type || 'Pet') + ' Lv.' + (p.level||1) + ' ⚡' + Math.floor(p.energy||0) +
-      (exploring ? ' [Exploring]' : tooLow ? ' [Need Lv5]' : '') +
-    '</option>';
-  }).join('');
+  try {
+    // Query DB directly — don't rely on petState being populated
+    var { data: pets, error } = await supabaseClient
+      .from('user_pets')
+      .select('id, nickname, level, energy, pet_id, pets(name)')
+      .eq('user_id', currentUser.id);
+
+    if (error) throw error;
+
+    if (!pets || pets.length === 0) {
+      form.innerHTML = '<div style="color:var(--text-light);font-size:0.82rem;">Adopt a pet first!</div>';
+      return;
+    }
+
+    var petOptions = pets.map(function(p) {
+      var exploring = _battleExpeditionPetIds.indexOf(p.id) !== -1;
+      var tooLow = (p.level || 1) < 5;
+      var disabled = exploring || tooLow;
+      var petName = p.nickname || (p.pets && p.pets.name) || 'Pet';
+      return '<option value="' + p.id + '"' + (disabled ? ' disabled' : '') + '>' +
+        escapeHtml(petName) + ' Lv.' + (p.level||1) + ' ⚡' + Math.floor(p.energy||0) +
+        (exploring ? ' [Exploring]' : tooLow ? ' [Need Lv5]' : '') +
+      '</option>';
+    }).join('');
 
   var zoneCards = EXPEDITION_ZONES.map(function(z) {
     return '<div class="battle-exp-zone-card" data-zone="' + z.key + '" onclick="battleExp_selectZone(\'' + z.key + '\',this)" style="cursor:pointer;border:2px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;flex:1;min-width:0;transition:all 0.2s;">' +
@@ -9943,6 +9953,10 @@ async function battleExp_renderForm() {
     '</div>' +
     '<div id="battle-exp-info" style="font-size:0.78rem;color:var(--text-light);margin-bottom:10px;min-height:18px;"></div>' +
     '<button id="battle-exp-btn" class="btn btn-primary" onclick="battleExp_start()" disabled style="width:100%;opacity:0.5;">🚀 Send on Expedition</button>';
+
+  } catch(err) {
+    form.innerHTML = '<div style="color:#ff6b6b;font-size:0.82rem;">Error loading pets: ' + escapeHtml(err.message) + '</div>';
+  }
 }
 
 var _battleExpZone = null;
@@ -10130,76 +10144,110 @@ async function addPetXP(petId, xpAmount) {
 
 async function loadBattlePets() {
   var grid = el('battle-pet-select');
+  if (!grid) return; // element not in DOM yet
+
   grid.innerHTML = '<div class="spinner"></div>';
-  
+
   if (!currentUser) {
     grid.innerHTML = '<div class="empty-state"><p>Please log in first! 🐾</p></div>';
     return;
   }
-  
-  var res = await supabaseClient
-    .from('user_pets')
-    .select('id, nickname, level, base_hp, base_attack, base_defense, base_speed, current_hp, max_hp, energy, max_energy, pet_id, pets!inner(name, image_file)')
-    .eq('user_id', currentUser.id);
-  
-  if (res.error) {
-    console.error('Battle pets query error:', res.error);
-    grid.innerHTML = '<div class="empty-state"><p>Error loading pets: ' + res.error.message + '</p></div>';
-    return;
-  }
-  
-  if (!res.data || res.data.length === 0) {
-    grid.innerHTML = '<div class="empty-state"><p>You need a pet to battle! Adopt one first. 🐾</p></div>';
-    return;
-  }
-  
-  grid.innerHTML = '';
-  
-  res.data.forEach(function(userPet) {
-    // Hide pets currently on expedition
-    if (_battleExpeditionPetIds.indexOf(userPet.id) !== -1) return;
 
-    var pet = userPet.pets;
-    var card = makeEl('div', { class: 'battle-pet-card' });
-    card.onclick = function() { selectBattlePet(userPet.id, card); };
-    
-    var img = makeEl('img');
-    img.src = 'images/pets/' + pet.image_file;
-    img.alt = pet.name;
-    card.appendChild(img);
-    
-    var name = makeEl('div', { class: 'battle-pet-card-name' });
-    name.textContent = userPet.nickname || pet.name;
-    card.appendChild(name);
-    
-    var level = makeEl('div', { class: 'battle-pet-card-level' });
-    level.textContent = 'Level ' + userPet.level;
-    card.appendChild(level);
-    
-    var stats = makeEl('div', { class: 'battle-pet-card-stats' });
-    
-    var hpStat = makeEl('div', { class: 'battle-pet-stat' });
-    var currentHP = (userPet.current_hp !== null && userPet.current_hp !== undefined) ? userPet.current_hp : (userPet.base_hp || 30);
-    var maxHP = userPet.max_hp || userPet.base_hp || 30;
-    hpStat.innerHTML = '<div class="battle-pet-stat-label">HP</div><div class="battle-pet-stat-value">' + currentHP + '/' + maxHP + '</div>';
-    stats.appendChild(hpStat);
-    
-    var atkStat = makeEl('div', { class: 'battle-pet-stat' });
-    atkStat.innerHTML = '<div class="battle-pet-stat-label">ATK</div><div class="battle-pet-stat-value">' + userPet.base_attack + '</div>';
-    stats.appendChild(atkStat);
-    
-    var defStat = makeEl('div', { class: 'battle-pet-stat' });
-    defStat.innerHTML = '<div class="battle-pet-stat-label">DEF</div><div class="battle-pet-stat-value">' + userPet.base_defense + '</div>';
-    stats.appendChild(defStat);
-    
-    var spdStat = makeEl('div', { class: 'battle-pet-stat' });
-    spdStat.innerHTML = '<div class="battle-pet-stat-label">SPD</div><div class="battle-pet-stat-value">' + userPet.base_speed + '</div>';
-    stats.appendChild(spdStat);
-    
-    card.appendChild(stats);
-    
-    grid.appendChild(card);
-  });
+  try {
+    var res = await supabaseClient
+      .from('user_pets')
+      .select('id, nickname, level, base_hp, base_attack, base_defense, base_speed, current_hp, max_hp, energy, max_energy, pet_id, pets(name, image_file)')
+      .eq('user_id', currentUser.id);
+
+    if (res.error) throw res.error;
+
+    if (!res.data || res.data.length === 0) {
+      grid.innerHTML = '<div class="empty-state"><p>You need a pet to battle! Adopt one first. 🐾</p></div>';
+      return;
+    }
+
+    // Refresh exploring pet IDs from DB in case they changed
+    var expRes = await supabaseClient
+      .from('expeditions')
+      .select('pet_id')
+      .eq('user_id', currentUser.id)
+      .eq('claimed', false)
+      .eq('completed', false);
+    _battleExpeditionPetIds = (expRes.data || []).map(function(r) { return r.pet_id; });
+
+    grid.innerHTML = '';
+    var rendered = 0;
+
+    res.data.forEach(function(userPet) {
+      // Hide pets currently on expedition
+      if (_battleExpeditionPetIds.indexOf(userPet.id) !== -1) return;
+
+      var pet = userPet.pets;
+      if (!pet) return; // safety — skip if join returned null
+
+      var card = makeEl('div', { class: 'battle-pet-card' });
+      card.onclick = function() { selectBattlePet(userPet.id, card); };
+
+      var img = makeEl('img');
+      img.src = 'images/pets/' + (pet.image_file || 'placeholder.png');
+      img.alt = pet.name || 'Pet';
+      img.onerror = function() { this.style.display = 'none'; };
+      card.appendChild(img);
+
+      var name = makeEl('div', { class: 'battle-pet-card-name' });
+      name.textContent = userPet.nickname || pet.name || 'Pet';
+      card.appendChild(name);
+
+      var level = makeEl('div', { class: 'battle-pet-card-level' });
+      level.textContent = 'Level ' + (userPet.level || 1);
+      card.appendChild(level);
+
+      var stats = makeEl('div', { class: 'battle-pet-card-stats' });
+
+      var currentHP = (userPet.current_hp !== null && userPet.current_hp !== undefined) ? userPet.current_hp : (userPet.base_hp || 30);
+      var maxHP = userPet.max_hp || userPet.base_hp || 30;
+
+      var hpStat = makeEl('div', { class: 'battle-pet-stat' });
+      hpStat.innerHTML = '<div class="battle-pet-stat-label">HP</div><div class="battle-pet-stat-value">' + currentHP + '/' + maxHP + '</div>';
+      stats.appendChild(hpStat);
+
+      var atkStat = makeEl('div', { class: 'battle-pet-stat' });
+      atkStat.innerHTML = '<div class="battle-pet-stat-label">ATK</div><div class="battle-pet-stat-value">' + (userPet.base_attack || 5) + '</div>';
+      stats.appendChild(atkStat);
+
+      var defStat = makeEl('div', { class: 'battle-pet-stat' });
+      defStat.innerHTML = '<div class="battle-pet-stat-label">DEF</div><div class="battle-pet-stat-value">' + (userPet.base_defense || 3) + '</div>';
+      stats.appendChild(defStat);
+
+      var spdStat = makeEl('div', { class: 'battle-pet-stat' });
+      spdStat.innerHTML = '<div class="battle-pet-stat-label">SPD</div><div class="battle-pet-stat-value">' + (userPet.base_speed || 4) + '</div>';
+      stats.appendChild(spdStat);
+
+      card.appendChild(stats);
+
+      if ((userPet.energy || 0) < 5) {
+        var warn = makeEl('div');
+        warn.style.cssText = 'font-size:0.7rem;color:#ff6b6b;margin-top:4px;text-align:center;';
+        warn.textContent = '⚠️ Low energy';
+        card.appendChild(warn);
+      }
+
+      grid.appendChild(card);
+      rendered++;
+    });
+
+    if (rendered === 0) {
+      grid.innerHTML = '<div class="empty-state"><p>All your pets are exploring! Wait for them to return. 🧭</p></div>';
+    }
+
+    var helperText = el('battle-helper-text');
+    if (helperText) helperText.textContent = 'Select a pet to battle (' + rendered + ' available)';
+
+  } catch(err) {
+    dbg('loadBattlePets error:', err);
+    grid.innerHTML = '<div class="empty-state"><p>Error loading pets: ' + escapeHtml(err.message) + '</p>' +
+      '<button class="btn btn-primary" onclick="loadBattlePets()" style="margin-top:8px;">Retry</button></div>';
+  }
 }
 
 function selectBattlePet(petId, cardElement) {
