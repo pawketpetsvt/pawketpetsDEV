@@ -13774,21 +13774,21 @@ async function furniture_openRoom(petId) {
     }
 
     // Load or create pet_rooms row
-    var { data: roomRow } = await supabaseClient
+    var { data: roomRow, error: roomErr } = await supabaseClient
       .from('pet_rooms')
       .select('*')
       .eq('pet_id', petId)
-      .single()
-      .catch(function() { return { data: null }; });
+      .maybeSingle();  // returns null (not error) if no row exists
+
+    if (roomErr) throw roomErr;
 
     if (!roomRow) {
-      var { data: newRoom } = await supabaseClient
+      var { data: newRoom, error: insertErr } = await supabaseClient
         .from('pet_rooms')
         .insert({ pet_id: petId, equipped_furniture: [] })
         .select()
-        .single()
-        .catch(function() { return { data: { pet_id: petId, equipped_furniture: [] } }; });
-      roomRow = newRoom || { pet_id: petId, equipped_furniture: [] };
+        .single();
+      roomRow = (!insertErr && newRoom) ? newRoom : { pet_id: petId, equipped_furniture: [] };
     }
 
     petRoomCache[petId] = roomRow;
