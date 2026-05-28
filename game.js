@@ -14577,18 +14577,6 @@ function guild_selectDungeon(key) {
   guild_updateDungeonBtn();
 }
 
-function guild_addPartyMember() {
-  var sel = document.getElementById('guild-liaison-picker');
-  if (!sel || !sel.value) return;
-  if (_selectedLiaisonIds.indexOf(sel.value) !== -1) { showToast('Already in party!', 1500); return; }
-  if (_selectedLiaisonIds.length >= 3) { showToast('Max 3 guildmates!', 1500); return; }
-  _selectedLiaisonIds.push(sel.value);
-  var opt = sel.options[sel.selectedIndex];
-  var listEl = document.getElementById('guild-party-list');
-  if (listEl) listEl.innerHTML = 'Party: You + ' + _selectedLiaisonIds.length + ' guildmate(s): ' + opt.text;
-  guild_updateDungeonBtn();
-}
-
 function guild_updateDungeonBtn() {
   var btn  = document.getElementById('guild-start-dungeon-btn');
   var info = document.getElementById('guild-dungeon-info');
@@ -14600,83 +14588,358 @@ function guild_updateDungeonBtn() {
   else info.textContent = 'Select a dungeon above.';
 }
 
+// ── Multi-pet dungeon battle ──────────────────────────────────────────────
+
+// Stored liaison data from party builder (fetched when guildmates are added)
+var _guildPartyData = []; // array of liaison objects from get_guild_liaisons RPC
+
+function guild_addPartyMember() {
+  var sel = document.getElementById('guild-liaison-picker');
+  if (!sel || !sel.value) return;
+  var userId = sel.value;
+  if (_guildPartyData.some(function(p) { return p.user_id === userId; })) { showToast('Already in party!', 1500); return; }
+  if (_guildPartyData.length >= 3) { showToast('Max 3 guildmates!', 1500); return; }
+
+  // Find the liaison data from the select option's stored data
+  var opt = sel.options[sel.selectedIndex];
+  _guildPartyData.push({ user_id: userId, label: opt.text });
+
+  var listEl = document.getElementById('guild-party-list');
+  if (listEl) {
+    listEl.innerHTML = '<strong>Party:</strong> You' + (_guildPartyData.length > 0 ? ' + ' + _guildPartyData.map(function(p){ return escapeHtml(p.label.split('—')[0].trim()); }).join(', ') : '');
+  }
+  guild_updateDungeonBtn();
+}
+
+// Enemy templates per dungeon
+var DUNGEON_ENEMIES = {
+  guild_dungeon_easy:   [
+    { name:'Restless Spirit', icon:'👻', base_hp:40,  base_attack:6,  base_defense:2,  speed:4 },
+    { name:'Crypt Crawler',   icon:'🦟', base_hp:30,  base_attack:8,  base_defense:1,  speed:6 },
+    { name:'Bone Archer',     icon:'🏹', base_hp:35,  base_attack:7,  base_defense:3,  speed:5 }
+  ],
+  guild_dungeon_medium: [
+    { name:'Swamp Lurker',    icon:'🐊', base_hp:70,  base_attack:12, base_defense:4,  speed:3 },
+    { name:'Shadow Imp',      icon:'😈', base_hp:55,  base_attack:15, base_defense:3,  speed:7 },
+    { name:'Vine Strangler',  icon:'🌿', base_hp:80,  base_attack:10, base_defense:6,  speed:2 }
+  ],
+  guild_dungeon_hard:   [
+    { name:'Void Knight',     icon:'🗡️', base_hp:120, base_attack:20, base_defense:8,  speed:6 },
+    { name:'Chaos Mage',      icon:'🧙', base_hp:90,  base_attack:25, base_defense:4,  speed:8 },
+    { name:'Corrupted Titan', icon:'👹', base_hp:160, base_attack:18, base_defense:10, speed:3 }
+  ]
+};
+
 async function guild_startDungeon() {
   if (!_selectedDungeonKey || !guildState.liaisonPetId || !guildState.myGuild) return;
   if (!canPerformAction('guild_dungeon', 5000)) return;
 
   var btn = document.getElementById('guild-start-dungeon-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Running dungeon…'; }
+  if (btn) { btn.disabled = true; btn.textContent = '⚔️ Loading battle…'; }
 
   try {
     var { data: dungeon } = await supabaseClient.from('guild_dungeons').select('*').eq('dungeon_key', _selectedDungeonKey).single();
     if (!dungeon) throw new Error('Dungeon not found');
-    if ((currentPoints||0) < dungeon.entry_cost_pp) { showToast('Need ' + dungeon.entry_cost_pp + ' PP to enter!', 3000); if (btn) { btn.disabled=false; guild_updateDungeonBtn(); } return; }
+    if ((currentPoints||0) < dungeon.entry_cost_pp) {
+      showToast('Need ' + dungeon.entry_cost_pp + ' PP to enter!', 3000);
+      if (btn) { btn.disabled = false; guild_updateDungeonBtn(); }
+      return;
+    }
 
     // Deduct entry cost
     await awardPP(-dungeon.entry_cost_pp, 'guild_dungeon_entry');
 
-    // Get my pet stats
-    var myPet = petState[guildState.liaisonPetId] || {};
+    // Build party — my pet first
+    var myPetRaw = petState[guildState.liaisonPetId] || {};
+    var party = [{
+      id:       guildState.liaisonPetId,
+      name:     escapeHtml(myPetRaw.nickname || myPetRaw.pet_type || 'Your Pet'),
+      ownerName:'You',
+      isPlayer: true,
+      icon:     '🐾',
+      variant:  myPetRaw.current_variant || null,
+      maxHp:    myPetRaw.max_hp || myPetRaw.base_hp || 30,
+      currentHp:myPetRaw.current_hp || myPetRaw.base_hp || 30,
+      attack:   myPetRaw.base_attack || 5,
+      defense:  myPetRaw.base_defense || 3,
+      speed:    myPetRaw.base_speed || 4
+    }];
 
-    // Simple wave simulation
-    var totalWaves = dungeon.waves || 3;
-    var avgLevel = ((myPet.level||1) + (guildState.myGuild.guild_level||1) * 2) / 2;
-    var wavesWon = 0;
-    for (var w = 0; w < totalWaves; w++) {
-      var enemyHP  = dungeon.base_enemy_level * 10 + w * 5;
-      var myAtk    = (myPet.base_attack||5) + Math.floor(Math.random() * 5);
-      var turns    = Math.ceil(enemyHP / myAtk);
-      var survived = turns <= 8 + Math.floor(avgLevel / 5);
-      if (survived) wavesWon++;
+    // Fetch full liaison data for selected guildmates
+    if (_guildPartyData.length > 0) {
+      var { data: liaisons } = await supabaseClient.rpc('get_guild_liaisons', {
+        p_guild_id: guildState.myGuild.guild_id,
+        p_exclude_user_id: currentUser.id
+      });
+      _guildPartyData.forEach(function(gm) {
+        var liaison = (liaisons||[]).find(function(l) { return l.user_id === gm.user_id; });
+        if (liaison) {
+          party.push({
+            id:       liaison.pet_id,
+            name:     escapeHtml(liaison.pet_name || 'Pet'),
+            ownerName:escapeHtml(liaison.username || 'Guildmate'),
+            isPlayer: false,
+            icon:     '🐾',
+            variant:  liaison.pet_variant || null,
+            maxHp:    liaison.pet_max_hp || 30,
+            currentHp:liaison.pet_max_hp || 30,
+            attack:   liaison.pet_attack || 5,
+            defense:  liaison.pet_defense || 3,
+            speed:    liaison.pet_speed || 4
+          });
+        }
+      });
     }
 
-    var victory = wavesWon >= Math.ceil(totalWaves * 0.6);
-    var levelBonus = Math.min(1.5, 1 + ((myPet.level||1) / 100));
-    var ppReward  = victory ? Math.floor(dungeon.base_pp_reward  * levelBonus) : Math.floor(dungeon.base_pp_reward * 0.25);
-    var xpReward  = victory ? Math.floor(dungeon.base_xp_reward  * levelBonus) : Math.floor(dungeon.base_xp_reward * 0.25);
-    var gxpReward = victory ? dungeon.base_guild_xp_reward : Math.floor(dungeon.base_guild_xp_reward * 0.25);
+    // Scale enemies to dungeon level
+    var enemyTemplates = DUNGEON_ENEMIES[_selectedDungeonKey] || DUNGEON_ENEMIES.guild_dungeon_easy;
+    var enemyLevel = dungeon.base_enemy_level || 5;
+    var levelMult = 1 + enemyLevel * 0.1;
 
-    // Award rewards
+    // Build waves
+    var totalWaves = dungeon.waves || 3;
+    var waves = [];
+    for (var w = 0; w < totalWaves; w++) {
+      var waveEnemyCount = Math.min(enemyTemplates.length, 1 + Math.floor(w / 2));
+      var waveEnemies = [];
+      for (var e = 0; e < waveEnemyCount; e++) {
+        var tmpl = enemyTemplates[e % enemyTemplates.length];
+        waveEnemies.push({
+          name:     tmpl.name,
+          icon:     tmpl.icon,
+          maxHp:    Math.floor(tmpl.base_hp * levelMult * (1 + w * 0.15)),
+          currentHp:Math.floor(tmpl.base_hp * levelMult * (1 + w * 0.15)),
+          attack:   Math.floor(tmpl.base_attack * (1 + w * 0.1)),
+          defense:  Math.floor(tmpl.base_defense),
+          speed:    tmpl.speed
+        });
+      }
+      waves.push(waveEnemies);
+    }
+
+    // Run the animated battle
+    guild_runBattle(dungeon, party, waves, 0, []);
+
+  } catch(err) {
+    showToast('Dungeon failed: ' + err.message, 4000);
+    if (btn) { btn.disabled = false; guild_updateDungeonBtn(); }
+  }
+}
+
+function guild_runBattle(dungeon, party, waves, waveIndex, fullLog) {
+  var mount = document.getElementById('guild-content');
+  if (!mount) return;
+
+  var enemies = waves[waveIndex].map(function(e) { return Object.assign({}, e); }); // fresh copy
+  var log = [];
+
+  // ── Simulate this wave ──
+  var turn = 0;
+  var maxTurns = 60;
+
+  while (
+    party.some(function(p) { return p.currentHp > 0; }) &&
+    enemies.some(function(e) { return e.currentHp > 0; }) &&
+    turn < maxTurns
+  ) {
+    turn++;
+    // Build turn order: all alive combatants sorted by speed
+    var order = []
+      .concat(party.filter(function(p) { return p.currentHp > 0; }))
+      .concat(enemies.filter(function(e) { return e.currentHp > 0; }));
+    order.sort(function(a, b) { return (b.speed||4) - (a.speed||4); });
+
+    order.forEach(function(actor) {
+      if (actor.currentHp <= 0) return;
+      var isParty = !!actor.isPlayer || actor.ownerName !== undefined;
+
+      if (isParty) {
+        // Attack random alive enemy
+        var targets = enemies.filter(function(e) { return e.currentHp > 0; });
+        if (!targets.length) return;
+        var target = targets[Math.floor(Math.random() * targets.length)];
+        var base = Math.max(1, actor.attack - target.defense);
+        var variance = 0.8 + Math.random() * 0.6;
+        var isCrit = Math.random() < 0.10;
+        var dmg = Math.floor(base * variance * (isCrit ? 1.5 : 1));
+        target.currentHp = Math.max(0, target.currentHp - dmg);
+        log.push({ type: isCrit ? 'crit' : 'atk', text: actor.name + ' attacks ' + target.name + ' for ' + dmg + ' damage!' + (isCrit ? ' ⚡ CRIT!' : ''), waveIdx: waveIndex });
+        if (target.currentHp <= 0) log.push({ type: 'death', text: target.name + ' was defeated! 💀', waveIdx: waveIndex });
+      } else {
+        // Enemy attacks random alive party member
+        var ptargets = party.filter(function(p) { return p.currentHp > 0; });
+        if (!ptargets.length) return;
+        var ptarget = ptargets[Math.floor(Math.random() * ptargets.length)];
+        var pbase = Math.max(1, actor.attack - ptarget.defense);
+        var pdmg = Math.floor(pbase * (0.8 + Math.random() * 0.6));
+        ptarget.currentHp = Math.max(0, ptarget.currentHp - pdmg);
+        log.push({ type: 'enemy', text: actor.name + ' attacks ' + ptarget.name + ' for ' + pdmg + ' damage!', waveIdx: waveIndex });
+        if (ptarget.currentHp <= 0) log.push({ type: 'death', text: ptarget.name + ' was knocked out! 😵', waveIdx: waveIndex });
+      }
+    });
+  }
+
+  fullLog = fullLog.concat(log);
+  var waveVictory = enemies.every(function(e) { return e.currentHp <= 0; });
+
+  // ── Render battle result screen ──
+  var partyHtml = party.map(function(p) {
+    var pct = Math.max(0, Math.round((p.currentHp / p.maxHp) * 100));
+    var barColor = pct > 60 ? '#4ade80' : pct > 30 ? '#fbbf24' : '#ff6b6b';
+    var varIcon = p.variant ? (VARIANT_PARTICLES[p.variant] ? VARIANT_PARTICLES[p.variant][0] : '✨') : '🐾';
+    return '<div class="guild-party-member">' +
+      '<div style="font-size:1.1rem;">' + varIcon + '</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:0.78rem;font-weight:700;color:' + (p.isPlayer?'var(--purple)':'var(--purple-dark)') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+          p.name + (p.isPlayer ? ' <span style="color:var(--purple);font-size:0.68rem;">(You)</span>' : ' <span style="color:var(--text-light);font-size:0.68rem;">(' + p.ownerName + ')</span>') +
+        '</div>' +
+        '<div class="guild-member-hp-bar"><div class="guild-member-hp-fill" style="width:' + pct + '%;background:' + barColor + ';"></div></div>' +
+        '<div style="font-size:0.68rem;color:var(--text-light);">' + Math.max(0,p.currentHp) + '/' + p.maxHp + ' HP' + (p.currentHp<=0 ? ' 💀' : '') + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  var enemyHtml = enemies.map(function(e) {
+    var pct = Math.max(0, Math.round((e.currentHp / e.maxHp) * 100));
+    return '<div class="guild-enemy-card">' +
+      '<div style="font-size:1.6rem;">' + e.icon + '</div>' +
+      '<div style="font-size:0.72rem;font-weight:700;color:' + (e.currentHp<=0?'#888':'var(--purple-dark)') + ';">' + e.name + '</div>' +
+      '<div class="guild-enemy-hp-bar"><div class="guild-enemy-hp-fill" style="width:' + pct + '%;opacity:' + (e.currentHp<=0?'0.3':'1') + ';"></div></div>' +
+      '<div style="font-size:0.68rem;color:var(--text-light);">' + Math.max(0,e.currentHp) + '/' + e.maxHp + (e.currentHp<=0?' ✅':'') + '</div>' +
+    '</div>';
+  }).join('');
+
+  var logHtml = fullLog.slice(-20).map(function(entry) {
+    var cls = entry.type === 'crit' ? 'critical' : entry.type === 'death' ? 'death' : entry.type === 'enemy' ? 'enemy-atk' : '';
+    return '<div class="guild-battle-log-entry ' + cls + '">' + escapeHtml(entry.text) + '</div>';
+  }).join('');
+
+  var hasMoreWaves = waveIndex < waves.length - 1;
+  var partyAlive = party.some(function(p) { return p.currentHp > 0; });
+
+  mount.innerHTML =
+    '<div style="font-size:0.78rem;font-weight:700;color:var(--text-light);letter-spacing:1px;margin-bottom:10px;">⚔️ ' + escapeHtml(dungeon.name) + ' — Wave ' + (waveIndex+1) + '/' + waves.length + '</div>' +
+
+    '<div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">' +
+      // Party side
+      '<div style="flex:1;">' +
+        '<div style="font-size:0.72rem;font-weight:700;color:var(--purple);margin-bottom:6px;letter-spacing:1px;">YOUR PARTY</div>' +
+        '<div class="guild-party-panel">' + partyHtml + '</div>' +
+      '</div>' +
+
+      // VS divider
+      '<div style="font-size:1.2rem;font-weight:800;color:var(--text-light);padding-top:30px;">⚡</div>' +
+
+      // Enemy side
+      '<div style="flex:1;">' +
+        '<div style="font-size:0.72rem;font-weight:700;color:#ff6b6b;margin-bottom:6px;letter-spacing:1px;">ENEMIES</div>' +
+        '<div class="guild-enemies-grid">' + enemyHtml + '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // Battle log
+    '<div style="font-size:0.72rem;font-weight:700;color:var(--text-light);margin-bottom:6px;letter-spacing:1px;">BATTLE LOG</div>' +
+    '<div class="guild-battle-log">' + logHtml + '</div>' +
+
+    // Wave result + actions
+    '<div style="margin-top:12px;padding:10px 0;text-align:center;">' +
+      '<div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;color:' + (waveVictory?'#4ade80':'#ff6b6b') + ';">' +
+        (waveVictory ? '✅ Wave ' + (waveIndex+1) + ' Cleared!' : '❌ Wave ' + (waveIndex+1) + ' Failed!') +
+      '</div>' +
+      (waveVictory && hasMoreWaves && partyAlive
+        ? '<button class="btn btn-primary" onclick="guild_nextWave()" style="width:100%;margin-bottom:6px;">Continue to Wave ' + (waveIndex+2) + ' →</button>'
+        : '') +
+      '<button class="btn btn-outline btn-sm" onclick="guild_endDungeon(' + JSON.stringify(waveVictory && !hasMoreWaves || (waveVictory && !partyAlive)) + ',' + (waveIndex+1) + ',' + waves.length + ')" style="width:100%;">' +
+        (waveVictory && !hasMoreWaves ? '🏆 Claim Rewards' : (waveVictory && hasMoreWaves && !partyAlive ? '💀 Party defeated — End Run' : '🏃 Retreat')) +
+      '</button>' +
+    '</div>';
+
+  // Scroll log to bottom
+  var logEl = mount.querySelector('.guild-battle-log');
+  if (logEl) logEl.scrollTop = logEl.scrollHeight;
+
+  // Store state for next wave
+  window._guildBattleState = { dungeon: dungeon, party: party, waves: waves, waveIndex: waveIndex, fullLog: fullLog };
+}
+
+function guild_nextWave() {
+  var s = window._guildBattleState;
+  if (!s) return;
+  // Small heal between waves (10% of max HP)
+  s.party.forEach(function(p) {
+    if (p.currentHp > 0) p.currentHp = Math.min(p.maxHp, p.currentHp + Math.floor(p.maxHp * 0.10));
+  });
+  s.fullLog.push({ type: 'heal', text: '— Wave ' + (s.waveIndex+2) + ' begins! Party recovered 10% HP. —', waveIdx: s.waveIndex+1 });
+  guild_runBattle(s.dungeon, s.party, s.waves, s.waveIndex + 1, s.fullLog);
+}
+
+async function guild_endDungeon(victory, wavesCleared, totalWaves) {
+  var s = window._guildBattleState;
+  if (!s) { guild_renderDungeons(); return; }
+  var dungeon = s.dungeon;
+  var party   = s.party;
+
+  var mount = document.getElementById('guild-content');
+  if (mount) mount.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    var myPet = petState[guildState.liaisonPetId] || {};
+    var levelBonus = Math.min(1.5, 1 + ((myPet.level||1) / 100));
+    var clearRatio = wavesCleared / totalWaves;
+    var ppReward  = Math.floor(dungeon.base_pp_reward  * levelBonus * clearRatio);
+    var xpReward  = Math.floor(dungeon.base_xp_reward  * levelBonus * clearRatio);
+    var gxpReward = Math.floor(dungeon.base_guild_xp_reward * clearRatio);
+
     if (ppReward > 0) await awardPP(ppReward, 'guild_dungeon');
     if (xpReward > 0) await addPetXP(guildState.liaisonPetId, xpReward);
     addPassXP(15, 'guild_dungeon').catch(function(){});
     updateBingoProgress('guild_dungeon', 1);
-
-    // Add guild XP
-    if (gxpReward > 0) {
-      await supabaseClient.rpc('add_guild_xp', { p_guild_id: guildState.myGuild.guild_id, p_xp_amount: gxpReward }).catch(function(){});
-    }
+    if (gxpReward > 0) await supabaseClient.rpc('add_guild_xp', { p_guild_id: guildState.myGuild.guild_id, p_xp_amount: gxpReward }).catch(function(){});
 
     // Log run
     await supabaseClient.from('guild_dungeon_runs').insert({
       guild_id: guildState.myGuild.guild_id, user_id: currentUser.id,
       dungeon_id: dungeon.id,
-      party: [{ user_id: currentUser.id, pet_id: guildState.liaisonPetId }],
-      enemies_defeated: wavesWon, victory: victory, rewards_claimed: true,
+      party: party.map(function(p) { return { pet_id: p.id, owner: p.ownerName }; }),
+      enemies_defeated: wavesCleared, victory: victory, rewards_claimed: true,
       completed_at: new Date().toISOString()
     }).catch(function(){});
 
-    // Show result modal
-    var modal = makeModal();
-    modal.innerHTML =
-      '<div style="text-align:center;padding:10px 0;">' +
-        '<div style="font-size:2.5rem;margin-bottom:8px;">' + (victory?'🏆':'💀') + '</div>' +
-        '<div style="font-weight:800;font-size:1.1rem;color:var(--purple-dark);margin-bottom:8px;">' + (victory?'Victory!':'Defeated') + '</div>' +
-        '<div style="font-size:0.82rem;color:var(--text-light);margin-bottom:12px;">Waves cleared: ' + wavesWon + '/' + totalWaves + '</div>' +
-        '<div style="background:rgba(153,102,255,0.08);border-radius:12px;padding:12px;margin-bottom:14px;">' +
-          '<div style="font-size:1.4rem;font-weight:800;color:#e6a800;">+' + ppReward + ' PP</div>' +
-          '<div style="font-size:0.82rem;color:#5dde7a;">+' + xpReward + ' XP · +' + gxpReward + ' Guild XP</div>' +
-        '</div>' +
-        '<button class="btn btn-primary" onclick="closeModal();guild_renderDungeons();" style="width:100%;">Back to Dungeons</button>' +
+    // Show result
+    var survivalSummary = party.map(function(p) {
+      var pct = Math.max(0, Math.round((p.currentHp/p.maxHp)*100));
+      return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.78rem;">' +
+        '<span style="flex:1;">' + p.name + (p.isPlayer?' (You)':'') + '</span>' +
+        '<span style="color:' + (p.currentHp>0?'#4ade80':'#ff6b6b') + ';">' + (p.currentHp>0?pct+'% HP':'KO') + '</span>' +
       '</div>';
-    openModal(modal);
+    }).join('');
+
+    if (mount) mount.innerHTML =
+      '<div style="text-align:center;padding:10px 0;">' +
+        '<div style="font-size:3rem;margin-bottom:10px;">' + (victory?'🏆':'💀') + '</div>' +
+        '<div style="font-weight:800;font-size:1.15rem;color:var(--purple-dark);margin-bottom:4px;">' + (victory?'Dungeon Complete!':'Run Ended') + '</div>' +
+        '<div style="font-size:0.82rem;color:var(--text-light);margin-bottom:14px;">Waves cleared: ' + wavesCleared + '/' + totalWaves + '</div>' +
+
+        '<div style="background:linear-gradient(135deg,rgba(255,215,0,0.12),rgba(153,102,255,0.08));border-radius:14px;padding:14px;margin-bottom:14px;">' +
+          '<div style="font-size:1.5rem;font-weight:800;color:#e6a800;">+' + ppReward + ' PP</div>' +
+          '<div style="font-size:0.82rem;color:#5dde7a;margin-top:4px;">+' + xpReward + ' Pet XP · +' + gxpReward + ' Guild XP</div>' +
+        '</div>' +
+
+        '<div style="text-align:left;margin-bottom:16px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;">' +
+          '<div style="font-weight:700;font-size:0.78rem;color:var(--purple-dark);margin-bottom:6px;">Party Survival</div>' +
+          survivalSummary +
+        '</div>' +
+
+        '<button class="btn btn-primary" onclick="guild_renderDungeons()" style="width:100%;">Back to Dungeons</button>' +
+      '</div>';
 
     _selectedDungeonKey = null;
     _selectedLiaisonIds = [];
+    _guildPartyData = [];
+    window._guildBattleState = null;
   } catch(err) {
-    showToast('Dungeon failed: ' + err.message, 4000);
-    await awardPP(dungeon ? dungeon.entry_cost_pp : 0, 'guild_dungeon_refund').catch(function(){});
-    if (btn) { btn.disabled = false; guild_updateDungeonBtn(); }
+    showToast('Error saving run: ' + err.message, 4000);
+    if (mount) mount.innerHTML = '<button class="btn btn-outline" onclick="guild_renderDungeons()">← Back to Dungeons</button>';
   }
 }
 
