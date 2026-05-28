@@ -995,7 +995,7 @@ a:hover { color: var(--pink) !important; }
 
 /* PET CARD BODY */
 .pet-card-body {
-  padding: 65px 24px 24px !important;
+  padding: 65px 16px 20px !important;
   position: relative !important;
 }
 
@@ -1139,20 +1139,28 @@ a:hover { color: var(--pink) !important; }
 /* PET ACTIONS */
 .pet-actions {
   display: flex !important;
-  gap: 10px !important;
-  margin: 16px 0 !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  margin: 12px 0 !important;
+  justify-content: center !important;
 }
 .btn-action {
-  flex: 1 !important;
+  flex: 1 1 auto !important;
+  min-width: 72px !important;
+  max-width: calc(50% - 4px) !important;
   font-family: 'Chewy', cursive !important;
-  font-size: 1rem !important;
-  padding: 12px 20px !important;
+  font-size: 0.88rem !important;
+  padding: 8px 10px !important;
   border-radius: 25px !important;
   border: 3px solid transparent !important;
   cursor: pointer !important;
   transition: all 0.2s !important;
   font-weight: 600 !important;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 .btn-action:hover:not(:disabled) {
   transform: translateY(-3px) !important;

@@ -3161,7 +3161,7 @@ function makeMyPetCard(pet) {
   var roomBtn = makeEl('button', {class:'btn-action'});
   roomBtn.textContent = '🏠 Room';
   roomBtn.title = 'Decorate your pet\'s room!';
-  roomBtn.style.cssText = 'flex:1;min-width:60px;padding:7px 10px;font-size:0.82rem;background:linear-gradient(135deg,#5cb85c,#3a9a3a);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:600;';
+  roomBtn.style.cssText = 'min-width:72px;padding:8px 10px;font-size:0.88rem;background:linear-gradient(135deg,#5cb85c,#3a9a3a);color:white;border:none;border-radius:25px;cursor:pointer;font-weight:600;white-space:nowrap;text-align:center;';
   roomBtn.onclick = (function(id) { return function() { furniture_openRoom(id); }; })(pet.id);
   
   var playBtn = makeEl('button', {class:'btn-action btn-play', id:'play-'+pet.id}, pet.energy >= 10 ? 'Play' : 'Tired!');
@@ -3177,7 +3177,7 @@ function makeMyPetCard(pet) {
   var snapBtn = makeEl('button', {class:'btn-action btn-snapshot', id:'snap-'+pet.id});
   snapBtn.textContent = '📸';
   snapBtn.title = 'Take a Snapshot of this pet!';
-  snapBtn.style.cssText = 'background:linear-gradient(135deg,#764ba2,#9966ff);color:white;border:none;border-radius:10px;padding:7px 10px;font-size:0.9rem;cursor:pointer;transition:transform 0.15s;flex:0 0 auto;';
+  snapBtn.style.cssText = 'background:linear-gradient(135deg,#764ba2,#9966ff);color:white;border:none;border-radius:25px;padding:8px 10px;font-size:0.9rem;cursor:pointer;transition:transform 0.15s;flex:0 0 auto;white-space:nowrap;';
   snapBtn.onmouseover = function() { this.style.transform = 'scale(1.1)'; };
   snapBtn.onmouseout  = function() { this.style.transform = 'scale(1)'; };
   snapBtn.onclick = function() { screenshot_generate(pet.id); };
