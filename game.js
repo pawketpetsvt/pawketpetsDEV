@@ -3816,7 +3816,8 @@ async function expedition_claim(expeditionId) {
   // Award PP
   var streak = await checkExplorationStreak(row.pet_id, row.zone);
   var streakMult = getStreakMultiplier(row.pet_id, row.zone);
-  var finalPP = Math.floor((row.reward_pp || 0) * streakMult);
+  var perkMult   = getActivePerkMultiplier('reward_boost');
+  var finalPP = Math.floor((row.reward_pp || 0) * streakMult * perkMult);
   await awardPP(finalPP, 'expedition_' + row.zone);
 
   // Check for secrets
@@ -5265,6 +5266,7 @@ async function loadShop() {
       
       // Apply event discount to displayed price
       var displayPrice = worldEvents.applyEventModifier(item.price, 'shopDiscount');
+      var guildDiscount = getActivePerkMultiplier('discount'); if (guildDiscount < 1) displayPrice = Math.floor(displayPrice * guildDiscount);
       var priceText = '🪙 ' + displayPrice + ' PP';
       if (displayPrice < item.price) {
         priceText += ' <span style="text-decoration:line-through;color:#999;font-size:0.85em;">' + item.price + '</span>';
@@ -5306,6 +5308,7 @@ async function loadShop() {
       // Apply event discount to displayed price
       var displayPrice = worldEvents.applyEventModifier(item.price, 'shopDiscount');
       var priceText = '🪙 ' + displayPrice + ' PP';
+      var guildDiscount = getActivePerkMultiplier('discount'); if (guildDiscount < 1) displayPrice = Math.floor(displayPrice * guildDiscount);
       if (displayPrice < item.price) {
         priceText += ' <span style="text-decoration:line-through;color:#999;font-size:0.85em;">' + item.price + '</span>';
       }
@@ -9055,6 +9058,12 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
     expGained = result.exp_gained || 0;
     ppGained = result.pp_gained || 0;
     console.log('✅ Battle saved securely. XP:', expGained, 'PP:', ppGained);
+  }
+  
+  // Apply guild XP boost perk
+  var xpPerkMult = getActivePerkMultiplier('xp_boost');
+  if (xpPerkMult > 1 && expGained > 0) {
+    expGained = Math.floor(expGained * xpPerkMult);
   }
   
   // CRITICAL: Ensure HP is properly updated after battle
@@ -14255,6 +14264,7 @@ async function guild_join(guildId) {
 
     showToast('🏛️ Joined the guild!', 3000);
     await loadGuildPage();
+    loadActiveGuildPerks().catch(function(){});
   } catch(err) {
     showToast('Could not join: ' + err.message, 3000);
   }
@@ -14388,6 +14398,7 @@ async function guild_renderMemberView(mount) {
     mount.innerHTML =
       '<div style="display:flex;gap:8px;margin-bottom:16px;">' +
         '<button class="btn btn-primary" onclick="guild_renderDungeons()" style="flex:1;">⚔️ Dungeons</button>' +
+        '<button class="btn btn-outline" onclick="guild_renderTreasury()" style="flex:1;">🏦 Treasury</button>' +
         '<button class="btn btn-outline" onclick="loadGuildPage()" style="flex:0 0 auto;">🔄</button>' +
       '</div>' +
 
@@ -14412,12 +14423,6 @@ async function guild_renderMemberView(mount) {
 
       // Liaison section
       liaisonSection +
-
-      // Donate
-      '<div style="margin-bottom:14px;">' +
-        '<div style="font-weight:700;font-size:0.82rem;color:var(--purple-dark);margin-bottom:4px;">💰 Donate to Treasury</div>' +
-        donateSection +
-      '</div>' +
 
       // Members
       '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:8px;">👥 Members</div>' +
@@ -14506,6 +14511,92 @@ async function guild_declineRequest(requestId) {
   } catch(err) { showToast('Failed: ' + err.message, 3000); }
 }
 
+// ── Guild Treasury & Voting System ───────────────────────────────────────
+
+// Active perk storage: { effectType: { multiplier, expiresAt } }
+var _activeGuildPerks = {};
+
+function getActivePerkMultiplier(effectType) {
+  var perk = _activeGuildPerks[effectType];
+  if (!perk) return 1.0;
+  if (Date.now() > perk.expiresAt) { delete _activeGuildPerks[effectType]; return 1.0; }
+  return perk.multiplier || 1.0;
+}
+
+function clearGuildPerks(guildId) {
+  var perkTypes = ['xp_boost', 'discount', 'reward_boost'];
+  perkTypes.forEach(function(t) {
+    try { localStorage.removeItem('guild_perk_' + guildId + '_' + t); } catch(e) {}
+    delete _activeGuildPerks[t];
+  });
+  try { localStorage.removeItem('guild_perks'); } catch(e) {}
+}
+
+function applyGuildPerk(effectType, effectValue, durationHours) {
+  if (!guildState.myGuild) return;
+  var guildId  = guildState.myGuild.guild_id;
+  var multiplier = 1.0;
+  if (effectType === 'xp_boost')      multiplier = 1 + ((effectValue.percent || 10) / 100);
+  else if (effectType === 'discount')  multiplier = 1 - ((effectValue.percent || 20) / 100);
+  else if (effectType === 'reward_boost') multiplier = 1 + ((effectValue.percent || 25) / 100);
+  var perk = { multiplier: multiplier, expiresAt: Date.now() + durationHours * 3600000, guildId: guildId };
+  _activeGuildPerks[effectType] = perk;
+  // Store with guild-scoped key so stale perks from old guilds don't bleed over
+  try { localStorage.setItem('guild_perk_' + guildId + '_' + effectType, JSON.stringify(perk)); } catch(e) {}
+}
+
+async function loadActiveGuildPerks() {
+  if (!currentUser) return;
+
+  // Restore guild-scoped perks from localStorage (only for current guild)
+  if (guildState.myGuild) {
+    var guildId = guildState.myGuild.guild_id;
+    var perkTypes = ['xp_boost', 'discount', 'reward_boost'];
+    var now = Date.now();
+    perkTypes.forEach(function(t) {
+      try {
+        var raw = localStorage.getItem('guild_perk_' + guildId + '_' + t);
+        if (raw) {
+          var p = JSON.parse(raw);
+          if (p.expiresAt > now && p.guildId === guildId) {
+            _activeGuildPerks[t] = p;
+          } else {
+            localStorage.removeItem('guild_perk_' + guildId + '_' + t);
+            delete _activeGuildPerks[t];
+          }
+        }
+      } catch(e) {}
+    });
+  } else {
+    // Not in a guild — clear everything
+    ['xp_boost', 'discount', 'reward_boost'].forEach(function(t) { delete _activeGuildPerks[t]; });
+    return;
+  }
+
+  try {
+    // Process any votes that have just passed/expired
+    var { data: results } = await supabaseClient.rpc('process_passed_treasury_votes').catch(function() { return { data: null }; });
+    (results || []).forEach(function(r) {
+      if (r.status === 'passed' && r.effect_type && r.effect_value) {
+        applyGuildPerk(r.effect_type, r.effect_value, r.duration_hours || 24);
+        showToast('🏦 Guild perk activated: ' + r.effect_type.replace('_',' ') + '!', 4000);
+      }
+    });
+  } catch(e) { dbg('loadActiveGuildPerks error:', e); }
+}
+
+// Prune expired perks every 60 seconds — no DB call, just in-memory cleanup
+safeSetInterval(function() {
+  var now = Date.now();
+  ['xp_boost','discount','reward_boost'].forEach(function(t) {
+    var p = _activeGuildPerks[t];
+    if (p && p.expiresAt <= now) {
+      delete _activeGuildPerks[t];
+      if (p.guildId) { try { localStorage.removeItem('guild_perk_' + p.guildId + '_' + t); } catch(e) {} }
+    }
+  });
+}, 60000);
+
 async function guild_donate() {
   var amountStr = (document.getElementById('guild-donate-amount')||{}).value;
   var amount = parseInt(amountStr);
@@ -14515,24 +14606,249 @@ async function guild_donate() {
   try {
     await awardPP(-amount, 'guild_donation');
 
-    // Fetch current treasury and contributions, then increment both
-    var { data: g } = await supabaseClient
-      .from('guilds').select('guild_treasury').eq('id', guildState.myGuild.guild_id).single();
-    await supabaseClient.from('guilds')
-      .update({ guild_treasury: ((g && g.guild_treasury) || 0) + amount })
-      .eq('id', guildState.myGuild.guild_id);
+    // Use RPC to atomically add to treasury and log
+    var { data: rpcResult, error: rpcErr } = await supabaseClient.rpc('add_to_guild_treasury', {
+      p_guild_id:    guildState.myGuild.guild_id,
+      p_user_id:     currentUser.id,
+      p_amount:      amount,
+      p_action:      'donate',
+      p_description: 'Player donated ' + amount + ' PP'
+    });
 
-    // Increment member contributions (not overwrite)
-    var { data: m } = await supabaseClient
-      .from('guild_members').select('total_contributions')
+    if (rpcErr) {
+      // Fallback: manual fetch+update if RPC not available
+      var { data: g } = await supabaseClient.from('guilds').select('guild_treasury').eq('id', guildState.myGuild.guild_id).single();
+      await supabaseClient.from('guilds').update({ guild_treasury: ((g && g.guild_treasury) || 0) + amount }).eq('id', guildState.myGuild.guild_id);
+    }
+
+    // Increment member contributions
+    var { data: m } = await supabaseClient.from('guild_members').select('total_contributions')
       .eq('guild_id', guildState.myGuild.guild_id).eq('user_id', currentUser.id).single();
     await supabaseClient.from('guild_members')
       .update({ total_contributions: ((m && m.total_contributions) || 0) + amount })
       .eq('guild_id', guildState.myGuild.guild_id).eq('user_id', currentUser.id);
 
+    awardBadge('treasury_donor').catch(function(){});
+    updateBingoProgress('donate_guild', 1);
     showToast('💰 Donated ' + amount + ' PP to the treasury!', 3000);
     loadGuildPage();
   } catch(err) { showToast('Failed: ' + err.message, 3000); }
+}
+
+async function guild_renderTreasury() {
+  var mount = document.getElementById('guild-content');
+  if (!mount || !guildState.myGuild) return;
+  mount.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    var guildId = guildState.myGuild.guild_id;
+
+    // Fetch treasury balance
+    var { data: guildData } = await supabaseClient.from('guilds').select('guild_treasury').eq('id', guildId).single();
+    var treasury = (guildData && guildData.guild_treasury) || 0;
+
+    // Fetch active votes
+    var { data: votes } = await supabaseClient
+      .from('guild_treasury_votes')
+      .select('*')
+      .eq('guild_id', guildId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
+
+    // Fetch treasury logs (last 10)
+    var { data: logs } = await supabaseClient
+      .from('guild_treasury_logs')
+      .select('*, players(username)')
+      .eq('guild_id', guildId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    var canPropose = guildState.myRole === 'leader' || guildState.myRole === 'officer';
+
+    // Active perks banner
+    var activePerkHtml = '';
+    var now = Date.now();
+    var activeKeys = Object.keys(_activeGuildPerks).filter(function(k) { return _activeGuildPerks[k].expiresAt > now; });
+    if (activeKeys.length > 0) {
+      activePerkHtml = '<div style="background:rgba(93,222,122,0.1);border:1px solid rgba(93,222,122,0.3);border-radius:10px;padding:10px 12px;margin-bottom:14px;">' +
+        '<div style="font-weight:700;font-size:0.8rem;color:#2d8a4e;margin-bottom:6px;">✨ Active Guild Perks</div>' +
+        activeKeys.map(function(k) {
+          var p = _activeGuildPerks[k];
+          var minsLeft = Math.floor((p.expiresAt - now) / 60000);
+          var label = k === 'xp_boost' ? '⚡ XP Boost' : k === 'discount' ? '🛒 Shop Discount' : k === 'reward_boost' ? '💰 Reward Boost' : k;
+          return '<div style="font-size:0.78rem;color:#2d8a4e;">' + label + ' · ' + minsLeft + 'm remaining</div>';
+        }).join('') +
+      '</div>';
+    }
+
+    // Votes html
+    var votesHtml = (votes && votes.length > 0)
+      ? votes.map(function(v) {
+          var endsAt  = new Date(v.ends_at);
+          var minsLeft = Math.max(0, Math.floor((endsAt - new Date()) / 60000));
+          var hrsLeft  = Math.floor(minsLeft / 60);
+          var timeStr  = minsLeft <= 0 ? 'Ending soon' : (hrsLeft > 0 ? hrsLeft + 'h ' + (minsLeft%60) + 'm' : minsLeft + 'm');
+          var effectIcons = { xp_boost:'⚡', discount:'🛒', reward_boost:'💰', special:'✨' };
+          return '<div style="border:2px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;">' +
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+              '<span style="font-size:1.2rem;">' + (effectIcons[v.effect_type]||'📊') + '</span>' +
+              '<span style="font-weight:700;font-size:0.9rem;color:var(--purple-dark);">' + escapeHtml(v.proposal) + '</span>' +
+              '<span style="margin-left:auto;font-size:0.72rem;color:var(--text-light);">⏱️ ' + timeStr + '</span>' +
+            '</div>' +
+            '<div style="font-size:0.78rem;color:var(--text-light);margin-bottom:8px;">' + escapeHtml(v.description||'') + '</div>' +
+            '<div style="font-size:0.78rem;margin-bottom:8px;">Cost: <strong>🪙' + v.cost + ' PP</strong> from treasury</div>' +
+            '<div style="display:flex;gap:16px;font-size:0.82rem;margin-bottom:10px;">' +
+              '<span style="color:#5dde7a;">👍 ' + (v.votes_for||0) + ' For</span>' +
+              '<span style="color:#ff6b6b;">👎 ' + (v.votes_against||0) + ' Against</span>' +
+            '</div>' +
+            '<div style="display:flex;gap:8px;">' +
+              '<button class="btn btn-primary btn-sm" onclick="guild_castVote(\'' + v.id + '\',true)" style="flex:1;">👍 Vote Yes</button>' +
+              '<button class="btn btn-outline btn-sm" onclick="guild_castVote(\'' + v.id + '\',false)" style="flex:1;color:#ff6b6b;border-color:#ff6b6b;">👎 Vote No</button>' +
+            '</div>' +
+          '</div>';
+        }).join('')
+      : '<div style="color:var(--text-light);font-size:0.82rem;font-style:italic;margin-bottom:14px;">No active proposals.</div>';
+
+    // Log html
+    var logHtml = (logs && logs.length > 0)
+      ? logs.map(function(l) {
+          var icon = l.amount > 0 ? '💰' : '💸';
+          var username = l.players ? escapeHtml(l.players.username) : 'Someone';
+          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(153,102,255,0.08);font-size:0.78rem;">' +
+            '<span>' + icon + '</span>' +
+            '<span style="flex:1;color:var(--purple-dark);">' + username + ' — ' + escapeHtml(l.description||l.action) + '</span>' +
+            '<span style="color:' + (l.amount>0?'#5dde7a':'#ff6b6b') + ';font-weight:600;">' + (l.amount>0?'+':'') + l.amount + ' PP</span>' +
+          '</div>';
+        }).join('')
+      : '<div style="color:var(--text-light);font-size:0.82rem;font-style:italic;">No transactions yet.</div>';
+
+    mount.innerHTML =
+      '<button class="btn btn-outline btn-sm" onclick="loadGuildPage()" style="margin-bottom:16px;">← Back to Guild</button>' +
+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">' +
+        '<div>' +
+          '<div style="font-size:0.72rem;color:var(--text-light);letter-spacing:1px;margin-bottom:2px;">GUILD TREASURY</div>' +
+          '<div style="font-size:2rem;font-weight:800;color:#e6a800;">🪙 ' + treasury.toLocaleString() + ' PP</div>' +
+        '</div>' +
+        (canPropose ? '<button class="btn btn-primary btn-sm" onclick="guild_showProposalForm()">➕ New Proposal</button>' : '') +
+      '</div>' +
+
+      activePerkHtml +
+
+      // Donate
+      '<div style="background:rgba(153,102,255,0.06);border-radius:12px;padding:12px 14px;margin-bottom:16px;">' +
+        '<div style="font-weight:700;font-size:0.82rem;margin-bottom:8px;">💰 Donate PP</div>' +
+        '<div style="display:flex;gap:8px;">' +
+          '<input type="number" id="guild-donate-amount" min="10" placeholder="Amount..." style="flex:1;padding:7px 10px;border-radius:8px;border:2px solid var(--border);font-size:0.85rem;">' +
+          '<button class="btn btn-primary btn-sm" onclick="guild_donate()">Donate</button>' +
+        '</div>' +
+      '</div>' +
+
+      // Active votes
+      '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:10px;">🗳️ Active Proposals</div>' +
+      votesHtml +
+
+      // Treasury log
+      '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:8px;margin-top:8px;">📜 Treasury Log</div>' +
+      '<div>' + logHtml + '</div>';
+
+    // Load any newly passed votes
+    loadActiveGuildPerks().catch(function(){});
+  } catch(err) {
+    mount.innerHTML = '<div class="empty-state"><p>Error loading treasury: ' + escapeHtml(err.message) + '</p><button class="btn btn-outline btn-sm" onclick="loadGuildPage()">← Back</button></div>';
+  }
+}
+
+function guild_showProposalForm() {
+  var treasury = 0;
+  var modal = makeModal();
+  modal.innerHTML =
+    '<div style="max-width:420px;">' +
+      '<h3 style="color:var(--purple);margin-bottom:16px;">✨ Create Treasury Proposal</h3>' +
+      '<div style="margin-bottom:10px;"><label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:4px;">Proposal Title</label>' +
+        '<input id="prop-title" type="text" maxlength="60" placeholder="e.g. XP Boost for the guild!" style="width:100%;padding:8px;border-radius:8px;border:2px solid var(--border);font-size:0.85rem;box-sizing:border-box;"></div>' +
+      '<div style="margin-bottom:10px;"><label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:4px;">Description</label>' +
+        '<textarea id="prop-desc" maxlength="200" style="width:100%;padding:8px;border-radius:8px;border:2px solid var(--border);font-size:0.82rem;resize:vertical;min-height:60px;box-sizing:border-box;"></textarea></div>' +
+      '<div style="display:flex;gap:10px;margin-bottom:10px;">' +
+        '<div style="flex:1;"><label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:4px;">Effect Type</label>' +
+          '<select id="prop-effect" style="width:100%;padding:8px;border-radius:8px;border:2px solid var(--border);font-size:0.85rem;" onchange="guild_updateProposalCost()">' +
+            '<option value="xp_boost">⚡ XP Boost (+10%)</option>' +
+            '<option value="discount">🛒 Shop Discount (-20%)</option>' +
+            '<option value="reward_boost">💰 Reward Boost (+25%)</option>' +
+          '</select></div>' +
+        '<div style="flex:1;"><label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:4px;">Duration (hours)</label>' +
+          '<input id="prop-duration" type="number" value="24" min="1" max="72" style="width:100%;padding:8px;border-radius:8px;border:2px solid var(--border);font-size:0.85rem;box-sizing:border-box;"></div>' +
+      '</div>' +
+      '<div style="background:rgba(255,215,0,0.1);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:0.82rem;">' +
+        '<div id="prop-cost-display">Cost: <strong>🪙1,000 PP</strong> from treasury · Votes close in 48 hours</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;">' +
+        '<button class="btn btn-primary" onclick="guild_createProposal()" style="flex:1;">Create Proposal</button>' +
+        '<button class="btn btn-outline" onclick="closeModal()" style="flex:0 0 auto;">Cancel</button>' +
+      '</div>' +
+    '</div>';
+  openModal(modal);
+}
+
+function guild_updateProposalCost() {
+  var costs = { xp_boost: 1000, discount: 2000, reward_boost: 1500 };
+  var sel = document.getElementById('prop-effect');
+  var costEl = document.getElementById('prop-cost-display');
+  if (!sel || !costEl) return;
+  var cost = costs[sel.value] || 1000;
+  costEl.innerHTML = 'Cost: <strong>🪙' + cost.toLocaleString() + ' PP</strong> from treasury · Votes close in 48 hours';
+}
+
+async function guild_createProposal() {
+  var title    = (document.getElementById('prop-title')   || {}).value.trim();
+  var desc     = (document.getElementById('prop-desc')    || {}).value.trim();
+  var effect   = (document.getElementById('prop-effect')  || {}).value;
+  var duration = parseInt((document.getElementById('prop-duration') || {}).value) || 24;
+
+  if (!title) { showToast('Please enter a proposal title', 2500); return; }
+  if (!guildState.myGuild) return;
+
+  var costMap = { xp_boost: 1000, discount: 2000, reward_boost: 1500 };
+  var effectValueMap = { xp_boost: { percent: 10 }, discount: { percent: 20 }, reward_boost: { percent: 25 } };
+  var cost = costMap[effect] || 1000;
+
+  try {
+    var { data: res, error } = await supabaseClient.rpc('create_treasury_vote', {
+      p_guild_id:      guildState.myGuild.guild_id,
+      p_created_by:    currentUser.id,
+      p_proposal:      title,
+      p_description:   desc,
+      p_cost:          cost,
+      p_effect_type:   effect,
+      p_effect_value:  effectValueMap[effect],
+      p_duration_hours:duration
+    });
+    if (error) throw error;
+    if (res && res.success === false) throw new Error(res.error || 'Failed');
+
+    addPassXP(10, 'guild_proposal').catch(function(){});
+    closeModal();
+    showToast('📊 Proposal created! Guild members can now vote.', 4000);
+    guild_renderTreasury();
+  } catch(err) { showToast('Failed: ' + err.message, 3000); }
+}
+
+async function guild_castVote(voteId, inFavor) {
+  if (!canPerformAction('guild_vote', 2000)) return;
+  try {
+    var { data: res, error } = await supabaseClient.rpc('cast_treasury_vote', {
+      p_vote_id: voteId,
+      p_user_id: currentUser.id,
+      p_vote:    inFavor
+    });
+    if (error) throw error;
+    if (res && res.success === false) throw new Error(res.error || 'Failed');
+
+    updateBingoProgress('vote_in_guild', 1);
+    addPassXP(5, 'guild_vote').catch(function(){});
+    showToast(inFavor ? '👍 Voted Yes!' : '👎 Voted No!', 2500);
+    guild_renderTreasury();
+  } catch(err) { showToast('Vote failed: ' + err.message, 3000); }
 }
 
 async function guild_leave() {
@@ -14543,6 +14859,9 @@ async function guild_leave() {
   }
   if (!confirm('Leave this guild?')) return;
   try {
+    // Clear perks for this guild BEFORE leaving
+    clearGuildPerks(guildState.myGuild.guild_id);
+
     await supabaseClient.from('guild_members').delete().eq('guild_id', guildState.myGuild.guild_id).eq('user_id', currentUser.id);
     await supabaseClient.from('guild_liaisons').update({ is_active: false }).eq('guild_id', guildState.myGuild.guild_id).eq('user_id', currentUser.id);
     guildState.myGuild = null;
@@ -15608,6 +15927,8 @@ async function checkDailyLogin() {
 
     // Apply furniture room happiness bonuses (non-blocking)
     furniture_applyDailyBonus().catch(function(){});
+    // Load guild perks (non-blocking)
+    loadActiveGuildPerks().catch(function(){});
 
   } catch (err) {
     console.error('[DailyLogin] Error:', err);
@@ -20614,6 +20935,7 @@ var worldEvents = {
    
    // In shop pricing:
    var finalPrice = worldEvents.applyEventModifier(basePrice, 'shopDiscount');
+   var guildDiscountFinal = getActivePerkMultiplier('discount'); if (guildDiscountFinal < 1) finalPrice = Math.floor(finalPrice * guildDiscountFinal);
    
    // In happiness updates:
    var happinessGain = worldEvents.applyEventModifier(baseGain, 'happinessGain');
