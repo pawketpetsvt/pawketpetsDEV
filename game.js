@@ -3149,7 +3149,14 @@ function makeMyPetCard(pet) {
   // Load asynchronously so it doesn't block card render
   personality_loadMood(pet.id).then(function() {
     personality_renderWidget(pet.id);
+    // Also render quest widget and try to assign one if none active
+    personality_renderQuestWidget(pet.id);
+    assignQuestArc(pet.id).catch(function(){});
   }).catch(function(){});
+
+  // Quest widget mount point (separate from mood widget)
+  var questMount = makeEl('div', { id: 'quest-widget-' + pet.id });
+  body.appendChild(questMount);
   var actions = makeEl('div', {class:'pet-actions'});
   actions.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;justify-content:center;';
   
@@ -3807,12 +3814,20 @@ async function expedition_claim(expeditionId) {
   await supabaseClient.from('expeditions').update({ claimed: true }).eq('id', expeditionId);
 
   // Award PP
-  await awardPP(row.reward_pp || 0, 'expedition_' + row.zone);
+  var streak = await checkExplorationStreak(row.pet_id, row.zone);
+  var streakMult = getStreakMultiplier(row.pet_id, row.zone);
+  var finalPP = Math.floor((row.reward_pp || 0) * streakMult);
+  await awardPP(finalPP, 'expedition_' + row.zone);
+
+  // Check for secrets
+  checkSecretDiscovery(row.pet_id, row.zone, streak).catch(function(){});
 
   // Integrations
   addPassXP(10, 'expedition').catch(function(){});
   checkPetWishes('expedition', row.pet_id).catch(function(){});
+  progressQuestArc(row.pet_id, 'expedition').catch(function(){});
   community_increment('expeditions_week1', 1);
+  checkAchievementTierProgress('expeditions_completed', row.pet_id, streak).catch(function(){});
 
   showToast('🏴‍☠️ Claimed ' + (row.reward_pp || 0) + ' PP from your expedition!', 4000);
 
@@ -3904,6 +3919,9 @@ async function race_init() {
   }
   area.innerHTML = '<div class="spinner"></div>';
 
+  // Load tracks if not cached
+  if (!_raceTracks) await race_loadTracks();
+
   // Check daily race count
   var today = new Date().toISOString().slice(0, 10);
   var { count } = await supabaseClient
@@ -3956,6 +3974,9 @@ function race_renderSetup() {
 
   area.innerHTML =
     '<div id="race-setup">' +
+      // Track selector (only if tracks are available from DB)
+      race_renderTrackSelector() +
+
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
         '<div style="font-size:0.82rem;color:var(--text-light);">Races left today: ' +
           '<strong style="color:' + (raceState.racesLeft > 0 ? 'var(--purple)' : '#ff6b6b') + ';">' + raceState.racesLeft + '/' + RACE_DAILY_MAX + '</strong>' +
@@ -3976,6 +3997,7 @@ function race_renderSetup() {
          currentPoints < raceState.bet ? '❌ Not enough PP' :
          '🏁 Start Race! (Bet ' + raceState.bet + ' PP)') +
       '</button>' +
+      '<button class="btn btn-outline btn-sm" onclick="race_renderWeeklyLeaderboard()" style="width:100%;margin-top:8px;">📅 Weekly Leaderboard</button>' +
     '</div>';
 }
 
@@ -4028,10 +4050,11 @@ async function race_start() {
   var cpuPool = CPU_PETS.slice().sort(function() { return Math.random() - 0.5; });
   while (lanes.length < 4) { lanes.push(cpuPool[lanes.length - raceState.selectedPets.length] || CPU_PETS[0]); }
 
-  // Compute race speeds with RNG
+  // Compute race speeds with RNG + track modifier
   var racerunners = lanes.map(function(pet) {
     var base = pet.base_speed || 4;
-    var speed = base * (0.7 + Math.random() * 0.6);
+    var trackMod = pet.isCpu ? 1 : race_getTrackSpeedModifier(pet.current_variant || null);
+    var speed = base * trackMod * (0.7 + Math.random() * 0.6);
     return { pet: pet, speed: speed, progress: 0, finished: false, finishOrder: null };
   });
 
@@ -4091,6 +4114,13 @@ async function race_start() {
   if (playerWon) {
     checkPetWishes('race', winner.pet.id).catch(function(){});
     awardBadge('speed_demon').catch(function(){});
+    progressQuestArc(winner.pet.id, 'race').catch(function(){});
+  }
+  // Weekly leaderboard + achievement tiers
+  var raceTimeMs = racerunners.length > 0 ? Math.floor(3000 + Math.random() * 2000) : null; // simulated time
+  if (playerBest && !playerBest.pet.isCpu) {
+    updateWeeklyLeaderboard(playerBest.pet.id, playerWon, raceTimeMs).catch(function(){});
+    checkAchievementTierProgress('race_wins', playerBest.pet.id, playerWon ? 1 : 0).catch(function(){});
   }
   community_increment('races_week1', 1);
 
@@ -4554,6 +4584,8 @@ async function feedFree(petId) {
   
   // WISHES: check feed wish
   checkPetWishes('feed', petId).catch(function(){});
+  progressQuestArc(petId, 'feed').catch(function(){});
+  checkAchievementTierProgress('feed_count', petId, 1).catch(function(){});
   
   // COMMUNITY GOALS: Track feeding
   community_increment('feed_pets_week1', 1);
@@ -4868,6 +4900,8 @@ async function playFree(petId) {
 
     // WISHES: check play wish
     checkPetWishes('play', petId).catch(function(){});
+    progressQuestArc(petId, 'play').catch(function(){});
+    checkAchievementTierProgress('play_count', petId, 1).catch(function(){});
     petState[petId].happiness = result.happiness;
     petState[petId].xp = result.xp;
 
@@ -10079,6 +10113,15 @@ async function battleExp_claim(expeditionId) {
   await awardPP(pp, 'expedition_' + row.zone);
   await addPetXP(row.pet_id, zone.xpReward);
 
+  // Streak + secrets
+  var expStreak = await checkExplorationStreak(row.pet_id, row.zone);
+  var expMult   = getStreakMultiplier(row.pet_id, row.zone);
+  if (expMult > 1) {
+    var bonusPP = Math.floor(pp * (expMult - 1));
+    if (bonusPP > 0) { await awardPP(bonusPP, 'streak_bonus'); showToast('🔥 Streak bonus: +' + bonusPP + ' PP!', 3000); }
+  }
+  checkSecretDiscovery(row.pet_id, row.zone, expStreak).catch(function(){});
+
   // Award item drops
   for (var i = 0; i < items.length; i++) {
     if (items[i].id) {
@@ -10088,6 +10131,7 @@ async function battleExp_claim(expeditionId) {
 
   addPassXP(10, 'expedition').catch(function(){});
   checkPetWishes('expedition', row.pet_id).catch(function(){});
+  progressQuestArc(row.pet_id, 'expedition').catch(function(){});
   community_increment('expeditions_week1', 1);
 
   // Show rewards modal
@@ -14963,6 +15007,482 @@ async function guild_loadDungeonHistory() {
       '</div>';
     }).join('');
   } catch(err) { mount.innerHTML = '<div style="color:var(--text-light);font-size:0.78rem;">Could not load history.</div>'; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEATURE PHASE: EXPLORATION STREAKS + SECRETS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// In-memory streak tracker: { "petId:zone": count }
+var _explorationStreaks = {};
+
+async function checkExplorationStreak(petId, zone) {
+  var key = petId + ':' + zone;
+  _explorationStreaks[key] = (_explorationStreaks[key] || 0) + 1;
+  var streak = _explorationStreaks[key];
+
+  // Persist streak count to expedition row if column exists
+  await supabaseClient.from('expeditions')
+    .update({ streak_count: streak })
+    .eq('pet_id', petId)
+    .eq('zone', zone)
+    .eq('claimed', false)
+    .catch(function(){});
+
+  var bonusMsg = '';
+  if (streak >= 10) {
+    bonusMsg = '🔥×10 Streak! +100% rewards & guaranteed rare item!';
+    awardPlayerTitle('forest_friend').catch(function(){});
+  } else if (streak >= 5) {
+    bonusMsg = '🔥×5 Streak! +50% rewards!';
+  } else if (streak >= 3) {
+    bonusMsg = '🔥×3 Streak! +25% rewards!';
+  }
+
+  if (bonusMsg) {
+    var pet = petState[petId] || {};
+    showToast('🌲 ' + escapeHtml(pet.nickname || 'Your pet') + ' is on a ' + streak + '-streak in ' + zone + '! ' + bonusMsg, 5000);
+  }
+  return streak;
+}
+
+function getStreakMultiplier(petId, zone) {
+  var streak = _explorationStreaks[petId + ':' + zone] || 0;
+  if (streak >= 10) return 2.0;
+  if (streak >= 5)  return 1.5;
+  if (streak >= 3)  return 1.25;
+  return 1.0;
+}
+
+async function checkSecretDiscovery(petId, zone, streak) {
+  try {
+    var { data: secrets } = await supabaseClient
+      .from('exploration_secrets')
+      .select('*')
+      .eq('zone', zone)
+      .lte('required_expedition_count', streak);
+
+    if (!secrets || secrets.length === 0) return;
+
+    // Check which secrets haven't been discovered by this user yet
+    var { data: discovered } = await supabaseClient
+      .from('expeditions')
+      .select('discovered_secrets')
+      .eq('user_id', currentUser.id)
+      .not('discovered_secrets', 'is', null)
+      .limit(50);
+
+    var foundKeys = [];
+    (discovered || []).forEach(function(r) {
+      (r.discovered_secrets || []).forEach(function(s) { foundKeys.push(s); });
+    });
+
+    secrets.forEach(function(secret) {
+      if (foundKeys.indexOf(secret.secret_key) !== -1) return; // already found
+
+      // Discovered!
+      var modal = makeModal();
+      modal.innerHTML =
+        '<div style="text-align:center;padding:10px 0;">' +
+          '<div style="font-size:2.5rem;margin-bottom:8px;">🔍</div>' +
+          '<div style="font-size:0.72rem;letter-spacing:2px;color:var(--purple);font-weight:700;margin-bottom:6px;">SECRET DISCOVERED</div>' +
+          '<div style="font-weight:800;font-size:1.1rem;color:var(--purple-dark);margin-bottom:8px;">' + escapeHtml(secret.name || 'Hidden Location') + '</div>' +
+          '<div style="font-size:0.82rem;color:var(--text-light);margin-bottom:12px;">' + escapeHtml(secret.description || '') + '</div>' +
+          (secret.reward_pp ? '<div style="font-size:1.2rem;font-weight:800;color:#e6a800;margin-bottom:10px;">+' + secret.reward_pp + ' PP bonus next expedition!</div>' : '') +
+          '<button class="btn btn-primary" onclick="closeModal()" style="width:100%;">Amazing! ✨</button>' +
+        '</div>';
+      openModal(modal);
+
+      if (secret.badge_reward) awardBadge(secret.badge_reward).catch(function(){});
+      if (secret.reward_pp)    awardPP(secret.reward_pp, 'secret_discovery').catch(function(){});
+      addPassXP(20, 'secret_discovery').catch(function(){});
+    });
+  } catch(e) { dbg('checkSecretDiscovery error:', e); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ACHIEVEMENT TIER SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function checkAchievementTierProgress(achievementKey, petId, currentValue) {
+  if (!currentUser || !petId) return;
+  try {
+    // Fetch achievement definition with tier columns
+    var { data: achievement } = await supabaseClient
+      .from('pet_achievements')
+      .select('id, name, tier2_requirement, tier3_requirement, tier4_requirement, tier5_requirement, tier2_reward, tier3_reward, tier4_reward, tier5_reward')
+      .eq('achievement_key', achievementKey)
+      .single();
+    if (!achievement) return;
+
+    // Fetch user's current tier for this achievement
+    var { data: userAch } = await supabaseClient
+      .from('user_pet_achievements')
+      .select('id, current_tier, progress')
+      .eq('user_id', currentUser.id)
+      .eq('pet_id', petId)
+      .eq('achievement_id', achievement.id)
+      .maybeSingle();
+
+    var currentTier = (userAch && userAch.current_tier) || 1;
+
+    // Check each tier in order
+    var tierRequirements = [
+      null, // tier 1 is base (always unlocked)
+      achievement.tier2_requirement,
+      achievement.tier3_requirement,
+      achievement.tier4_requirement,
+      achievement.tier5_requirement
+    ];
+    var tierRewards = [
+      null,
+      achievement.tier2_reward,
+      achievement.tier3_reward,
+      achievement.tier4_reward,
+      achievement.tier5_reward
+    ];
+
+    var newTier = currentTier;
+    for (var t = currentTier; t < 5; t++) {
+      var req = tierRequirements[t];
+      if (req && currentValue >= req) {
+        newTier = t + 1;
+      } else break;
+    }
+
+    if (newTier > currentTier) {
+      // Update tier
+      if (userAch) {
+        await supabaseClient.from('user_pet_achievements')
+          .update({ current_tier: newTier, tier_completed_at: new Date().toISOString() })
+          .eq('id', userAch.id);
+      } else {
+        await supabaseClient.from('user_pet_achievements').insert({
+          user_id: currentUser.id, pet_id: petId,
+          achievement_id: achievement.id, current_tier: newTier,
+          progress: currentValue, tier_completed_at: new Date().toISOString()
+        });
+      }
+
+      // Grant tier reward
+      var reward = tierRewards[newTier - 1];
+      if (reward) {
+        if (reward.pp)    await awardPP(reward.pp, 'tier_reward').catch(function(){});
+        if (reward.badge) await awardBadge(reward.badge).catch(function(){});
+        if (reward.title) await awardPlayerTitle(reward.title).catch(function(){});
+      }
+
+      // Tier milestone badges
+      if (newTier >= 5) awardBadge('gold_collector').catch(function(){});
+      else if (newTier >= 4) awardBadge('silver_collector').catch(function(){});
+      else if (newTier >= 2) awardBadge('bronze_collector').catch(function(){});
+
+      // Show notification
+      showToast('🏆 ' + escapeHtml(achievement.name || achievementKey) + ' reached Tier ' + newTier + '!', 4000);
+      addPassXP(10 * newTier, 'tier_unlock').catch(function(){});
+    }
+  } catch(e) { dbg('checkAchievementTierProgress error:', e); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PERSONALITY QUESTS (3-DAY ARCS)
+// ═══════════════════════════════════════════════════════════════════════════
+
+var _petQuestCache = {}; // { petId: { quest_arc, quest_day, quest_data, completed } }
+
+async function assignQuestArc(petId) {
+  if (!currentUser || !petId) return;
+  var today = new Date().toISOString().slice(0, 10);
+
+  // Check if already has active quest
+  var mood = petMoodCache[petId];
+  if (mood && mood.quest_arc && mood.quest_day && mood.quest_day < 3) return;
+
+  try {
+    // Get personality for this pet
+    var personality = mood ? mood.personality : 'playful';
+
+    // Fetch quest arcs for this personality
+    var { data: arcs } = await supabaseClient
+      .from('personality_quests')
+      .select('*')
+      .eq('personality', personality);
+
+    if (!arcs || arcs.length === 0) return;
+
+    var arc = arcs[Math.floor(Math.random() * arcs.length)];
+
+    // Store on pet_daily_moods
+    await supabaseClient.from('pet_daily_moods')
+      .update({ quest_arc: arc.quest_key, quest_day: 1, quest_data: arc })
+      .eq('pet_id', petId)
+      .eq('date', today)
+      .catch(function(){});
+
+    if (petMoodCache[petId]) {
+      petMoodCache[petId].quest_arc = arc.quest_key;
+      petMoodCache[petId].quest_day = 1;
+      petMoodCache[petId].quest_data = arc;
+    }
+
+    _petQuestCache[petId] = { arc: arc, day: 1, completed: false };
+
+    var pet = petState[petId] || {};
+    showToast('📖 ' + escapeHtml(pet.nickname || 'Your pet') + ' started a new quest: ' + escapeHtml(arc.name || 'New Adventure') + '!', 4000);
+  } catch(e) { dbg('assignQuestArc error:', e); }
+}
+
+async function progressQuestArc(petId, actionKey) {
+  var questData = _petQuestCache[petId];
+  if (!questData || questData.completed) return;
+
+  var arc = questData.arc;
+  var today = new Date().toISOString().slice(0, 10);
+
+  // Check if today's action matches the quest's required action
+  var dayActions = arc['day' + questData.day + '_action'];
+  if (!dayActions) return;
+  var actions = Array.isArray(dayActions) ? dayActions : [dayActions];
+  if (actions.indexOf(actionKey) === -1) return;
+
+  var newDay = questData.day + 1;
+  questData.day = newDay;
+
+  // Day reward
+  var dayReward = arc['day' + (newDay - 1) + '_reward'] || 25;
+  await awardPP(dayReward, 'quest_day_' + (newDay-1)).catch(function(){});
+  addPassXP(10, 'quest_progress').catch(function(){});
+  updateBingoProgress('complete_quest', 1);
+
+  var pet = petState[petId] || {};
+  showToast('📖 Quest Day ' + (newDay-1) + '/3 complete! +' + dayReward + ' PP · ' + escapeHtml(arc['day' + (newDay-1) + '_story'] || ''), 5000);
+
+  if (newDay > 3) {
+    // Quest complete!
+    questData.completed = true;
+    var finalReward = arc.completion_reward || 100;
+    await awardPP(finalReward, 'quest_complete').catch(function(){});
+    addPassXP(50, 'quest_complete').catch(function(){});
+    if (arc.reward_badge) awardBadge(arc.reward_badge).catch(function(){});
+    if (arc.reward_title) awardPlayerTitle(arc.reward_title).catch(function(){});
+
+    // Celebration modal
+    var modal = makeModal();
+    modal.innerHTML =
+      '<div style="text-align:center;padding:10px 0;">' +
+        '<div style="font-size:3rem;margin-bottom:10px;">📖✨</div>' +
+        '<div style="font-size:0.72rem;letter-spacing:2px;color:var(--purple);font-weight:700;margin-bottom:6px;">QUEST COMPLETE</div>' +
+        '<div style="font-weight:800;font-size:1.1rem;color:var(--purple-dark);margin-bottom:8px;">' + escapeHtml(arc.name || 'Adventure') + '</div>' +
+        '<div style="font-size:0.82rem;color:var(--text-light);margin-bottom:12px;">' + escapeHtml(arc.completion_story || escapeHtml(pet.nickname || 'Your pet') + ' completed the quest!') + '</div>' +
+        '<div style="background:rgba(255,215,0,0.12);border-radius:12px;padding:12px;margin-bottom:14px;">' +
+          '<div style="font-size:1.3rem;font-weight:800;color:#e6a800;">+' + finalReward + ' PP</div>' +
+          '<div style="font-size:0.82rem;color:#5dde7a;">+50 Pass XP</div>' +
+          (arc.reward_badge ? '<div style="font-size:0.8rem;color:var(--purple);">🎖️ Badge unlocked!</div>' : '') +
+        '</div>' +
+        '<button class="btn btn-primary" onclick="closeModal()" style="width:100%;">Amazing! 🎉</button>' +
+      '</div>';
+    openModal(modal);
+
+    // Clear quest state
+    await supabaseClient.from('pet_daily_moods')
+      .update({ quest_arc: null, quest_day: null })
+      .eq('pet_id', petId)
+      .eq('date', today)
+      .catch(function(){});
+    delete _petQuestCache[petId];
+    if (petMoodCache[petId]) { petMoodCache[petId].quest_arc = null; petMoodCache[petId].quest_day = null; }
+  } else {
+    // Update DB
+    await supabaseClient.from('pet_daily_moods')
+      .update({ quest_day: newDay })
+      .eq('pet_id', petId)
+      .eq('date', today)
+      .catch(function(){});
+  }
+
+  // Refresh mood widget
+  personality_renderWidget(petId);
+  personality_renderQuestWidget(petId);
+}
+
+function personality_renderQuestWidget(petId) {
+  var questMount = document.getElementById('quest-widget-' + petId);
+  if (!questMount) return;
+  var questData = _petQuestCache[petId];
+  var mood = petMoodCache[petId];
+
+  // Also try to load from mood cache if not in quest cache
+  if (!questData && mood && mood.quest_arc && mood.quest_data) {
+    _petQuestCache[petId] = { arc: mood.quest_data, day: mood.quest_day || 1, completed: false };
+    questData = _petQuestCache[petId];
+  }
+
+  if (!questData || questData.completed) { questMount.innerHTML = ''; return; }
+
+  var arc = questData.arc;
+  var day = questData.day;
+  var pct = Math.round(((day - 1) / 3) * 100);
+
+  questMount.innerHTML =
+    '<div style="background:linear-gradient(135deg,rgba(255,215,0,0.08),rgba(153,102,255,0.06));border-radius:12px;border:1px solid rgba(255,215,0,0.25);padding:10px 12px;margin:8px 0;">' +
+      '<div style="font-weight:700;font-size:0.82rem;color:var(--purple-dark);margin-bottom:4px;">📖 Quest: ' + escapeHtml(arc.name || 'Adventure') + ' (Day ' + (day-1) + '/3)</div>' +
+      '<div style="font-size:0.75rem;color:var(--text-light);margin-bottom:6px;">' + escapeHtml(arc['day' + day + '_hint'] || 'Complete today\'s action to progress!') + '</div>' +
+      '<div style="background:rgba(255,215,0,0.12);border-radius:20px;height:6px;overflow:hidden;">' +
+        '<div style="width:' + pct + '%;height:100%;background:linear-gradient(90deg,#ffd700,#ffa500);border-radius:20px;"></div>' +
+      '</div>' +
+    '</div>';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RACE TRACKS + WEEKLY LEADERBOARD
+// ═══════════════════════════════════════════════════════════════════════════
+
+var _raceTracks     = null; // cached from DB
+var _selectedTrack  = null; // current track key
+
+async function race_loadTracks() {
+  try {
+    var { data } = await supabaseClient.from('race_tracks').select('*').order('id', { ascending: true });
+    _raceTracks = data || [];
+  } catch(e) {
+    dbg('race_loadTracks error:', e);
+    _raceTracks = []; // graceful fallback — race still works without tracks
+  }
+}
+
+function race_renderTrackSelector() {
+  if (!_raceTracks || _raceTracks.length === 0) return '';
+
+  var weather = (typeof weatherSystem !== 'undefined' && weatherSystem.currentWeather) ? weatherSystem.currentWeather.id : null;
+
+  var cards = _raceTracks.map(function(t) {
+    var weatherBonus = '';
+    if (weather && t.weather_bonus) {
+      try {
+        var wb = typeof t.weather_bonus === 'string' ? JSON.parse(t.weather_bonus) : t.weather_bonus;
+        if (wb[weather]) weatherBonus = '<div style="font-size:0.65rem;color:#5dde7a;">🌤 +' + wb[weather] + '% in current weather</div>';
+      } catch(e) {}
+    }
+    var selected = _selectedTrack === t.track_key;
+    return '<div onclick="race_selectTrack(\'' + t.track_key + '\')" style="cursor:pointer;border:2px solid ' + (selected?'var(--purple)':'var(--border)') + ';border-radius:10px;padding:8px;text-align:center;flex:1;min-width:0;transition:all 0.2s;background:' + (selected?'rgba(153,102,255,0.1)':'') + ';" id="track-card-' + t.track_key + '">' +
+      '<div style="font-size:1.4rem;">' + (t.icon||'🏁') + '</div>' +
+      '<div style="font-size:0.72rem;font-weight:700;color:var(--purple-dark);">' + escapeHtml(t.name||t.track_key) + '</div>' +
+      weatherBonus +
+    '</div>';
+  }).join('');
+
+  return '<div style="margin-bottom:12px;">' +
+    '<div style="font-weight:700;font-size:0.82rem;color:var(--purple-dark);margin-bottom:6px;">🏁 Select Track:</div>' +
+    '<div style="display:flex;gap:6px;">' + cards + '</div>' +
+  '</div>';
+}
+
+function race_selectTrack(trackKey) {
+  _selectedTrack = trackKey;
+  document.querySelectorAll('[id^="track-card-"]').forEach(function(c) {
+    var selected = c.id === 'track-card-' + trackKey;
+    c.style.borderColor = selected ? 'var(--purple)' : 'var(--border)';
+    c.style.background  = selected ? 'rgba(153,102,255,0.1)' : '';
+  });
+}
+
+function race_getTrackSpeedModifier(petVariant) {
+  if (!_selectedTrack || !_raceTracks) return 1;
+  var track = _raceTracks.find(function(t) { return t.track_key === _selectedTrack; });
+  if (!track) return 1;
+  try {
+    var bonuses = typeof track.type_bonus === 'string' ? JSON.parse(track.type_bonus) : (track.type_bonus || {});
+    return 1 + ((bonuses[petVariant] || 0) / 100);
+  } catch(e) { return 1; }
+}
+
+async function updateWeeklyLeaderboard(petId, won, raceTimeMs) {
+  if (!currentUser) return;
+  try {
+    var weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Sunday
+    weekStart.setHours(0,0,0,0);
+    var weekKey = weekStart.toISOString().slice(0,10);
+
+    var { data: existing } = await supabaseClient
+      .from('race_weekly_scores')
+      .select('id, wins_this_week, best_time_ms')
+      .eq('user_id', currentUser.id)
+      .eq('week_start', weekKey)
+      .eq('pet_id', petId)
+      .maybeSingle();
+
+    if (existing) {
+      var updates = {};
+      if (won) updates.wins_this_week = (existing.wins_this_week || 0) + 1;
+      if (raceTimeMs && (!existing.best_time_ms || raceTimeMs < existing.best_time_ms)) updates.best_time_ms = raceTimeMs;
+      if (Object.keys(updates).length > 0) {
+        await supabaseClient.from('race_weekly_scores').update(updates).eq('id', existing.id);
+      }
+    } else {
+      await supabaseClient.from('race_weekly_scores').insert({
+        user_id: currentUser.id, pet_id: petId, week_start: weekKey,
+        wins_this_week: won ? 1 : 0,
+        best_time_ms: raceTimeMs || null
+      });
+    }
+  } catch(e) { dbg('updateWeeklyLeaderboard error:', e); }
+}
+
+async function race_renderWeeklyLeaderboard() {
+  var area = document.getElementById('race-area');
+  if (!area) return;
+
+  try {
+    var weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    weekStart.setHours(0,0,0,0);
+    var weekKey = weekStart.toISOString().slice(0,10);
+
+    var resets = new Date(weekStart);
+    resets.setDate(resets.getDate() + 7);
+    var msLeft = resets - Date.now();
+    var daysLeft = Math.floor(msLeft / 86400000);
+    var hrsLeft  = Math.floor((msLeft % 86400000) / 3600000);
+
+    var { data: scores } = await supabaseClient
+      .from('race_weekly_scores')
+      .select('user_id, wins_this_week, best_time_ms, players(username)')
+      .eq('week_start', weekKey)
+      .order('wins_this_week', { ascending: false })
+      .limit(10);
+
+    // Find my rank
+    var myRank = null;
+    (scores || []).forEach(function(s, i) {
+      if (s.user_id === currentUser.id) myRank = i + 1;
+    });
+
+    var medals = ['🥇','🥈','🥉'];
+    var rows = (scores || []).map(function(s, i) {
+      var isMe = s.user_id === currentUser.id;
+      var timeStr = s.best_time_ms ? Math.floor(s.best_time_ms/1000) + '.' + String(s.best_time_ms%1000).padStart(3,'0') + 's' : '—';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(153,102,255,0.08);font-size:0.78rem;' + (isMe?'font-weight:700;':'') + '">' +
+        '<span style="width:20px;">' + (medals[i]||('#'+(i+1))) + '</span>' +
+        '<span style="flex:1;color:' + (isMe?'var(--purple)':'var(--purple-dark)') + ';">' + escapeHtml(s.players ? s.players.username : 'Player') + (isMe?' (You)':'') + '</span>' +
+        '<span style="color:#e6a800;">' + (s.wins_this_week||0) + ' wins</span>' +
+        '<span style="color:var(--text-light);margin-left:8px;">' + timeStr + '</span>' +
+      '</div>';
+    }).join('') || '<div style="color:var(--text-light);font-size:0.82rem;">No races this week yet!</div>';
+
+    area.innerHTML =
+      '<div style="margin-bottom:14px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+          '<div style="font-weight:700;font-size:0.9rem;color:var(--purple-dark);">📅 Weekly Leaderboard</div>' +
+          '<div style="font-size:0.75rem;color:var(--text-light);">Resets in ' + daysLeft + 'd ' + hrsLeft + 'h</div>' +
+        '</div>' +
+        rows +
+        (myRank ? '<div style="margin-top:10px;font-size:0.78rem;color:var(--text-light);">Your rank: <strong>#' + myRank + '</strong></div>' : '') +
+      '</div>' +
+      '<button class="btn btn-outline" onclick="race_init()" style="width:100%;">← Back to Racing</button>';
+  } catch(e) {
+    area.innerHTML = '<div style="color:var(--text-light);font-size:0.82rem;">Could not load leaderboard.</div><button class="btn btn-outline" onclick="race_init()" style="width:100%;">← Back</button>';
+  }
 }
 
 async function checkDailyLogin() {
