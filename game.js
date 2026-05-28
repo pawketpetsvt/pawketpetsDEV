@@ -981,41 +981,154 @@ function esw_hideTooltip() {
 
 function esw_showModal() {
   esw_hideTooltip();
-  var widget = document.getElementById('event-status-widget');
-  if (!widget) return;
+  // Open the 7-day calendar instead of the old single-condition modal
+  calendar_open();
+}
 
-  var isEvent = widget.dataset.type === 'event';
-  var bonuses = (widget.dataset.bonuses || '').trim();
-  var title = (widget.dataset.icon || '') + ' ' + (widget.dataset.name || 'Today\'s Conditions');
+// ─── EVENT CALENDAR ──────────────────────────────────────────────────────────
 
-  // Build a DOM-based modal instead of passing HTML strings to showCenteredModal
+var WEATHER_ICONS = {
+  clear:'☀️', rainy:'🌧️', foggy:'🌫️', windy:'💨', starry:'✨', cursed:'🟣'
+};
+var EVENT_TYPE_ICONS = {
+  weather:'🌤️', bonus_event:'⚡', holiday:'🎉', streamer_birthday:'🎂'
+};
+
+async function calendar_open() {
   var modal = makeModal();
-  var html = '<h2 style="color:var(--purple);margin-bottom:14px;">' + escapeHtml(title) + '</h2>';
-  html += '<p style="margin-bottom:14px;line-height:1.6;">' + escapeHtml(widget.dataset.desc || '') + '</p>';
-
-  if (bonuses) {
-    html += '<div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.4);border-radius:10px;padding:12px 16px;margin-bottom:14px;">';
-    html += '<strong style="color:#fbbf24;">✨ Active ' + (isEvent ? 'Event ' : '') + 'Bonuses:</strong><br><br>';
-    // bonuses are newline-separated plain text
-    html += '<span style="line-height:2.2;white-space:pre-line;">' + escapeHtml(bonuses) + '</span>';
-    html += '</div>';
-  }
-
-  if (isEvent && widget.dataset.endDate) {
-    try {
-      var end = new Date(widget.dataset.endDate);
-      var hoursLeft = Math.max(0, Math.floor((end - Date.now()) / 3600000));
-      var daysLeft  = Math.floor(hoursLeft / 24);
-      var remaining = daysLeft > 0
-        ? daysLeft + 'd ' + (hoursLeft % 24) + 'h remaining'
-        : hoursLeft > 0 ? hoursLeft + 'h remaining' : 'Ending very soon!';
-      html += '<p style="color:#94a3b8;font-size:0.85rem;">⏰ ' + escapeHtml(remaining) + '</p>';
-    } catch(e) {}
-  }
-
-  html += '<button class="btn btn-outline" onclick="closeModal()" style="margin-top:16px;width:100%;">Close</button>';
-  modal.innerHTML = html;
+  modal.innerHTML = '<div style="text-align:center;padding:20px 0;"><div class="spinner"></div><div style="color:var(--text-light);margin-top:8px;font-size:0.85rem;">Loading forecast…</div></div>';
   openModal(modal);
+  await calendar_load(modal);
+}
+
+async function calendar_load(modal) {
+  // Build 7-day array starting from today
+  var days = [];
+  var now = new Date();
+
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(now);
+    d.setDate(now.getDate() + i);
+    days.push({
+      date: d,
+      dateStr: d.toISOString().slice(0, 10),
+      label: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }),
+      weather: null,
+      event: null,
+      isToday: i === 0
+    });
+  }
+
+  // Today: use live in-memory state
+  if (typeof weatherSystem !== 'undefined' && weatherSystem.currentWeather) {
+    days[0].weather = weatherSystem.currentWeather;
+  }
+  if (typeof worldEvents !== 'undefined' && worldEvents.currentEvent) {
+    days[0].event = worldEvents.currentEvent;
+  }
+
+  // Future days: try scheduled_events table
+  try {
+    var { data: scheduled } = await supabaseClient
+      .from('scheduled_events')
+      .select('*')
+      .gte('event_date', days[1].dateStr)
+      .lte('event_date', days[6].dateStr)
+      .order('event_date', { ascending: true });
+
+    if (scheduled && scheduled.length > 0) {
+      scheduled.forEach(function(row) {
+        var day = days.find(function(d) { return d.dateStr === row.event_date; });
+        if (!day) return;
+        if (row.event_type === 'weather') {
+          day.weather = { id: row.weather_id || row.event_id, name: row.name, icon: row.icon || WEATHER_ICONS[row.weather_id] || '🌤️', description: row.description || '' };
+        } else {
+          day.event = { id: row.event_id || row.id, name: row.name, icon: row.icon || EVENT_TYPE_ICONS[row.event_type] || '⚡', description: row.description || '', event_type: row.event_type };
+        }
+      });
+    }
+  } catch(e) {
+    // Scheduled events table doesn't exist yet or query failed — silent fallback
+  }
+
+  // Render
+  modal.innerHTML = calendar_render(days);
+}
+
+function calendar_render(days) {
+  var dayCards = days.map(function(day) {
+    var weatherIcon  = (day.weather && day.weather.icon) ? day.weather.icon  : '❓';
+    var weatherName  = (day.weather && day.weather.name) ? day.weather.name  : 'Unknown';
+    var weatherDesc  = (day.weather && day.weather.description) ? day.weather.description : '';
+
+    var eventBadge = '';
+    if (day.event) {
+      eventBadge =
+        '<div style="margin-top:6px;padding:3px 8px;border-radius:20px;background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.3);display:inline-block;">' +
+          '<span style="font-size:0.75rem;color:#fbbf24;font-weight:600;">' +
+            (day.event.icon || '⚡') + ' ' + escapeHtml(day.event.name) +
+          '</span>' +
+        '</div>';
+    }
+
+    return '<div style="' +
+      'border-radius:14px;padding:14px 12px;text-align:center;min-width:90px;flex:1;' +
+      'border:2px solid ' + (day.isToday ? 'var(--purple)' : 'var(--border)') + ';' +
+      'background:' + (day.isToday ? 'rgba(153,102,255,0.08)' : 'rgba(255,255,255,0.5)') + ';' +
+      'cursor:pointer;transition:all 0.2s;box-sizing:border-box;"' +
+      ' onmouseover="this.style.transform=\'translateY(-3px)\';this.style.boxShadow=\'0 6px 18px rgba(153,102,255,0.15)\'"' +
+      ' onmouseout="this.style.transform=\'\';this.style.boxShadow=\'\'"' +
+      ' title="' + escapeHtml(weatherDesc) + '">' +
+      '<div style="font-size:0.72rem;font-weight:' + (day.isToday ? '800' : '600') + ';color:' + (day.isToday ? 'var(--purple)' : 'var(--text-light)') + ';margin-bottom:6px;">' +
+        escapeHtml(day.label) +
+      '</div>' +
+      '<div style="font-size:1.8rem;margin-bottom:4px;">' + weatherIcon + '</div>' +
+      '<div style="font-size:0.72rem;color:var(--purple-dark);font-weight:600;">' + escapeHtml(weatherName) + '</div>' +
+      eventBadge +
+    '</div>';
+  });
+
+  // Split into two rows: today + next 3, then last 3
+  var row1 = dayCards.slice(0, 4).join('');
+  var row2 = dayCards.slice(4).join('');
+
+  return '<div style="max-width:680px;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">' +
+      '<h2 style="margin:0;color:var(--purple);font-size:1.15rem;">🗓️ 7-Day Forecast</h2>' +
+      '<button onclick="closeModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text-light);padding:0;line-height:1;">×</button>' +
+    '</div>' +
+
+    // Today's detail card
+    (days[0].weather || days[0].event
+      ? '<div style="background:linear-gradient(135deg,rgba(153,102,255,0.1),rgba(255,102,204,0.06));border-radius:14px;padding:14px 18px;margin-bottom:18px;border:1px solid rgba(153,102,255,0.2);">' +
+          '<div style="font-weight:700;font-size:0.8rem;color:var(--purple);margin-bottom:8px;letter-spacing:1px;">TODAY\'S CONDITIONS</div>' +
+          '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' +
+            (days[0].weather
+              ? '<div style="display:flex;align-items:center;gap:8px;">' +
+                  '<span style="font-size:1.6rem;">' + (days[0].weather.icon||'🌤️') + '</span>' +
+                  '<div><div style="font-weight:700;color:var(--purple-dark);">' + escapeHtml(days[0].weather.name||'') + '</div>' +
+                  '<div style="font-size:0.78rem;color:var(--text-light);">' + escapeHtml(days[0].weather.description||'') + '</div></div>' +
+                '</div>'
+              : '') +
+            (days[0].event
+              ? '<div style="display:flex;align-items:center;gap:8px;padding-left:' + (days[0].weather ? '16px' : '0') + ';border-left:' + (days[0].weather ? '1px solid rgba(153,102,255,0.2)' : 'none') + ';">' +
+                  '<span style="font-size:1.6rem;">' + (days[0].event.icon||'⚡') + '</span>' +
+                  '<div><div style="font-weight:700;color:#fbbf24;">' + escapeHtml(days[0].event.name||'') + '</div>' +
+                  '<div style="font-size:0.78rem;color:var(--text-light);">' + escapeHtml(days[0].event.description||'') + '</div></div>' +
+                '</div>'
+              : '') +
+          '</div>' +
+        '</div>'
+      : '') +
+
+    // 7-day grid
+    '<div style="font-weight:700;font-size:0.8rem;color:var(--text-light);margin-bottom:10px;letter-spacing:1px;">7-DAY OUTLOOK</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">' + row1 + '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">' + row2 + '</div>' +
+
+    '<div style="text-align:center;font-size:0.75rem;color:var(--text-light);">Hover a day for details · Future forecasts may change</div>' +
+    '<button class="btn btn-outline" onclick="closeModal()" style="width:100%;margin-top:14px;">Close</button>' +
+  '</div>';
 }
 
 function initEventStatusWidget() {
