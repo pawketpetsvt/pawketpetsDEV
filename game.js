@@ -2352,12 +2352,7 @@ async function confirmAdopt() {
   var btn = el('confirm-adopt-btn');
   var nickname = el('nickname-input').value.trim();
   
-  // Validation
-  if (!nickname || nickname === '') {
-    showToast('Please enter a nickname! ❌');
-    return;
-  }
-  
+  // Nickname is optional — empty falls through to selectedPet.name below
   if (nickname.length > 50) {
     showToast('Nickname must be 50 characters or less! ❌');
     return;
