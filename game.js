@@ -1048,7 +1048,33 @@ async function calendar_load(modal) {
       });
     }
   } catch(e) {
-    // Scheduled events table doesn't exist yet or query failed — silent fallback
+    // Silent fallback — table may not exist yet
+  }
+
+  // For any future day still without weather, generate deterministic forecast
+  // Uses date string as seed so ALL players see the same forecast
+  var weatherKeys = typeof weatherSystem !== 'undefined' && weatherSystem.weatherTypes
+    ? Object.keys(weatherSystem.weatherTypes)
+    : ['clear','rainy','foggy','windy','starry'];
+  var weatherIconMap = { clear:'☀️', rainy:'🌧️', foggy:'🌫️', windy:'💨', starry:'✨', cursed:'🟣' };
+  var weatherNameMap = { clear:'Clear Skies', rainy:'Rainy', foggy:'Foggy', windy:'Windy', starry:'Starry Night', cursed:'Cursed Aura' };
+
+  function calendarHash(str) {
+    var h = 0;
+    for (var i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0; }
+    return Math.abs(h);
+  }
+
+  for (var di = 1; di < days.length; di++) {
+    if (!days[di].weather) {
+      var wKey = weatherKeys[calendarHash(days[di].dateStr) % weatherKeys.length];
+      days[di].weather = {
+        id:   wKey,
+        name: weatherNameMap[wKey] || wKey,
+        icon: weatherIconMap[wKey] || '🌤️',
+        description: 'Forecasted weather for this day.'
+      };
+    }
   }
 
   // Render
@@ -7349,7 +7375,7 @@ async function loadLeaderboard(type) {
             id: p.id,
             username: p.username,
             value: icon + ' ' + streak + (streak === 1 ? ' day' : ' days'),
-            stat: p.last_login ? getTimeAgo(p.last_login) : 'Never',
+            stat: p.last_login ? getTimeAgo(new Date(p.last_login)) : 'Never',
             streak: streak
           };
         });

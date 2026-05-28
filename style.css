@@ -10037,9 +10037,9 @@ body.night-mode .btn-outline:hover {
    ══════════════════════════════════════════════════════════════════════════ */
 
 #companion-buddy {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
+  position: fixed !important;
+  bottom: 20px !important;
+  right: 20px !important;
   z-index: 1500;
   pointer-events: none;
 }
@@ -16413,7 +16413,16 @@ body.night-mode .item-icon-img {
 
 /* Companion buddy: position relative so particles anchor correctly */
 #companion-buddy {
-  position: relative;
+  position: fixed !important; /* override any later position:relative that breaks fixed */
+  bottom: 20px !important;
+  right: 20px !important;
+  left: auto !important;
+  z-index: 1500;
+  pointer-events: none;
+}
+
+.companion-sprite {
+  position: relative; /* needed so variant particles anchor to the sprite, not the page */
 }
 
 
