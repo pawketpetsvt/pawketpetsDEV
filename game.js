@@ -27912,6 +27912,408 @@ dbg('✅ Gifting & Polls systems loaded');
 // ADMIN PANEL — Poll Management (Embertail only)
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════
+// GRAND PRIX ADMIN PANEL
+// Only accessible to admin UUID — checked at start of every function
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function gp_adminRecalcScores() {
+  if (!await isAdmin()) return;
+  if (!confirm('Recalculate scores for all entries in the current event?')) return;
+  var btn = event && event.target; var restore = gp_adminBtnLoading(btn, '⏳ Recalculating…');
+
+  var { data: events } = await supabaseClient.rpc('get_current_grand_prix').catch(function(){ return { data: null }; });
+  if (!events || events.length === 0) { showToast('No active event', 2500); return; }
+  var evId = events[0].id;
+
+  var { data: entries } = await supabaseClient
+    .from('grand_prix_entries')
+    .select('id, pet_id, training_bonus, user_pets(base_speed, level, happiness, max_happiness, current_variant)')
+    .eq('event_id', evId);
+
+  if (!entries || entries.length === 0) { showToast('No entries', 2000); return; }
+
+  var updated = 0;
+  for (var i = 0; i < entries.length; i++) {
+    var e   = entries[i];
+    var pet = e.user_pets || {};
+    var spd  = Math.min(50, (pet.base_speed||4) * 5);
+    var lvl  = Math.min(100, (pet.level||1) * 2);
+    var hap  = ((pet.happiness||50) / (pet.max_happiness||100)) * 20;
+    var vrnt = GP_VARIANT_BONUS[pet.current_variant||''] || 0;
+    var trn  = Math.min(15, e.training_bonus||0);
+    var rnd  = Math.random() * 15;
+    var score = Math.min(200, spd + lvl + hap + vrnt + trn + rnd);
+    await supabaseClient.from('grand_prix_entries').update({ race_score: score }).eq('id', e.id);
+    updated++;
+  }
+
+  await supabaseClient.from('admin_logs').insert({ admin_id: currentUser.id, action: 'gp_recalc_scores', details: { event_id: evId, updated } }).catch(function(){});
+  restore();
+  showToast('Recalculated scores for ' + updated + ' entries', 3000);
+  await gp_adminRefresh();
+}
+
+async function gp_adminFixRankings() {
+  if (!await isAdmin()) return;
+  if (!confirm('Re-sort and assign ranks for all entries by current score?')) return;
+
+  var { data: events } = await supabaseClient.rpc('get_current_grand_prix').catch(function(){ return { data: null }; });
+  if (!events || events.length === 0) { showToast('No active event', 2500); return; }
+  var evId = events[0].id;
+
+  var { data: entries } = await supabaseClient
+    .from('grand_prix_entries').select('id, race_score').eq('event_id', evId).order('race_score', { ascending: false });
+
+  if (!entries || entries.length === 0) { showToast('No entries', 2000); return; }
+
+  // Assign ranks with tie handling
+  var prevScore = -1, rankCounter = 0, currentRank = 1;
+  for (var i = 0; i < entries.length; i++) {
+    rankCounter++;
+    if (entries[i].race_score !== prevScore) currentRank = rankCounter;
+    await supabaseClient.from('grand_prix_entries').update({ final_rank: currentRank }).eq('id', entries[i].id);
+    prevScore = entries[i].race_score;
+  }
+
+  await supabaseClient.from('admin_logs').insert({ admin_id: currentUser.id, action: 'gp_fix_rankings', details: { event_id: evId, count: entries.length } }).catch(function(){});
+  showToast('Rankings fixed for ' + entries.length + ' entries', 3000);
+  await gp_adminRefresh();
+}
+
+async function gp_adminSetWinner(entryId, username) {
+  if (!await isAdmin()) return;
+  if (!confirm('Set ' + username + ' as rank #1? All other ranks will shift down by 1.')) return;
+
+  var { data: events } = await supabaseClient.rpc('get_current_grand_prix').catch(function(){ return { data: null }; });
+  if (!events || events.length === 0) { showToast('No active event', 2500); return; }
+  var evId = events[0].id;
+
+  // Shift everyone currently at rank ≥1 up by 1 (to make room), then set target to 1
+  var { data: allEntries } = await supabaseClient.from('grand_prix_entries').select('id, final_rank').eq('event_id', evId).order('final_rank', { ascending: true });
+  for (var i = 0; i < (allEntries||[]).length; i++) {
+    if (allEntries[i].id !== entryId && (allEntries[i].final_rank||99) <= 1) {
+      await supabaseClient.from('grand_prix_entries').update({ final_rank: (allEntries[i].final_rank||1) + 1 }).eq('id', allEntries[i].id);
+    }
+  }
+  // Give the winner a score high enough to justify rank 1
+  await supabaseClient.from('grand_prix_entries').update({ final_rank: 1, race_score: 200 }).eq('id', entryId);
+
+  await supabaseClient.from('admin_logs').insert({ admin_id: currentUser.id, action: 'gp_set_winner', details: { entryId, username } }).catch(function(){});
+  showToast(username + ' set as winner!', 3000);
+  await gp_adminRefresh();
+}
+
+async function gp_adminShowLogs() {
+  if (!await isAdmin()) return;
+  var modal = makeModal();
+  modal.innerHTML = '<div class="spinner"></div>';
+  openModal(modal);
+
+  try {
+    // Fetch recent admin logs for GP actions
+    var { data: logs } = await supabaseClient
+      .from('admin_logs')
+      .select('action, details, created_at')
+      .like('action', 'gp_%')
+      .order('created_at', { ascending: false })
+      .limit(30);
+
+    var logRows = (logs||[]).map(function(l) {
+      var ts = new Date(l.created_at).toLocaleString();
+      return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:0.75rem;">' +
+        '<span style="color:#ff9966;font-weight:600;">' + escapeHtml(l.action) + '</span>' +
+        '<span style="color:#aaa;margin-left:8px;">' + ts + '</span>' +
+        '<div style="color:#ccc;margin-top:2px;font-size:0.7rem;">' + escapeHtml(JSON.stringify(l.details||{})) + '</div>' +
+      '</div>';
+    }).join('') || '<div style="color:#aaa;font-size:0.82rem;">No logs found.</div>';
+
+    modal.innerHTML =
+      '<div style="background:linear-gradient(135deg,#1a0a0a,#1a1a2e);border-radius:16px;padding:20px;max-width:540px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">' +
+          '<div style="font-weight:800;color:#fff;font-size:1rem;">📋 Admin Action Log</div>' +
+          '<button onclick="closeModal()" style="background:none;border:none;color:#aaa;font-size:1.4rem;cursor:pointer;">×</button>' +
+        '</div>' +
+        '<div style="max-height:400px;overflow-y:auto;">' + logRows + '</div>' +
+        '<button class="gp-admin-btn" onclick="gp_adminShowLogs()" style="width:100%;margin-top:12px;">🔄 Refresh</button>' +
+      '</div>';
+  } catch(err) {
+    modal.innerHTML = '<div style="color:#ff6b6b;padding:20px;">Error loading logs: ' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+async function gp_adminPanel() {
+  if (!await isAdmin()) { showToast('Admin access required', 3000); return; }
+
+  var modal = makeModal();
+  modal.innerHTML = '<div class="spinner"></div>';
+  openModal(modal);
+  await gp_adminRender(modal);
+}
+
+async function gp_adminRender(modal) {
+  if (!modal) return;
+
+  // Fetch current event
+  var { data: events } = await supabaseClient.rpc('get_current_grand_prix').catch(function(){ return { data: null }; });
+  var ev = events && events.length > 0 ? events[0] : null;
+
+  // Fetch all entries if event exists
+  var entries = [];
+  if (ev) {
+    var { data: rawEntries } = await supabaseClient
+      .from('grand_prix_entries')
+      .select('id, user_id, pet_id, training_bonus, race_score, final_rank, reward_claimed, players(username), user_pets(nickname, level, current_variant, pets(name))')
+      .eq('event_id', ev.id)
+      .order('final_rank', { ascending: true });
+    entries = rawEntries || [];
+  }
+
+  var statusColors = { registration:'#5dde7a', racing:'#fbbf24', reward_claim:'#9966ff', complete:'#aaa' };
+  var statusColor  = ev ? (statusColors[ev.status]||'#aaa') : '#aaa';
+
+  // Event status panel
+  var eventHtml = ev
+    ? '<div style="background:rgba(0,0,0,0.15);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:0.82rem;">' +
+        '<div style="font-weight:700;color:#fff;margin-bottom:6px;">📊 Week ' + ev.week_number + ' · ' + ev.year + '</div>' +
+        '<div style="color:' + statusColor + ';font-weight:600;margin-bottom:4px;">Status: ' + ev.status.toUpperCase() + '</div>' +
+        '<div style="color:#ccc;">🪙 Prize Pool: ' + (ev.prize_pool||0).toLocaleString() + ' PP · 👥 ' + (ev.total_entries||0) + ' entries</div>' +
+      '</div>'
+    : '<div style="color:#ff6b6b;font-size:0.82rem;margin-bottom:14px;">No active event found.</div>';
+
+  // Force status buttons
+  var forceHtml =
+    '<div style="margin-bottom:14px;">' +
+      '<div style="font-weight:700;font-size:0.78rem;color:#ff9966;margin-bottom:8px;letter-spacing:1px;">FORCE STATUS</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+        '<button class="gp-admin-btn" onclick="gp_adminForceStatus(\'registration\')" style="background:#1a6b2a;">🎟️ Open Reg</button>' +
+        '<button class="gp-admin-btn" onclick="gp_adminForceStatus(\'racing\')"       style="background:#6b5500;">🏁 Start Racing</button>' +
+        '<button class="gp-admin-btn" onclick="gp_adminForceSimulate()"               style="background:#6b0000;">🏆 Simulate & Complete</button>' +
+        '<button class="gp-admin-btn" onclick="gp_adminForceStatus(\'reward_claim\')" style="background:#4a006b;">🎁 Force Reward Claim</button>' +
+      '</div>' +
+    '</div>' +
+    '<div style="margin-bottom:14px;">' +
+      '<div style="font-weight:700;font-size:0.78rem;color:#ff9966;margin-bottom:8px;letter-spacing:1px;">SCORE TOOLS</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+        '<button class="gp-admin-btn" onclick="gp_adminRecalcScores()"  style="background:#003366;">📊 Recalculate Scores</button>' +
+        '<button class="gp-admin-btn" onclick="gp_adminFixRankings()"   style="background:#003366;">🔧 Fix Rankings</button>' +
+        '<button class="gp-admin-btn" onclick="gp_adminShowLogs()"      style="background:#222;">📋 View Logs</button>' +
+      '</div>' +
+    '</div>';
+
+  // Prize pool management
+  var prizeHtml = ev
+    ? '<div style="margin-bottom:14px;">' +
+        '<div style="font-weight:700;font-size:0.78rem;color:#ff9966;margin-bottom:8px;letter-spacing:1px;">PRIZE POOL</div>' +
+        '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
+          '<button class="gp-admin-btn" onclick="gp_adminAdjustPrize(1000)">➕ +1000</button>' +
+          '<button class="gp-admin-btn" onclick="gp_adminAdjustPrize(-500)">➖ -500</button>' +
+          '<input id="gp-admin-prize-input" type="number" placeholder="Custom amount" style="padding:6px 8px;border-radius:6px;border:1px solid #555;background:#1a1a2e;color:#fff;width:120px;font-size:0.82rem;">' +
+          '<button class="gp-admin-btn" onclick="gp_adminSetPrize()">✏️ Set</button>' +
+        '</div>' +
+      '</div>'
+    : '';
+
+  // Entries table
+  var entriesHtml = entries.length > 0
+    ? '<div style="margin-bottom:14px;">' +
+        '<div style="font-weight:700;font-size:0.78rem;color:#ff9966;margin-bottom:8px;letter-spacing:1px;">ENTRIES (' + entries.length + ')</div>' +
+        '<div style="max-height:240px;overflow-y:auto;">' +
+          entries.map(function(e) {
+            var pname = (e.user_pets && (e.user_pets.nickname || (e.user_pets.pets && e.user_pets.pets.name))) || 'Pet';
+            var uname = e.players ? escapeHtml(e.players.username) : 'Unknown';
+            return '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.08);font-size:0.75rem;">' +
+              '<span style="color:#ff9966;width:20px;text-align:right;">' + (e.final_rank||'-') + '</span>' +
+              '<span style="flex:1;color:#eee;">' + uname + ' · ' + escapeHtml(pname) + ' Lv.' + (e.user_pets&&e.user_pets.level||1) + (e.user_pets&&e.user_pets.current_variant?' ✨'+e.user_pets.current_variant:'') + '</span>' +
+              '<span style="color:#fbbf24;width:40px;text-align:right;">' + Math.round(e.race_score||0) + '</span>' +
+              '<span style="color:#aaa;width:20px;text-align:right;">+' + (e.training_bonus||0) + '</span>' +
+              '<button onclick="gp_adminEditTraining(\'' + e.id + '\',' + (e.training_bonus||0) + ')" style="background:#444;border:none;color:#fff;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.7rem;">✏️</button>' +
+              '<button onclick="gp_adminSetWinner(\'' + e.id + '\',\'' + uname + '\')" style="background:#4a3a00;border:none;color:#ffd700;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.7rem;">👑</button>' +
+              '<button onclick="gp_adminRemoveEntry(\'' + e.id + '\',\'' + uname + '\')" style="background:#6b0000;border:none;color:#fff;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.7rem;">🗑️</button>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>'
+    : (ev ? '<div style="color:#aaa;font-size:0.82rem;margin-bottom:14px;">No entries yet.</div>' : '');
+
+  // Notification sender
+  var notifHtml =
+    '<div style="margin-bottom:14px;">' +
+      '<div style="font-weight:700;font-size:0.78rem;color:#ff9966;margin-bottom:8px;letter-spacing:1px;">SEND NOTIFICATION</div>' +
+      '<select id="gp-admin-notif-target" style="width:100%;padding:6px;border-radius:6px;border:1px solid #555;background:#1a1a2e;color:#fff;font-size:0.82rem;margin-bottom:6px;">' +
+        '<option value="all">All Participants</option>' +
+        '<option value="top10">Top 10 Only</option>' +
+      '</select>' +
+      '<input id="gp-admin-notif-msg" type="text" placeholder="Message..." style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid #555;background:#1a1a2e;color:#fff;font-size:0.82rem;margin-bottom:6px;box-sizing:border-box;">' +
+      '<button class="gp-admin-btn" onclick="gp_adminSendNotif()" style="width:100%;">📨 Send Notification</button>' +
+    '</div>';
+
+  modal.innerHTML =
+    '<div style="max-width:560px;background:linear-gradient(135deg,#1a0a0a,#1a1a2e);border-radius:16px;padding:20px;">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">' +
+        '<div>' +
+          '<div style="font-size:0.7rem;letter-spacing:2px;color:#ff6b6b;font-weight:700;">GRAND PRIX ADMIN</div>' +
+          '<div style="font-weight:800;font-size:1.1rem;color:#fff;">🏁 Race Control Panel</div>' +
+        '</div>' +
+        '<button onclick="closeModal()" style="background:none;border:none;color:#aaa;font-size:1.4rem;cursor:pointer;">×</button>' +
+      '</div>' +
+      eventHtml +
+      forceHtml +
+      prizeHtml +
+      entriesHtml +
+      notifHtml +
+      '<button class="gp-admin-btn" onclick="gp_adminCreateEvent()" style="width:100%;background:#1a3a6b;">📅 Create New Event (this week)</button>' +
+    '</div>';
+}
+
+// Helper — re-render modal without reopening it
+async function gp_adminRefresh() {
+  var modal = document.querySelector('.modal-content');
+  if (modal) await gp_adminRender(modal);
+}
+
+// Disable a button during async admin action, re-enable on finish
+function gp_adminBtnLoading(btn, loadingText) {
+  if (!btn) return function(){};
+  var orig = btn.textContent;
+  btn.disabled = true;
+  btn.style.opacity = '0.6';
+  btn.textContent = loadingText || '⏳ Working…';
+  return function() { btn.disabled = false; btn.style.opacity = ''; btn.textContent = orig; };
+}
+
+async function gp_adminForceStatus(status) {
+  if (!await isAdmin()) return;
+  if (!gpState.event && !confirm('No cached event — fetch and update anyway?')) return;
+  var btn = event && event.target; var restore = gp_adminBtnLoading(btn, '⏳ Updating…');
+
+  // Get the event ID from DB directly
+  var { data: events } = await supabaseClient.rpc('get_current_grand_prix').catch(function(){ return { data: null }; });
+  var evId = events && events.length > 0 ? events[0].id : null;
+  if (!evId) {
+    // Fall back: most recent non-complete event
+    var { data: any } = await supabaseClient.from('grand_prix_events').select('id').neq('status','complete').order('week_number',{ascending:false}).limit(1).single().catch(function(){ return { data: null }; });
+    evId = any ? any.id : null;
+  }
+  if (!evId) { showToast('No event found to update', 3000); return; }
+
+  await supabaseClient.from('grand_prix_events').update({ status: status }).eq('id', evId);
+  await supabaseClient.from('admin_logs').insert({ admin_id: currentUser.id, action: 'gp_force_status_' + status, details: { event_id: evId } }).catch(function(){});
+  restore();
+  showToast('Status set to ' + status, 2500);
+  await gp_adminRefresh();
+}
+
+async function gp_adminForceSimulate() {
+  if (!await isAdmin()) return;
+  if (!confirm('Run full simulation? This scores all entries, assigns ranks, and sends notifications.')) return;
+  var btn = event && event.target; var restore = gp_adminBtnLoading(btn, '⏳ Simulating…');
+
+  var { data: events } = await supabaseClient.rpc('get_current_grand_prix').catch(function(){ return { data: null }; });
+  if (!events || events.length === 0) { showToast('No active event', 3000); return; }
+
+  await supabaseClient.from('admin_logs').insert({ admin_id: currentUser.id, action: 'gp_force_simulate', details: { event_id: events[0].id } }).catch(function(){});
+  await simulateGrandPrix(events[0].id);
+  restore();
+  await gp_adminRefresh();
+}
+
+async function gp_adminAdjustPrize(delta) {
+  if (!await isAdmin()) return;
+  var { data: events } = await supabaseClient.rpc('get_current_grand_prix').catch(function(){ return { data: null }; });
+  if (!events || events.length === 0) { showToast('No active event', 2500); return; }
+  var ev = events[0];
+  var newPool = Math.max(0, (ev.prize_pool||0) + delta);
+  await supabaseClient.from('grand_prix_events').update({ prize_pool: newPool }).eq('id', ev.id);
+  await supabaseClient.from('admin_logs').insert({ admin_id: currentUser.id, action: 'gp_adjust_prize', details: { delta, new_pool: newPool } }).catch(function(){});
+  showToast('Prize pool: ' + newPool.toLocaleString() + ' PP', 2000);
+  await gp_adminRefresh();
+}
+
+async function gp_adminSetPrize() {
+  if (!await isAdmin()) return;
+  var input = document.getElementById('gp-admin-prize-input');
+  var amount = parseInt(input ? input.value : '');
+  if (isNaN(amount) || amount < 0) { showToast('Enter a valid amount', 2000); return; }
+  var { data: events } = await supabaseClient.rpc('get_current_grand_prix').catch(function(){ return { data: null }; });
+  if (!events || events.length === 0) { showToast('No active event', 2500); return; }
+  await supabaseClient.from('grand_prix_events').update({ prize_pool: amount }).eq('id', events[0].id);
+  await supabaseClient.from('admin_logs').insert({ admin_id: currentUser.id, action: 'gp_set_prize', details: { amount } }).catch(function(){});
+  showToast('Prize pool set to ' + amount.toLocaleString() + ' PP', 2500);
+  await gp_adminRefresh();
+}
+
+async function gp_adminEditTraining(entryId, currentBonus) {
+  if (!await isAdmin()) return;
+  var input = prompt('New training bonus (0–15):', currentBonus);
+  if (input === null) return;
+  var val = Math.min(15, Math.max(0, parseInt(input)||0));
+  await supabaseClient.from('grand_prix_entries').update({ training_bonus: val }).eq('id', entryId);
+  await supabaseClient.from('admin_logs').insert({ admin_id: currentUser.id, action: 'gp_edit_training', details: { entryId, val } }).catch(function(){});
+  showToast('Training bonus updated to ' + val, 2000);
+  await gp_adminRefresh();
+}
+
+async function gp_adminRemoveEntry(entryId, username) {
+  if (!await isAdmin()) return;
+  if (!confirm('Remove entry for ' + username + '? This cannot be undone.')) return;
+  await supabaseClient.from('grand_prix_entries').delete().eq('id', entryId);
+  await supabaseClient.from('admin_logs').insert({ admin_id: currentUser.id, action: 'gp_remove_entry', details: { entryId, username } }).catch(function(){});
+  showToast('Entry removed', 2500);
+  await gp_adminRefresh();
+}
+
+async function gp_adminSendNotif() {
+  if (!await isAdmin()) return;
+  var target  = (document.getElementById('gp-admin-notif-target')||{}).value || 'all';
+  var message = (document.getElementById('gp-admin-notif-msg')||{}).value.trim();
+  if (!message) { showToast('Enter a message', 2000); return; }
+
+  var { data: events } = await supabaseClient.rpc('get_current_grand_prix').catch(function(){ return { data: null }; });
+  if (!events || events.length === 0) { showToast('No active event', 2500); return; }
+
+  var query = supabaseClient.from('grand_prix_entries').select('user_id, final_rank').eq('event_id', events[0].id);
+  if (target === 'top10') query = query.lte('final_rank', 10);
+  var { data: targets } = await query;
+
+  var sent = 0;
+  for (var i = 0; i < (targets||[]).length; i++) {
+    await createNotification(targets[i].user_id, 'grand_prix_results', '🏁 Grand Prix Admin Message', message, 'tab:racing').catch(function(){});
+    sent++;
+  }
+  await supabaseClient.from('admin_logs').insert({ admin_id: currentUser.id, action: 'gp_send_notif', details: { target, message, sent } }).catch(function(){});
+  showToast('Sent to ' + sent + ' players', 3000);
+}
+
+async function gp_adminCreateEvent() {
+  if (!await isAdmin()) return;
+  if (!confirm('Create a new Grand Prix event for this week? Will fail if one already exists.')) return;
+
+  var now      = new Date();
+  var saturday = new Date(now); saturday.setUTCDate(saturday.getUTCDate() + (6 - saturday.getUTCDay() + 7) % 7); saturday.setUTCHours(0,0,0,0);
+  var monday   = new Date(saturday); monday.setUTCDate(monday.getUTCDate() + 2);
+
+  function getWeekNumber(d) {
+    var date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    var day  = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - day);
+    var yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+    return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  }
+
+  var { error } = await supabaseClient.from('grand_prix_events').insert({
+    week_number: getWeekNumber(now), year: now.getFullYear(),
+    start_time: saturday.toISOString(), end_time: monday.toISOString(),
+    registration_end: saturday.toISOString(), status: 'registration',
+    prize_pool: 0, total_entries: 0
+  });
+
+  if (error) { showToast('Error: ' + error.message, 3500); return; }
+  await supabaseClient.from('admin_logs').insert({ admin_id: currentUser.id, action: 'gp_create_event', details: { week: getWeekNumber(now) } }).catch(function(){});
+  showToast('Event created!', 3000);
+  await gp_adminRefresh();
+}
+
 async function isAdmin() {
   if (!currentUser) return false;
   var ADMIN_IDS = ['c8310873-c1f9-4d6e-a71a-1dad03974f5b'];
