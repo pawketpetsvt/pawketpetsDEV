@@ -3940,7 +3940,8 @@ var raceState = {
 
 // ── Init ──────────────────────────────────────────────────────────────────
 async function race_init() {
-  var area = document.getElementById('race-area');
+  // Support both the Racing page (racing-race-area) and the Minigames page (race-area)
+  var area = document.getElementById('racing-race-area') || document.getElementById('race-area');
   if (!area) return;
   if (!currentUser) {
     area.innerHTML = '<p style="color:var(--text-light);text-align:center;">Log in to race!</p>';
@@ -3973,7 +3974,7 @@ async function race_init() {
 
 // ── Setup UI ─────────────────────────────────────────────────────────────
 async function race_renderSetup() {
-  var area = document.getElementById('race-area');
+  var area = document.getElementById('racing-race-area') || document.getElementById('race-area');
   if (!area) return;
 
   area.innerHTML = '<div class="spinner"></div>';
@@ -15849,7 +15850,7 @@ async function updateWeeklyLeaderboard(petId, won, raceTimeMs) {
 }
 
 async function race_renderWeeklyLeaderboard() {
-  var area = document.getElementById('race-area');
+  var area = document.getElementById('racing-race-area') || document.getElementById('race-area');
   if (!area) return;
 
   try {
@@ -15937,10 +15938,10 @@ var gpState = {
 };
 
 var GP_TRAINING_TYPES = {
-  speed:   { label: '💨 Speed Training',   bonus: 3,  energyCost: 10, ppCost: 0,  happinessCost: 0, desc: '+3 race score · Costs 10 energy' },
-  stamina: { label: '💪 Stamina Training', bonus: 2,  energyCost: 5,  ppCost: 0,  happinessCost: 0, desc: '+2 race score · Costs 5 energy, grants +10 energy' },
-  focus:   { label: '🎯 Focus Training',   bonus: 4,  energyCost: 15, ppCost: 0,  happinessCost: 5, desc: '+4 race score · Costs 15 energy & 5 happiness' },
-  lucky:   { label: '🍀 Lucky Training',   bonus: -1, energyCost: 0,  ppCost: 20, happinessCost: 0, desc: '+1-8 random bonus · Costs 20 PP · Once per week' }
+  speed:   { label: '💨 Speed Training',   bonus: 3,  energyCost: 10, ppCost: 0,  happinessCost: 0,  energyGain: 0,  desc: '+3 race score · Costs 10 energy' },
+  stamina: { label: '💪 Stamina Training', bonus: 1,  energyCost: 0,  ppCost: 0,  happinessCost: 0,  energyGain: 15, desc: '+1 race score · Free! Grants +15 energy' },
+  focus:   { label: '🎯 Focus Training',   bonus: 5,  energyCost: 20, ppCost: 0,  happinessCost: 10, energyGain: 0,  desc: '+5 race score · Costs 20 energy & 10 happiness' },
+  lucky:   { label: '🍀 Lucky Training',   bonus: -1, energyCost: 0,  ppCost: 15, happinessCost: 0,  energyGain: 0,  desc: '+2–10 random bonus · Costs 15 PP' }
 };
 
 var GP_VARIANT_BONUS = {
@@ -16036,9 +16037,15 @@ async function gp_renderNoEvent(mount) {
 // ── Registration phase ────────────────────────────────────────────────────
 async function gp_renderRegistration(mount) {
   var ev = gpState.event;
-  var regEnd = new Date(ev.registration_end);
-  var minsLeft = Math.max(0, Math.floor((regEnd - new Date()) / 60000));
-  var timeStr  = minsLeft > 60 ? Math.floor(minsLeft/60) + 'h ' + (minsLeft%60) + 'm' : minsLeft + 'm';
+
+  // Calculate next Sunday 23:59 UTC
+  var regClose = ev.registration_end ? new Date(ev.registration_end) : (function(){
+    var d = new Date(); d.setUTCDate(d.getUTCDate() + (7 - d.getUTCDay()) % 7 || 7); d.setUTCHours(23,59,59,0); return d;
+  })();
+  var minsLeft = Math.max(0, Math.floor((regClose - new Date()) / 60000));
+  var daysLeft = Math.floor(minsLeft / 1440);
+  var hrsLeft  = Math.floor((minsLeft % 1440) / 60);
+  var timeStr  = daysLeft > 0 ? daysLeft + 'd ' + hrsLeft + 'h left' : hrsLeft + 'h left';
 
   var entrySection = gpState.entry
     ? '<div style="background:rgba(93,222,122,0.1);border:1px solid rgba(93,222,122,0.3);border-radius:12px;padding:14px 16px;margin-bottom:16px;">' +
@@ -16052,8 +16059,9 @@ async function gp_renderRegistration(mount) {
       gp_headerHtml(ev) +
       '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">' +
         '<div style="flex:1;background:rgba(153,102,255,0.08);border-radius:10px;padding:12px;text-align:center;">' +
-          '<div style="font-size:0.72rem;color:var(--text-light);margin-bottom:2px;">REGISTRATION CLOSES</div>' +
-          '<div style="font-weight:700;color:var(--purple);">⏰ ' + timeStr + '</div>' +
+          '<div style="font-size:0.72rem;color:var(--text-light);margin-bottom:2px;">CLOSES</div>' +
+          '<div style="font-weight:700;color:var(--purple);">📅 Sunday 23:59 UTC</div>' +
+          '<div style="font-size:0.68rem;color:var(--text-light);">' + timeStr + '</div>' +
         '</div>' +
         '<div style="flex:1;background:rgba(255,215,0,0.1);border-radius:10px;padding:12px;text-align:center;">' +
           '<div style="font-size:0.72rem;color:var(--text-light);margin-bottom:2px;">PRIZE POOL</div>' +
@@ -16204,28 +16212,19 @@ async function gp_renderRacing(mount) {
   if (gpState.entry) {
     var trainingBonus = gpState.entry.training_bonus || 0;
     var bonusPct = Math.round((trainingBonus / 15) * 100);
-
-    // Check if trained today
-    var { data: todayTraining } = await supabaseClient
-      .from('grand_prix_training')
-      .select('id')
-      .eq('user_id', currentUser.id)
-      .eq('event_id', ev.id)
-      .eq('training_day', new Date().toISOString().slice(0,10))
-      .maybeSingle();
-
-    var alreadyTrained = !!todayTraining;
+    var remaining  = 15 - trainingBonus;
 
     var trainBtns = Object.keys(GP_TRAINING_TYPES).map(function(key) {
       var t = GP_TRAINING_TYPES[key];
+      var capHit = trainingBonus >= 15;
       return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;' +
-        (alreadyTrained?'opacity:0.5;':'') + '">' +
+        (capHit?'opacity:0.5;':'') + '">' +
         '<div style="flex:1;">' +
           '<div style="font-weight:700;font-size:0.82rem;color:var(--purple-dark);">' + t.label + '</div>' +
           '<div style="font-size:0.72rem;color:var(--text-light);">' + t.desc + '</div>' +
         '</div>' +
-        '<button class="btn btn-primary btn-sm" onclick="gp_train(\'' + key + '\')" ' + (alreadyTrained?'disabled':'') + ' style="font-size:0.75rem;white-space:nowrap;">' +
-          '+' + (key==='lucky'?'1-8':t.bonus) + ' pts' +
+        '<button class="btn btn-primary btn-sm" onclick="gp_train(\'' + key + '\')" ' + (capHit?'disabled':'') + ' style="font-size:0.75rem;white-space:nowrap;">' +
+          '+' + (key==='lucky'?'2-10':t.bonus) + ' pts' +
         '</button>' +
       '</div>';
     }).join('');
@@ -16233,11 +16232,12 @@ async function gp_renderRacing(mount) {
     trainingSection =
       '<div style="border:2px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:16px;">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">' +
-          '<div style="font-weight:700;font-size:0.88rem;color:var(--purple-dark);">🎯 Daily Training</div>' +
-          (alreadyTrained
-            ? '<div style="font-size:0.75rem;color:#5dde7a;font-weight:600;">✅ Trained today!</div>'
-            : '<div style="font-size:0.75rem;color:var(--text-light);">Available now</div>') +
+          '<div style="font-weight:700;font-size:0.88rem;color:var(--purple-dark);">🎯 Training (Weekly Cap)</div>' +
+          (trainingBonus >= 15
+            ? '<div style="font-size:0.75rem;color:#5dde7a;font-weight:600;">✅ Cap reached!</div>'
+            : '<div style="font-size:0.75rem;color:var(--purple);">' + remaining + ' pts remaining</div>') +
         '</div>' +
+        '<div style="background:rgba(153,102,255,0.06);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:0.75rem;color:var(--text-light);">Train as much as you want right now! Cap is 15 pts per week — no daily limit.</div>' +
         '<div style="margin-bottom:10px;">' +
           '<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-light);margin-bottom:4px;">' +
             '<span>Weekly training bonus</span><span>' + trainingBonus + '/15</span>' +
@@ -16292,7 +16292,7 @@ async function gp_renderRacing(mount) {
 }
 
 async function gp_train(trainingType) {
-  if (!gpState.entry || !currentUser || !canPerformAction('gp_train', 3000)) return;
+  if (!gpState.entry || !currentUser || !canPerformAction('gp_train', 1000)) return;
 
   var t = GP_TRAINING_TYPES[trainingType];
   if (!t) return;
@@ -16300,40 +16300,46 @@ async function gp_train(trainingType) {
   var petId = gpState.entry.pet_id;
   var pet   = petState[petId] || {};
 
+  // Check weekly cap first
+  var currentBonus = gpState.entry.training_bonus || 0;
+  var addedBonus   = trainingType === 'lucky' ? Math.floor(Math.random() * 9) + 2 : t.bonus;
+  if (currentBonus + addedBonus > 15) {
+    addedBonus = 15 - currentBonus; // partial fill to reach cap
+    if (addedBonus <= 0) { showToast('Weekly training cap (15) already reached!', 2500); return; }
+  }
+
   // Validate costs
   if (t.energyCost > 0 && (pet.energy||0) < t.energyCost) { showToast('Not enough energy! (need ' + t.energyCost + ')', 2500); return; }
-  if (t.happinessCost > 0 && (pet.happiness||0) < t.happinessCost + 20) { showToast('Pet needs to be happier for Focus Training!', 2500); return; }
+  if (t.happinessCost > 0 && (pet.happiness||0) < t.happinessCost + 10) { showToast('Pet needs to be happier for Focus Training!', 2500); return; }
   if (t.ppCost > 0 && (currentPoints||0) < t.ppCost) { showToast('Need ' + t.ppCost + ' PP for Lucky Training!', 2500); return; }
 
-  // Training cap
-  if ((gpState.entry.training_bonus||0) >= 15) { showToast('Max training bonus (15) already reached!', 2500); return; }
-
-  // Calculate bonus
-  var bonus = trainingType === 'lucky' ? Math.floor(Math.random() * 8) + 1 : t.bonus;
-
   try {
-    var { data: result, error } = await supabaseClient.rpc('train_grand_prix_pet', {
-      p_user_id:      currentUser.id,
-      p_pet_id:       petId,
-      p_training_type:trainingType,
-      p_bonus_amount: bonus
-    });
+    // Directly update training_bonus on the entry (no daily table check)
+    var { error } = await supabaseClient
+      .from('grand_prix_entries')
+      .update({ training_bonus: currentBonus + addedBonus, training_type: trainingType })
+      .eq('id', gpState.entry.id);
     if (error) throw error;
-    if (result && result.success === false) throw new Error(result.error || 'Failed');
+
+    gpState.entry.training_bonus = currentBonus + addedBonus;
 
     // Apply energy/happiness/PP costs client-side
     if (t.energyCost > 0 && petState[petId]) petState[petId].energy = Math.max(0, (petState[petId].energy||0) - t.energyCost);
-    if (trainingType === 'stamina' && petState[petId]) petState[petId].energy = Math.min(petState[petId].max_energy||100, (petState[petId].energy||0) + 10);
+    if (t.energyGain > 0 && petState[petId]) petState[petId].energy = Math.min(petState[petId].max_energy||100, (petState[petId].energy||0) + t.energyGain);
     if (t.happinessCost > 0 && petState[petId]) petState[petId].happiness = Math.max(0, (petState[petId].happiness||0) - t.happinessCost);
-    if (t.ppCost > 0) { await awardPP(-t.ppCost, 'gp_lucky_training'); }
+    if (t.ppCost > 0) await awardPP(-t.ppCost, 'gp_lucky_training');
 
-    // Also update DB energy/happiness
-    var energyUpdate = (petState[petId] || {}).energy;
-    if (energyUpdate !== undefined) await supabaseClient.from('user_pets').update({ energy: energyUpdate }).eq('id', petId).catch(function(){});
+    // Persist energy/happiness update
+    if (petState[petId]) {
+      var upd = {};
+      if (t.energyCost > 0 || t.energyGain > 0) upd.energy = petState[petId].energy;
+      if (t.happinessCost > 0) upd.happiness = petState[petId].happiness;
+      if (Object.keys(upd).length > 0) await supabaseClient.from('user_pets').update(upd).eq('id', petId).catch(function(){});
+    }
 
     addPassXP(10, 'grand_prix_training').catch(function(){});
     updateBingoProgress('train_grand_prix', 1);
-    showToast('🎯 Training complete! +' + bonus + ' race score!', 3000);
+    showToast('🎯 Training complete! +' + addedBonus + ' race score! (' + (currentBonus + addedBonus) + '/15)', 3000);
     gp_load();
   } catch(err) {
     showToast('Training failed: ' + err.message, 3000);

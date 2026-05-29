@@ -1226,7 +1226,7 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
       </div>
       <!-- Quick Race panel -->
       <div id="racing-panel-quickrace">
-        <div id="race-area"><div class="spinner"></div></div>
+        <div id="racing-race-area"><div class="spinner"></div></div>
       </div>
       <!-- Grand Prix panel -->
       <div id="racing-panel-grandprix" style="display:none;">
@@ -2096,10 +2096,14 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
         </div>
 
         <!-- Admin Panel — only visible to admins via JS -->
-        <div id="admin-panel-section" style="display:none;margin-top:30px;padding-top:24px;border-top:2px solid var(--border);">
-          <h3 style="color:#ff4500;margin-bottom:6px;">⚙️ Admin Tools</h3>
-          <button class="btn btn-primary" onclick="showAdminPollModal()" style="background:linear-gradient(135deg,#ff4500,#ff6b35);">🗳️ Manage Polls</button>
-        </div>
+         <div id="admin-panel-section" style="display:none;margin-top:30px;padding-top:24px;border-top:2px solid var(--border);">
+           <div style="background:rgba(255,69,0,0.08);border:2px solid rgba(255,69,0,0.3);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:0.8rem;font-weight:700;color:#ff4500;">⚠️ ADMIN CONTROLS — USE WITH CAUTION</div>
+           <h3 style="color:#ff4500;margin-bottom:10px;">⚙️ Admin Tools</h3>
+           <div style="display:flex;gap:8px;flex-wrap:wrap;">
+             <button class="btn btn-primary" onclick="showAdminPollModal()" style="background:linear-gradient(135deg,#ff4500,#ff6b35);">🗳️ Manage Polls</button>
+             <button class="btn btn-primary" onclick="gp_adminPanel()" style="background:linear-gradient(135deg,#cc0000,#ff4500);">🏁 Grand Prix</button>
+           </div>
+         </div>
 
         <!-- Referral System -->
         <div style="margin-top:40px;padding-top:30px;border-top:2px solid var(--border);">
