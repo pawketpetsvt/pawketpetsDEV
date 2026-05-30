@@ -13927,8 +13927,8 @@ async function furniture_loadShop() {
   grid.innerHTML = '<div class="spinner"></div>';
 
   try {
-    // Load catalog
-    if (!furnitureCache) {
+    // Load catalog — re-fetch if cache is null OR was previously an empty array
+    if (!furnitureCache || furnitureCache.length === 0) {
       var { data, error } = await supabaseClient.from('furniture_items').select('*').order('cost', { ascending: true });
       if (error) throw error;
       furnitureCache = data || [];
@@ -13968,6 +13968,9 @@ async function furniture_loadShop() {
     grid.innerHTML = '<div class="empty-state"><p>Could not load furniture shop: ' + escapeHtml(err.message) + '</p></div>';
   }
 }
+
+// Alias — Deepseek/console tests reference this name
+var loadFurnitureShop = function() { return furniture_loadShop(); };
 
 async function furniture_buy(furnitureKey, cost) {
   if (!currentUser) { showToast('Log in first!', 2000); return; }
