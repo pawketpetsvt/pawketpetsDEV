@@ -3997,7 +3997,7 @@ async function race_renderSetup() {
     ? '<div style="color:#ff6b6b;font-size:0.85rem;text-align:center;">No eligible pets (need level 5+, ' + RACE_ENERGY_COST + '+ energy)</div>'
     : myPets.map(function(p) {
         var spd = p.base_speed || 4;
-        var selected = raceState.selectedPets.some(function(s) { return s.id === p.id; });
+        var selected = raceState.selectedPets.some(function(s) { return s && s.id === p.id; });
         return '<div class="race-pet-option ' + (selected ? 'race-pet-selected' : '') + '" ' +
           'onclick="race_togglePet(\'' + p.id + '\')" ' +
           'data-pet-id="' + p.id + '" ' +
@@ -4055,15 +4055,15 @@ function race_petAvatar(p) {
 }
 
 function race_togglePet(petId) {
-  var idx = raceState.selectedPets.findIndex(function(p) { return p.id === petId; });
+  var idx = raceState.selectedPets.findIndex(function(p) { return p && p.id === petId; });
   if (idx !== -1) {
     raceState.selectedPets.splice(idx, 1);
   } else {
-    if (raceState.selectedPets.length >= 2) {
-      showToast('Max 2 of your pets per race!', 2000);
-      return;
-    }
-    raceState.selectedPets.push(petState[petId]);
+    if (raceState.selectedPets.length >= 2) { showToast('Max 2 of your pets per race!', 2000); return; }
+    // Use the pet from the DB result already in myPets (stored on renderSetup), not petState
+    var pet = petState[petId];
+    if (!pet) { showToast('Pet data not found — try refreshing', 2500); return; }
+    raceState.selectedPets.push(pet);
   }
   race_renderSetup();
 }
@@ -4171,7 +4171,7 @@ async function race_start() {
   }
   community_increment('races_week1', 1);
 
-  // Show results
+  // Show results with animated log
   race_renderResults(racerunners, payout, playerBest);
   raceState.racing = false;
 }
@@ -4239,7 +4239,7 @@ function race_animate(runners) {
 
 // ── Results UI ────────────────────────────────────────────────────────────
 function race_renderResults(runners, payout, playerBest) {
-  var area = document.getElementById('race-area');
+  var area = document.getElementById('racing-race-area') || document.getElementById('race-area');
   if (!area) return;
 
   var winner = runners[0];
@@ -4268,8 +4268,18 @@ function race_renderResults(runners, payout, playerBest) {
     '</div>';
   }).join('');
 
+  // Generate race log entries
+  var petName = playerBest ? escapeHtml(playerBest.pet.nickname || playerBest.pet.pet_type || 'Your pet') : 'Your pet';
+  var logLines = race_generateLog(petName, playerWon, playerPlace);
+
   area.innerHTML =
-    '<div style="padding:10px 4px;">' +
+    '<div style="padding:4px;">' +
+      // Race log (animated)
+      '<div style="background:rgba(0,0,0,0.07);border-radius:12px;padding:12px 14px;margin-bottom:14px;">' +
+        '<div style="font-weight:700;font-size:0.8rem;color:var(--purple-dark);margin-bottom:8px;letter-spacing:1px;">🏁 RACE LOG</div>' +
+        '<div id="race-log-entries" style="font-size:0.8rem;color:var(--text-light);line-height:1.7;min-height:60px;"></div>' +
+      '</div>' +
+      // Results
       '<div style="text-align:center;margin-bottom:14px;">' +
         '<div style="font-size:2rem;">' + (playerWon ? '🎉' : '😤') + '</div>' +
         '<div style="font-weight:800;font-size:1.05rem;color:var(--purple-dark);">' + placeText + '</div>' +
@@ -4283,6 +4293,48 @@ function race_renderResults(runners, payout, playerBest) {
         '</button>' +
       '</div>' +
     '</div>';
+
+  // Animate the log progressively
+  var logEl = document.getElementById('race-log-entries');
+  if (!logEl) return;
+  var idx = 0;
+  var interval = safeSetInterval(function() {
+    if (idx >= logLines.length) { clearInterval(interval); return; }
+    var line = document.createElement('div');
+    line.textContent = logLines[idx];
+    line.style.cssText = 'animation:fadeIn 0.3s ease;border-bottom:1px solid rgba(153,102,255,0.08);padding:2px 0;' +
+      (idx === logLines.length - 1 ? 'font-weight:700;color:' + outcomeColor + ';' : '');
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+    idx++;
+  }, 600);
+}
+
+function race_generateLog(petName, didWin, place) {
+  var lines = [];
+  lines.push('🏁 AND THEY\'RE OFF! ' + petName + ' charges from the gate!');
+  if (didWin) {
+    lines.push('Lap 1: ' + petName + ' takes an early lead! The crowd roars!');
+    lines.push('Lap 2: ' + petName + ' extends the advantage — no one can close the gap!');
+    lines.push('Final lap: ' + petName + ' enters the home stretch with a commanding lead!');
+    lines.push('🎉 ' + petName + ' crosses the finish line FIRST! VICTORY! 🏆');
+  } else if (place === 2) {
+    lines.push('Lap 1: ' + petName + ' gets a solid start, right in the pack!');
+    lines.push('Lap 2: ' + petName + ' battles hard, trading places at the front!');
+    lines.push('Final lap: A strong push, but the leader pulls ahead at the last moment!');
+    lines.push('🥈 ' + petName + ' finishes in 2nd! A great effort!');
+  } else if (place === 3) {
+    lines.push('Lap 1: ' + petName + ' settles into the pack, finding a rhythm.');
+    lines.push('Lap 2: ' + petName + ' makes a move, pushing towards the front!');
+    lines.push('Final lap: A hard-fought battle for the podium!');
+    lines.push('🥉 ' + petName + ' secures 3rd place! Well done!');
+  } else {
+    lines.push('Lap 1: ' + petName + ' struggles to find pace early on.');
+    lines.push('Lap 2: The pack pulls away — ' + petName + ' is giving everything they have!');
+    lines.push('Final lap: One last push, but the gap is too large.');
+    lines.push('💪 ' + petName + ' finishes the race. Better luck next time!');
+  }
+  return lines;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -15957,16 +16009,32 @@ async function gp_load() {
   mount.innerHTML = '<div class="spinner"></div>';
 
   // Ping the edge function to trigger any pending status transitions
-  // (open registration, close registration, score entries, etc.)
-  // Fire-and-forget — don't block the UI on it
-  fetch('https://hqzugbxutgefjilgmxqu.supabase.co/functions/v1/process-grand-prix', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
-  }).catch(function(e) { dbg('GP auto-check failed:', e); });
+  // Fire-and-forget with auth token to avoid 401
+  supabaseClient.auth.getSession().then(function(res) {
+    var token = res && res.data && res.data.session ? res.data.session.access_token : '';
+    fetch('https://hqzugbxutgefjilgmxqu.supabase.co/functions/v1/process-grand-prix', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }
+    }).catch(function(e) { dbg('GP auto-check failed:', e); });
+  }).catch(function(){});
 
   try {
-    // Fetch current event
-    var { data: events } = await supabaseClient.rpc('get_current_grand_prix');
+    // Fetch current event — RPC first, fallback to direct query if RPC missing
+    var events = null;
+    try {
+      var { data: rpcData, error: rpcErr } = await supabaseClient.rpc('get_current_grand_prix');
+      if (rpcErr) throw rpcErr;
+      events = rpcData;
+    } catch(rpcFail) {
+      dbg('get_current_grand_prix RPC unavailable, using direct query:', rpcFail.message);
+      var { data: directData } = await supabaseClient
+        .from('grand_prix_events')
+        .select('id, week_number, year, status, prize_pool, total_entries, registration_end, start_time, end_time')
+        .in('status', ['registration', 'racing', 'reward_claim'])
+        .order('week_number', { ascending: false })
+        .limit(1);
+      events = directData;
+    }
     gpState.event = (events && events.length > 0) ? events[0] : null;
 
     // Fetch user's entry if event exists
@@ -24356,8 +24424,7 @@ function phase1_displayPetOfTheDay() {
   try {
     var container = document.getElementById('phase1-pet-of-day-container');
     if (!container) {
-      console.warn('⚠️ Phase 1: Pet of day container not found in DOM');
-      return;
+      return; // Container not in DOM on this page — silent return
     }
     
     if (!phase1_state.petOfTheDay) {
@@ -24463,8 +24530,7 @@ function phase1_displayWeeklySpotlight() {
   try {
     var container = document.getElementById('phase1-spotlight-container');
     if (!container) {
-      console.warn('⚠️ Phase 1: Spotlight container not found in DOM');
-      return;
+      return; // Container not in DOM on this page — silent return
     }
     
     if (!phase1_state.weeklySpotlight) {
