@@ -15982,6 +15982,55 @@ function racing_init() {
   racing_showTab(_racingActiveTab || 'quickrace');
 }
 
+// Alias — some tests and edge function pings reference this name
+var gp_renderGrandPrix = gp_load;
+
+// Replay modal — called from results phase "Watch Replay" button
+async function gp_showReplay(replayId) {
+  try {
+    var { data: replay } = await supabaseClient
+      .from('grand_prix_replays')
+      .select('*')
+      .eq('id', replayId)
+      .single();
+    if (!replay) { showToast('Replay not found', 2000); return; }
+
+    var logs = replay.race_log || (replay.replay_text ? replay.replay_text.split('\n') : []);
+
+    var modal = makeModal();
+    modal.innerHTML =
+      '<div class="gp-replay-modal">' +
+        '<h2 style="margin-bottom:10px;">🎬 Grand Prix Replay</h2>' +
+        '<div class="gp-replay-log" id="gp-replay-log">' +
+          '<div style="color:#aaa;font-size:0.82rem;">Press Watch Replay to begin...</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:8px;">' +
+          '<button class="btn btn-primary" onclick="gp_playReplayAnimation()" style="flex:1;">🏁 Watch Replay</button>' +
+          '<button class="btn btn-outline" onclick="closeModal()">Close</button>' +
+        '</div>' +
+      '</div>';
+    openModal(modal);
+    window._currentReplayLogs = logs;
+  } catch(e) { showToast('Could not load replay', 2500); }
+}
+
+function gp_playReplayAnimation() {
+  var container = document.getElementById('gp-replay-log');
+  if (!container || !window._currentReplayLogs) return;
+  container.innerHTML = '';
+  var idx = 0;
+  var logs = window._currentReplayLogs;
+  var interval = safeSetInterval(function() {
+    if (idx >= logs.length) { clearInterval(interval); return; }
+    var entry = document.createElement('div');
+    entry.className = 'gp-replay-entry';
+    entry.textContent = logs[idx];
+    container.appendChild(entry);
+    container.scrollTop = container.scrollHeight;
+    idx++;
+  }, 800);
+}
+
 // ── Grand Prix state ──────────────────────────────────────────────────────
 var gpState = {
   event:   null,  // current grand_prix_events row
