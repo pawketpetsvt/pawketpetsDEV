@@ -3,7 +3,19 @@
 // ══════════════════════════════════════════════════════════════════════════
 // DEBUG FLAG — set to true locally to see verbose logs; false for production
 // ══════════════════════════════════════════════════════════════════════════
+var _notifTabHidden = false;
+
 var DEBUG = false;
+// Refresh notification badge when user returns to this tab
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) {
+    _notifTabHidden = true;
+  } else {
+    _notifTabHidden = false;
+    if (currentUser) updateNotificationBadge().catch(function() {});
+  }
+});
+
 function dbg() { if (DEBUG) console.log.apply(console, arguments); }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -170,21 +182,9 @@ function safeClearTimeout(id) {
 }
 
 function cleanupAllTimers() {
-  // Clear all tracked intervals
-  activeTimers.intervals.forEach(function(id) {
-    clearInterval(id);
-  });
-  
-  // Clear all tracked timeouts
-  activeTimers.timeouts.forEach(function(id) {
-    clearTimeout(id);
-  });
-  
-  // Reset arrays
-  activeTimers.intervals = [];
-  activeTimers.timeouts = [];
-  
-  dbg('✅ All timers cleaned up');
+  // System timers (weather, events, news, notifications) live outside activeTimers
+  // and must not be cleared on tab switch. UI/particle cleanup happens in showTab().
+  dbg('✅ Timer cleanup skipped — system timers preserved');
 }
 
 function playBattleSound(soundKey, volume, forceBoss) {
@@ -4371,6 +4371,7 @@ var petMoodCache = {};
 
 // Load (or generate) today's mood for a pet
 async function personality_loadMood(petId) {
+  if (!petId || typeof petId !== 'string') return null;
   var today = new Date().toISOString().slice(0, 10);
 
   // Return from cache if same day
@@ -13882,17 +13883,17 @@ async function updateNotificationBadge() {
   if (!currentUser) return;
 
   try {
-    // Timeout after 8 seconds to prevent hanging requests
-    var timeoutPromise = new Promise(function(_, reject) {
-      setTimeout(function() { reject(new Error('timeout')); }, 8000);
-    });
-    var fetchPromise = supabaseClient
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 8000);
+
+    var { data, error } = await supabaseClient
       .from('notifications')
       .select('id')
       .eq('user_id', currentUser.id)
-      .eq('is_read', false);
+      .eq('is_read', false)
+      .abortSignal(controller.signal);
 
-    var { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+    clearTimeout(timeoutId);
     if (error) throw error;
 
     var count = data ? data.length : 0;
