@@ -1711,8 +1711,8 @@ async function showApp(user) {
   checkReferralCode(); // Check for referral code in URL
   await updateNotificationBadge(); // Update notification count
   
-  // Refresh notifications every 60 seconds
-  safeSetInterval(updateNotificationBadge, 60000);
+  // Refresh notifications every 2 minutes (reduced from 60s to limit CORS noise)
+  safeSetInterval(updateNotificationBadge, 120000);
 
   var bonus = await checkDailyBonus(user.id);
   if (bonus.awarded) {
@@ -13880,33 +13880,34 @@ async function markAllNotificationsRead() {
 // Update notification badge count
 async function updateNotificationBadge() {
   if (!currentUser) return;
-  
+
   try {
-    var { data, error } = await supabaseClient
+    // Timeout after 8 seconds to prevent hanging requests
+    var timeoutPromise = new Promise(function(_, reject) {
+      setTimeout(function() { reject(new Error('timeout')); }, 8000);
+    });
+    var fetchPromise = supabaseClient
       .from('notifications')
       .select('id')
       .eq('user_id', currentUser.id)
       .eq('is_read', false);
-    
+
+    var { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
     if (error) throw error;
-    
+
     var count = data ? data.length : 0;
     var badge = document.getElementById('notification-badge');
-    var bell = document.getElementById('notification-bell');
-    
+    var bell  = document.getElementById('notification-bell');
+
     if (count > 0) {
-      if (badge) {
-        badge.textContent = count > 99 ? '99+' : count;
-        badge.style.display = 'flex';
-      }
-      if (bell) bell.style.display = 'inline-flex';
+      if (badge) { badge.textContent = count > 99 ? '99+' : count; badge.style.display = 'flex'; }
+      if (bell)  bell.style.display = 'inline-flex';
     } else {
       if (badge) badge.style.display = 'none';
-      if (bell) bell.style.display = 'inline-flex'; // Still show bell, just no badge
+      if (bell)  bell.style.display = 'inline-flex';
     }
-    
   } catch (err) {
-    console.error('Error updating notification badge:', err);
+    // Silently ignore — intermittent CORS/network hiccups should not flood console
   }
 }
 
@@ -17518,8 +17519,8 @@ showApp = async function(user) {
   // Initialize notifications
   await updateNotificationBadge();
   
-  // Poll for new notifications every 30 seconds
-  safeSetInterval(updateNotificationBadge, 30000);
+  // Poll for new notifications every 2 minutes (reduced from 30s to limit CORS noise)
+  safeSetInterval(updateNotificationBadge, 120000);
 };
 
 
