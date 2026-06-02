@@ -23151,12 +23151,18 @@ async function checkBingoLines() {
         dailyBingo.completedLines.push(lineKey);
         
         // Award line bonus
-        updateAllPoints(currentPoints + 100);
-        await supabaseClient.rpc('award_pp_secure', {
-          p_user_id: currentUser.id,
-          p_amount: 100,
-          p_reason: 'Bingo Line Complete'
-        });
+        try {
+          var { data: newPtsLine, error: lineErr } = await supabaseClient.rpc('award_pp_secure', {
+            p_amount: 100,
+            p_reason: 'Bingo Line Complete'
+          });
+          if (lineErr) throw lineErr;
+          if (typeof newPtsLine === 'number') { currentPoints = newPtsLine; updateAllPoints(newPtsLine); }
+          else { updateAllPoints(currentPoints + 100); }
+        } catch(e) {
+          updateAllPoints(currentPoints + 100);
+          dbg('award_pp_secure line error:', e);
+        }
         
         await addPassXP(50, 'bingo_line');
         
@@ -23171,12 +23177,18 @@ async function checkBingoLines() {
     dailyBingo.blackoutCompleted = true;
     
     // Award blackout bonus
-    updateAllPoints(currentPoints + 500);
-    await supabaseClient.rpc('award_pp_secure', {
-      p_user_id: currentUser.id,
-      p_amount: 500,
-      p_reason: 'Bingo Blackout!'
-    });
+    try {
+      var { data: newPtsBlackout, error: blackoutErr } = await supabaseClient.rpc('award_pp_secure', {
+        p_amount: 500,
+        p_reason: 'Bingo Blackout!'
+      });
+      if (blackoutErr) throw blackoutErr;
+      if (typeof newPtsBlackout === 'number') { currentPoints = newPtsBlackout; updateAllPoints(newPtsBlackout); }
+      else { updateAllPoints(currentPoints + 500); }
+    } catch(e) {
+      updateAllPoints(currentPoints + 500);
+      dbg('award_pp_secure blackout error:', e);
+    }
     
     await addPassXP(200, 'bingo_blackout');
     
