@@ -4387,11 +4387,17 @@ async function personality_loadMood(petId) {
     .single();
 
   if (row) {
+    var parsedWishes = row.wishes
+      ? (typeof row.wishes === 'string' ? JSON.parse(row.wishes) : row.wishes)
+      : [];
+    var parsedCompleted = row.completed_wishes
+      ? (typeof row.completed_wishes === 'string' ? JSON.parse(row.completed_wishes) : row.completed_wishes)
+      : [];
     petMoodCache[petId] = {
       date: today,
       personality: row.personality,
-      wishes: row.wishes || [],
-      completedWishes: row.completed_wishes || [],
+      wishes: parsedWishes,
+      completedWishes: parsedCompleted,
       rewardClaimed: row.reward_claimed || false
     };
     return petMoodCache[petId];
@@ -4402,13 +4408,17 @@ async function personality_loadMood(petId) {
   var shuffled = WISH_POOL.slice().sort(function() { return Math.random() - 0.5; });
   var wishes = shuffled.slice(0, 3).map(function(w) { return { key: w.key, text: w.text, action: w.action, reward: w.reward }; });
 
-  // Save to DB (upsert)
+  // Save to DB (upsert) — serialize arrays as JSON strings for JSONB columns
+  var wishesForDb = JSON.stringify(wishes.map(function(w) {
+    return { key: w.key, text: w.text, action: w.action, reward: w.reward };
+  }));
+
   await supabaseClient.from('pet_daily_moods').upsert({
     pet_id: petId,
     date: today,
     personality: personality,
-    wishes: wishes,
-    completed_wishes: [],
+    wishes: wishesForDb,
+    completed_wishes: JSON.stringify([]),
     reward_claimed: false
   }, { onConflict: 'pet_id,date' });
 
@@ -4431,9 +4441,9 @@ async function personality_completeWish(petId, actionKey) {
   await awardPP(wish.reward, 'wish_' + wish.key);
   showToast('🎯 Wish completed: ' + wish.text + ' +' + wish.reward + ' PP!', 3500);
 
-  // Persist to DB
+  // Persist to DB — serialize array as JSON string for JSONB column
   await supabaseClient.from('pet_daily_moods')
-    .update({ completed_wishes: mood.completedWishes })
+    .update({ completed_wishes: JSON.stringify(mood.completedWishes) })
     .eq('pet_id', petId)
     .eq('date', mood.date);
 
