@@ -23074,11 +23074,16 @@ function saveDailyBingo() {
   localStorage.setItem('daily_bingo', JSON.stringify(dailyBingo));
   // Also persist to DB so progress survives localStorage clears
   if (currentUser) {
-    supabaseClient.from('user_bingo_progress').upsert({
-      user_id: currentUser.id,
-      date: dailyBingo.date,
-      bingo_data: JSON.stringify(dailyBingo)
-    }, { onConflict: 'user_id,date' }).catch(function(){});
+    (async function() {
+      try {
+        var { error } = await supabaseClient.from('user_bingo_progress').upsert({
+          user_id: currentUser.id,
+          date: dailyBingo.date,
+          bingo_data: JSON.stringify(dailyBingo)
+        }, { onConflict: 'user_id,date' });
+        if (error) dbg('saveDailyBingo DB error:', error);
+      } catch(e) { dbg('saveDailyBingo exception:', e); }
+    })();
   }
 }
 
