@@ -9181,29 +9181,26 @@ body.night-mode .stat-item.global .stat-value {
 
 /* Rotation Banner */
 .shop-rotation-banner {
-  background: linear-gradient(135deg, #9966ff, #ff66cc);
-  padding: 20px;
-  border-radius: 15px;
-  margin-bottom: 24px;
+  background: linear-gradient(135deg, rgba(153,102,255,0.15), rgba(255,102,204,0.1));
+  border: 1px solid var(--purple-light);
+  padding: 6px 14px;
+  border-radius: 20px;
+  margin-bottom: 14px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 4px 12px rgba(153, 102, 255, 0.3);
+  font-size: 0.78rem;
 }
 
 .rotation-week {
-  font-family: 'Chewy', cursive;
-  font-size: 1.5rem;
-  color: white;
-  font-weight: bold;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  font-size: 0.78rem;
+  color: var(--purple);
+  font-weight: 700;
 }
 
 .rotation-timer {
-  font-family: 'Chewy', cursive;
-  font-size: 1.1rem;
-  color: rgba(255, 255, 255, 0.95);
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+  font-size: 0.78rem;
+  color: var(--text-light);
 }
 
 #rotation-countdown {

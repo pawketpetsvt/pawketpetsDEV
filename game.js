@@ -2116,7 +2116,7 @@ function containsProfanity(text) {
       return true;
     }
     
-    // Check for leetspeak and common substitutions
+    // Check for leetspeak and common substitutions — with word boundaries to avoid false positives
     var variations = word
       .replace(/a/g, '[a@4]')
       .replace(/e/g, '[e3]')
@@ -2125,7 +2125,7 @@ function containsProfanity(text) {
       .replace(/s/g, '[s5$]')
       .replace(/t/g, '[t7]');
     
-    var variationRegex = new RegExp(variations, 'i');
+    var variationRegex = new RegExp('\\b' + variations + '\\b', 'i');
     if (variationRegex.test(lowerText)) {
       return true;
     }
@@ -2573,6 +2573,10 @@ async function loadMyPets() {
     fragment.appendChild(makeMyPetCard(pet)); 
   });
   grid.appendChild(fragment);
+  // Apply equipped variants to all pet cards immediately on render
+  Object.values(petState).forEach(function(pet) {
+    if (pet && pet.variant) { setTimeout(function() { skinkey_applyVariantToAllDisplays(pet.id, pet.variant); }, 50); }
+  });
   
   container.innerHTML = '';
   container.appendChild(grid);
@@ -4016,6 +4020,9 @@ async function race_renderSetup() {
       'onclick="race_setBet(' + b + ')" style="padding:6px 14px;">' + b + ' PP</button>';
   }).join('');
 
+  // Cache DB pets so race_togglePet can look them up by id
+  window._racePetsCache = myPets;
+
   var canRace = raceState.selectedPets.length >= 1 && raceState.racesLeft > 0 && currentPoints >= raceState.bet;
 
   area.innerHTML =
@@ -4060,8 +4067,8 @@ function race_togglePet(petId) {
     raceState.selectedPets.splice(idx, 1);
   } else {
     if (raceState.selectedPets.length >= 2) { showToast('Max 2 of your pets per race!', 2000); return; }
-    // Use the pet from the DB result already in myPets (stored on renderSetup), not petState
-    var pet = petState[petId];
+    // Look up from the DB-fetched cache first, then fall back to petState
+    var pet = (window._racePetsCache || []).find(function(p) { return p.id === petId; }) || petState[petId];
     if (!pet) { showToast('Pet data not found — try refreshing', 2500); return; }
     raceState.selectedPets.push(pet);
   }
@@ -4685,6 +4692,15 @@ async function feedFree(petId) {
   checkPetWishes('feed', petId).catch(function(){});
   progressQuestArc(petId, 'feed').catch(function(){});
   checkAchievementTierProgress('feed_count', petId, 1).catch(function(){});
+
+  // JOURNAL: log food discovery
+  if (typeof logJournalDiscovery === 'function') {
+    var feedPet = petState[petId] || {};
+    var feedPetType = feedPet.pet_type || (feedPet.pets && feedPet.pets.name) || null;
+    if (feedPetType) {
+      logJournalDiscovery(feedPetType, 'loved', itemName || '').catch(function(){});
+    }
+  }
   
   // COMMUNITY GOALS: Track feeding
   community_increment('feed_pets_week1', 1);
@@ -23056,6 +23072,14 @@ function generateDailyBingo() {
 // Save bingo to localStorage
 function saveDailyBingo() {
   localStorage.setItem('daily_bingo', JSON.stringify(dailyBingo));
+  // Also persist to DB so progress survives localStorage clears
+  if (currentUser) {
+    supabaseClient.from('user_bingo_progress').upsert({
+      user_id: currentUser.id,
+      date: dailyBingo.date,
+      bingo_data: JSON.stringify(dailyBingo)
+    }, { onConflict: 'user_id,date' }).catch(function(){});
+  }
 }
 
 // Update bingo progress
@@ -23086,13 +23110,9 @@ async function updateBingoProgress(taskType, amount) {
     if (!bingoNotificationsShown[notificationKey]) {
       bingoNotificationsShown[notificationKey] = true;
       
-      // Award points
+      // Award points — use awardPP which has its own fallback, not award_pp_secure directly
       updateAllPoints(currentPoints + square.rewardPoints);
-      await supabaseClient.rpc('award_pp_secure', {
-        p_user_id: currentUser.id,
-        p_amount: square.rewardPoints,
-        p_reason: 'Bingo: ' + square.name
-      });
+      awardPP(square.rewardPoints, 'bingo_' + taskType).catch(function(){});
       
       // Award Pass XP
       await addPassXP(15, 'bingo_square');
@@ -28178,9 +28198,24 @@ async function gp_adminPanel() {
 async function gp_adminRender(modal) {
   if (!modal) return;
 
-  // Fetch current event
-  var { data: events } = await supabaseClient.rpc('get_current_grand_prix').catch(function(){ return { data: null }; });
-  var ev = events && events.length > 0 ? events[0] : null;
+  // Fetch current event — use try/catch, not .catch() (RPC may not support it)
+  var ev = null;
+  try {
+    var { data: events, error: evErr } = await supabaseClient.rpc('get_current_grand_prix');
+    if (evErr) throw evErr;
+    ev = (events && events.length > 0) ? events[0] : null;
+  } catch(e) {
+    try {
+      // Fallback: direct query
+      var { data: fallbackEvts } = await supabaseClient
+        .from('grand_prix_events')
+        .select('id, week_number, year, status, prize_pool, total_entries, registration_end, start_time, end_time')
+        .in('status', ['registration', 'racing', 'reward_claim'])
+        .order('week_number', { ascending: false })
+        .limit(1);
+      ev = fallbackEvts && fallbackEvts.length > 0 ? fallbackEvts[0] : null;
+    } catch(e2) { dbg('gp_adminRender: could not fetch event', e2); }
+  }
 
   // Fetch all entries if event exists
   var entries = [];

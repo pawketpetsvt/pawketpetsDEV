@@ -54,7 +54,7 @@
    ═══════════════════════════════════════════════════════════ */
 .tutorial-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:999999;pointer-events:none}
 .tutorial-backdrop{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(2px);pointer-events:none}
-.tutorial-mascot{position:fixed;right:100px;bottom:280px;z-index:1000001;text-align:center;pointer-events:none;animation:tutorial-mascot-bounce 2s ease-in-out infinite}
+.tutorial-mascot{position:fixed;right:100px;bottom:280px;z-index:1000001;text-align:center;pointer-events:none;animation:tutorial-mascot-bounce 4s ease-in-out infinite}
 .tutorial-mascot-image{width:180px;height:180px;object-fit:contain;filter:drop-shadow(0 8px 24px rgba(0,0,0,0.3));animation:tutorial-mascot-float 3s ease-in-out infinite}
 .tutorial-mascot-name{font-family:'Chewy',cursive;font-size:1.2rem;color:#fff;margin-top:12px;text-shadow:0 2px 8px rgba(0,0,0,0.5)}
 .tutorial-mascot-excited .tutorial-mascot-image{animation:tutorial-mascot-excited 0.5s ease-in-out infinite}
@@ -89,7 +89,7 @@
 .tutorial-recap-list li{padding:8px 0;border-bottom:1px solid var(--purple-light);font-size:1rem;color:var(--text)}
 .tutorial-recap-list li:before{content:"✅ ";margin-right:6px}
 @keyframes tutorial-dialogue-enter{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-@keyframes tutorial-mascot-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes tutorial-mascot-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 @keyframes tutorial-mascot-float{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-15px) rotate(3deg)}}
 @keyframes tutorial-mascot-excited{0%,100%{transform:scale(1) rotate(0)}25%{transform:scale(1.1) rotate(-5deg)}75%{transform:scale(1.1) rotate(5deg)}}
 @keyframes tutorial-mascot-explaining{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.03)}}
@@ -850,16 +850,6 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
 
 
 
-
-        <!-- ── PET RACING ── -->
-        <div class="game-card" id="race-game-card" style="grid-column:1/-1;">
-          <div class="game-title">🏁 Pet Racing</div>
-          <div class="game-desc">Race your pets! Place a bet and win big PP!</div>
-          <span class="game-reward">Up to 3× your bet</span>
-          <div class="game-area" id="race-area">
-            <div class="spinner"></div>
-          </div>
-        </div>
 
       </div>
     </div>
@@ -2556,9 +2546,9 @@ var Tutorial = {
     var rect = btn.getBoundingClientRect();
     var arrow = document.createElement('div');
     arrow.className = 'tutorial-tab-arrow';
-    arrow.textContent = '👉';
+    arrow.textContent = '👈';
     arrow.style.top = (rect.top + rect.height / 2 - 16) + 'px';
-    arrow.style.left = (rect.right + 4) + 'px';
+    arrow.style.left = (rect.right + 8) + 'px';
     document.body.appendChild(arrow);
     this._arrowEl = arrow;
   },
@@ -2683,6 +2673,12 @@ var Tutorial = {
         '</div>';
     } else if (dialogue.waitForPet) {
       this.waitingForPet = true;
+      // Remove backdrop blur so the adoption page is clearly visible and clickable
+      var backdrop = this.overlay ? this.overlay.querySelector('.tutorial-backdrop') : null;
+      if (backdrop) {
+        backdrop.style.backdropFilter = 'none';
+        backdrop.style.background = 'rgba(0,0,0,0.15)';
+      }
       buttonsEl.innerHTML =
         '<button class="btn tutorial-skip" onclick="Tutorial.promptSkip()">Skip Tutorial</button>' +
         '<button class="btn btn-primary tutorial-next" disabled>⏳ Adopt a pet to continue...</button>';
@@ -2713,6 +2709,12 @@ var Tutorial = {
   onPetAdopted: function() {
     if (!this.active || !this.waitingForPet) return;
     this.waitingForPet = false;
+    // Restore backdrop
+    var backdrop = this.overlay ? this.overlay.querySelector('.tutorial-backdrop') : null;
+    if (backdrop) {
+      backdrop.style.backdropFilter = 'blur(2px)';
+      backdrop.style.background = 'rgba(0,0,0,0.5)';
+    }
     var buttonsEl = document.getElementById('tutorial-buttons');
     if (buttonsEl) {
       buttonsEl.innerHTML =
