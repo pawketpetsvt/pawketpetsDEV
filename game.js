@@ -4409,19 +4409,45 @@ async function personality_loadMood(petId) {
   var shuffled = WISH_POOL.slice().sort(function() { return Math.random() - 0.5; });
   var wishes = shuffled.slice(0, 3).map(function(w) { return { key: w.key, text: w.text, action: w.action, reward: w.reward }; });
 
-  // Save to DB (upsert) — serialize arrays as JSON strings for JSONB columns
-  var wishesForDb = JSON.stringify(wishes.map(function(w) {
-    return { key: w.key, text: w.text, action: w.action, reward: w.reward };
+  // Save to DB — use insert with fallback update for better 403/duplicate handling
+  var safeWishes = (wishes && wishes.length) ? wishes : [];
+  var wishesForDb = JSON.stringify(safeWishes.map(function(w) {
+    return {
+      key:    String(w.key    || ''),
+      text:   String(w.text   || ''),
+      action: String(w.action || ''),
+      reward: Number(w.reward) || 10
+    };
   }));
+  var safePersonality = personality || 'playful';
 
-  await supabaseClient.from('pet_daily_moods').upsert({
-    pet_id: petId,
-    date: today,
-    personality: personality,
-    wishes: wishesForDb,
-    completed_wishes: JSON.stringify([]),
-    reward_claimed: false
-  }, { onConflict: 'pet_id,date' });
+  var { error: insertErr } = await supabaseClient
+    .from('pet_daily_moods')
+    .insert({
+      pet_id:           petId,
+      date:             today,
+      personality:      safePersonality,
+      wishes:           wishesForDb,
+      completed_wishes: '[]',
+      reward_claimed:   false
+    });
+
+  // If duplicate (already exists today), update instead
+  if (insertErr && insertErr.code === '23505') {
+    var { error: updateErr } = await supabaseClient
+      .from('pet_daily_moods')
+      .update({
+        personality:      safePersonality,
+        wishes:           wishesForDb,
+        completed_wishes: '[]',
+        reward_claimed:   false
+      })
+      .eq('pet_id', petId)
+      .eq('date',   today);
+    if (updateErr) dbg('[Mood] Update fallback error:', updateErr);
+  } else if (insertErr) {
+    dbg('[Mood] Insert error:', insertErr);
+  }
 
   petMoodCache[petId] = { date: today, personality: personality, wishes: wishes, completedWishes: [], rewardClaimed: false };
   return petMoodCache[petId];
@@ -24439,13 +24465,11 @@ async function phase1_loadPetOfTheDay() {
     
     var { data, error } = await supabaseClient
       .from('daily_featured_pet')
-      .select('*')
+      .select('date, user_pet_id, pet_name, owner_username, pet_level, featured_quote')
       .eq('date', today)
-      .single();
+      .maybeSingle();
     
-    if (error && error.code !== 'PGRST116') {
-      throw error;
-    }
+    if (error) throw error;
     
     if (!data) {
       dbg('ℹ️ Phase 1: No pet of the day yet - generating...');
