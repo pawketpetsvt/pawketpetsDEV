@@ -2573,13 +2573,15 @@ async function loadMyPets() {
     fragment.appendChild(makeMyPetCard(pet)); 
   });
   grid.appendChild(fragment);
-  // Apply equipped variants to all pet cards immediately on render
-  Object.values(petState).forEach(function(pet) {
-    if (pet && pet.variant) { setTimeout(function() { skinkey_applyVariantToAllDisplays(pet.id, pet.variant); }, 50); }
-  });
-  
   container.innerHTML = '';
   container.appendChild(grid);
+
+  // Apply variants AFTER cards are in the live DOM so getElementById finds them
+  Object.values(petState).forEach(function(pet) {
+    if (pet && pet.current_variant) {
+      setTimeout(function() { skinkey_applyVariantToAllDisplays(pet.id, pet.current_variant); }, 50);
+    }
+  });
 }
 
 // Feed/Play event delegation - attached to document once, always works
