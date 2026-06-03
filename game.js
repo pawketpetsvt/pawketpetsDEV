@@ -3993,14 +3993,12 @@ async function race_renderSetup() {
       .select('id, nickname, level, energy, base_speed, current_variant, pets(name, image_file)')
       .eq('user_id', currentUser.id);
     if (!error && dbPets) {
-      myPets = dbPets.filter(function(p) {
-        return (p.level || 1) >= 5 && (p.energy || 0) >= RACE_ENERGY_COST;
-      });
+      myPets = dbPets; // All pets eligible — no level/energy gate for Quick Race
     }
   } catch(e) { dbg('race_renderSetup: DB query failed', e); }
 
   var petsHtml = myPets.length === 0
-    ? '<div style="color:#ff6b6b;font-size:0.85rem;text-align:center;">No eligible pets (need level 5+, ' + RACE_ENERGY_COST + '+ energy)</div>'
+    ? '<div style="color:#ff6b6b;font-size:0.85rem;text-align:center;">No pets found — adopt one first! 🐾</div>'
     : myPets.map(function(p) {
         var spd = p.base_speed || 4;
         var selected = raceState.selectedPets.some(function(s) { return s && s.id === p.id; });
@@ -10399,13 +10397,12 @@ async function loadBattlePets() {
       return;
     }
 
-    // Refresh exploring pet IDs from DB in case they changed
+    // Refresh exploring pet IDs from DB — filter only active (unclaimed) expeditions
     var expRes = await supabaseClient
       .from('expeditions')
       .select('pet_id')
       .eq('user_id', currentUser.id)
-      .eq('claimed', false)
-      .eq('completed', false);
+      .eq('claimed', false);
     _battleExpeditionPetIds = (expRes.data || []).map(function(r) { return r.pet_id; });
 
     grid.innerHTML = '';
@@ -22262,10 +22259,7 @@ async function loadEquipmentShop() {
       });
     }
     
-    var html = '<div class="shop-rotation-banner">';
-    html += '<div class="rotation-week">📅 Week ' + currentWeek + ' Rotation</div>';
-    html += '<div class="rotation-timer">⏰ Next rotation in: <span id="rotation-countdown">' + getTimeUntilRotation() + '</span></div>';
-    html += '</div>';
+    var html = ''; // Rotation banner removed
     
     var ownedEquipment = [];
     if (currentUser) {
@@ -22377,7 +22371,7 @@ async function loadEquipmentShop() {
     
     container.innerHTML = html;
     
-    safeSetInterval(updateRotationCountdown, 60000);
+   // safeSetInterval(updateRotationCountdown, 60000); // Removed — rotation banner removed
     
   } catch (err) {
     container.innerHTML = '<div class="error-state"><p>Failed to load shop.</p></div>';

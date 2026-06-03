@@ -9181,17 +9181,7 @@ body.night-mode .stat-item.global .stat-value {
 
 /* Rotation Banner */
 .shop-rotation-banner {
-  background: linear-gradient(135deg, rgba(153,102,255,0.15), rgba(255,102,204,0.1));
-  border: 1px solid var(--purple-light);
-  padding: 6px 14px;
-  border-radius: 20px;
-  margin-bottom: 14px;
-  display: inline-flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.78rem;
-  width: auto;
-  max-width: 100%;
+  display: none !important;
 }
 
 .rotation-week {
