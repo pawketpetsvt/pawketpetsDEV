@@ -14011,7 +14011,13 @@ async function furniture_loadShop() {
 
     var ownedIds = (userFurnCache || []).map(function(r) { return r.furniture_id; });
 
-    var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;padding:8px 0;">';
+    var html =
+      // Info banner: shared across rooms + daily happiness tip
+      '<div style="background:rgba(255,170,0,0.1);border:1px solid rgba(255,170,0,0.3);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:0.78rem;color:#b37700;">'
+      + '🏠 <strong>Furniture is shared</strong> — one purchase works in every pet\'s room!'
+      + '<br>✨ Each item gives your pets a <strong>daily happiness boost</strong> on login.'
+      + '</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;padding:8px 0;">';
     furnitureCache.forEach(function(item) {
       var owned = ownedIds.indexOf(item.id) !== -1;
       var canAfford = (currentPoints || 0) >= item.cost;
@@ -14019,12 +14025,13 @@ async function furniture_loadShop() {
         '<div style="border:2px solid var(--border);border-radius:14px;padding:14px 10px;text-align:center;background:' + (owned ? 'rgba(93,222,122,0.06)' : 'var(--white)') + ';">' +
           '<div style="font-size:2.2rem;margin-bottom:6px;">' + escapeHtml(item.emoji) + '</div>' +
           '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:2px;">' + escapeHtml(item.name) + '</div>' +
-          '<div style="font-size:0.74rem;color:var(--text-light);margin-bottom:6px;">' + escapeHtml(item.description || '') + '</div>' +
-          '<div style="font-size:0.78rem;color:#5dde7a;font-weight:600;margin-bottom:8px;">+' + item.happiness_bonus + ' happiness/day</div>' +
+          '<div style="font-size:0.74rem;color:var(--text-light);margin-bottom:4px;">' + escapeHtml(item.description || '') + '</div>' +
+          '<div style="font-size:0.78rem;color:#5dde7a;font-weight:600;margin-bottom:2px;">+' + item.happiness_bonus + ' happiness/day</div>' +
+          '<div style="font-size:0.7rem;color:#ffaa00;margin-bottom:8px;">🏠 All pet rooms</div>' +
           (owned
             ? '<div style="font-size:0.75rem;color:#5dde7a;font-weight:700;">✅ Owned</div>'
             : canAfford
-              ? '<button class="btn btn-primary btn-sm" onclick="furniture_buy(\'' + item.furniture_key + '\',' + item.cost + ')" style="width:100%;font-size:0.8rem;">🪙 ' + item.cost + ' PP — Buy</button>'
+              ? '<button class="btn btn-primary btn-sm" onclick="furniture_buy(\'' + item.id + '\',' + item.cost + ')" style="width:100%;font-size:0.8rem;">🪙 ' + item.cost + ' PP — Buy</button>'
               : '<button class="btn btn-outline btn-sm" disabled style="width:100%;font-size:0.8rem;opacity:0.5;">🪙 ' + item.cost + ' PP</button>'
           ) +
         '</div>';
@@ -14039,23 +14046,30 @@ async function furniture_loadShop() {
 // Alias — Deepseek/console tests reference this name
 var loadFurnitureShop = function() { return furniture_loadShop(); };
 
-async function furniture_buy(furnitureKey, cost) {
+async function furniture_buy(furnitureId, cost) {
   if (!currentUser) { showToast('Log in first!', 2000); return; }
   if ((currentPoints || 0) < cost) { showToast('Not enough PP!', 2500); return; }
   if (!canPerformAction('buy_furniture', 1500)) return;
 
   try {
-    var { data, error } = await supabaseClient.rpc('buy_furniture_secure', {
-      p_user_id: currentUser.id,
-      p_furniture_key: furnitureKey,
-      p_cost: cost
-    });
-    if (error) throw error;
+    // Deduct PP
+    var newPoints = currentPoints - cost;
+    var { error: ppError } = await supabaseClient
+      .from('players')
+      .update({ pawketpoints: newPoints })
+      .eq('id', currentUser.id);
+    if (ppError) throw ppError;
 
-    updateAllPoints(data.new_pp !== undefined ? data.new_pp : (currentPoints - cost));
+    // Add to user_furniture using id (not furniture_key)
+    var { error: furnError } = await supabaseClient
+      .from('user_furniture')
+      .insert({ user_id: currentUser.id, furniture_id: furnitureId, quantity: 1 });
+    if (furnError) throw furnError;
+
+    updateAllPoints(newPoints);
     userFurnCache = null; // invalidate cache
     furnitureCache = null;
-    showToast('🪑 Furniture purchased!', 2500);
+    showToast('🪑 Furniture purchased! Equip it from any pet\'s room. 🏠', 3000);
     furniture_loadShop();
   } catch(err) {
     showToast('Purchase failed: ' + err.message, 3000);
@@ -14066,7 +14080,7 @@ async function furniture_loadUserInventory() {
   if (!currentUser) return;
   var { data } = await supabaseClient
     .from('user_furniture')
-    .select('id, furniture_id, quantity, furniture_items(furniture_key, name, emoji, description, happiness_bonus, category)')
+    .select('id, furniture_id, quantity, furniture_items(name, emoji, description, happiness_bonus, category)')
     .eq('user_id', currentUser.id);
   userFurnCache = data || [];
 }
