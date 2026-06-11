@@ -10214,9 +10214,18 @@ function battleExp_updateBtn() {
 
   var pet  = petState[petId];
   var zone = EXPEDITION_ZONES.find(function(z) { return z.key === _battleExpZone; });
-  if (!pet || !zone) return;
+  if (!zone) return;
 
-  var ok = pet.energy >= zone.energyCost;
+  // If pet not in petState (My Pets not visited yet), fetch from DB then re-run
+  if (!pet) {
+    supabaseClient.from('user_pets').select('id, energy, level, nickname').eq('id', petId).single()
+      .then(function(res) {
+        if (res.data) { petState[petId] = res.data; battleExp_updateBtn(); }
+      }).catch(function(){});
+    return;
+  }
+
+  var ok = (pet.energy || 0) >= zone.energyCost;
   btn.disabled  = !ok;
   btn.style.opacity = ok ? '1' : '0.5';
   info.textContent = ok
@@ -10234,7 +10243,15 @@ async function battleExp_start() {
 
   var pet  = petState[petId];
   var zone = EXPEDITION_ZONES.find(function(z) { return z.key === _battleExpZone; });
-  if (!pet || !zone) return;
+  if (!zone) return;
+
+  // If petState not loaded, fetch directly from DB
+  if (!pet) {
+    var { data: dbPet } = await supabaseClient.from('user_pets').select('*').eq('id', petId).single().catch(function(){ return { data: null }; });
+    if (!dbPet) { showToast('Pet not found — try refreshing', 2500); return; }
+    petState[petId] = dbPet;
+    pet = dbPet;
+  }
   if ((pet.energy || 0) < zone.energyCost) { showToast('Not enough energy!', 2500); return; }
   if (_battleExpeditionPetIds.indexOf(petId) !== -1) { showToast('That pet is already exploring!', 2500); return; }
 
