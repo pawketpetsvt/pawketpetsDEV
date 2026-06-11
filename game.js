@@ -4023,6 +4023,7 @@ async function race_renderSetup() {
     ? '<div style="color:#ff6b6b;font-size:0.85rem;text-align:center;">No pets found — adopt one first! 🐾</div>'
     : myPets.map(function(p) {
         var spd = p.base_speed || 4;
+        var spdColor = spd >= 7 ? '#4ade80' : spd >= 5 ? '#fbbf24' : '#ff9966';
         var selected = raceState.selectedPets.some(function(s) { return s && s.id === p.id; });
         return '<div class="race-pet-option ' + (selected ? 'race-pet-selected' : '') + '" ' +
           'onclick="race_togglePet(\'' + p.id + '\')" ' +
@@ -4032,7 +4033,8 @@ async function race_renderSetup() {
           'background:' + (selected ? 'rgba(153,102,255,0.1)' : 'transparent') + ';">' +
           '<div style="font-size:1.4rem;">' + race_petAvatar(p) + '</div>' +
           '<div style="font-size:0.78rem;font-weight:700;color:var(--purple-dark);">' + escapeHtml(p.nickname || p.pet_type || 'Pet') + '</div>' +
-          '<div style="font-size:0.72rem;color:var(--text-light);">Lv.' + (p.level||1) + ' · ⚡' + Math.floor(p.energy||0) + ' · 💨' + spd + '</div>' +
+          '<div style="font-size:0.72rem;color:var(--text-light);">Lv.' + (p.level||1) + ' · ⚡' + Math.floor(p.energy||0) + '</div>' +
+          '<div style="font-size:0.72rem;font-weight:700;color:' + spdColor + ';">💨 Speed: ' + spd + '</div>' +
         '</div>';
       }).join('');
 
@@ -4059,11 +4061,22 @@ async function race_renderSetup() {
         '<div style="font-size:0.82rem;color:var(--text-light);">Your PP: <strong>🪙' + (currentPoints||0) + '</strong></div>' +
       '</div>' +
       '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:8px;">Select up to 2 pets to race (CPU fills the rest):</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:14px;">' + petsHtml + '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:10px;">' + petsHtml + '</div>' +
+      '<div style="background:rgba(153,102,255,0.06);border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:0.7rem;color:var(--text-light);line-height:1.7;">' +
+        '<strong style="color:var(--purple-dark);">🏎️ What makes a pet fast?</strong> ' +
+        'Speed (💨) = pet\'s base stat. Increases by leveling up, equipping speed gear, or certain variants. Higher speed → better win odds and bigger payouts!' +
+      '</div>' +
       '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:8px;">Your Bet:</div>' +
       '<div style="display:flex;gap:8px;margin-bottom:16px;">' + betBtns + '</div>' +
       '<div style="font-size:0.78rem;color:var(--text-light);margin-bottom:12px;">' +
         '⚡ Costs ' + RACE_ENERGY_COST + ' energy from racing pets · Max 2× your bet · CPU fills empty lanes' +
+      '</div>' +
+      '<div style="background:rgba(153,102,255,0.08);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:0.75rem;color:var(--text-light);line-height:1.6;">' +
+        '<strong style="color:var(--purple-dark);">🏁 Race Rewards:</strong><br>' +
+        '🥇 1st Place — Win 1.5× to 3× your bet<br>' +
+        '🥈 2nd Place — Get your bet back (small bonus if close)<br>' +
+        '🥉 3rd Place — Get half your bet back<br>' +
+        '4️⃣ 4th Place — Lose your full bet · Faster pets = bigger wins!' +
       '</div>' +
       '<button id="race-start-btn" class="btn btn-primary" onclick="race_start()" ' +
         (canRace ? '' : 'disabled ') +
@@ -4151,14 +4164,32 @@ async function race_start() {
   var playerWon = playerRunners.length > 0 && playerRunners[0].finishOrder === 1;
   var playerBest = playerRunners.length > 0 ? playerRunners[0] : null;
 
-  // Calculate payout
+  // Calculate payout — placement-based system
   var payout = 0;
+  var profit  = 0;
   if (playerBest) {
-    var avgSpeed = racerunners.reduce(function(s, r) { return s + r.speed; }, 0) / racerunners.length;
-    var multiplier = Math.min(3, Math.max(1, avgSpeed / playerBest.speed));
-    if (playerBest.finishOrder === 1) payout = Math.round(raceState.bet * multiplier);
-    else if (playerBest.finishOrder === 2) payout = Math.round(raceState.bet * 0.5);
-    // 3rd/4th: no payout (already deducted bet)
+    var avgSpeed   = racerunners.reduce(function(s, r) { return s + r.speed; }, 0) / racerunners.length;
+    var speedRatio = playerBest.speed / (avgSpeed || 1);
+
+    if (playerBest.finishOrder === 1) {
+      // 1st: 1.5× to 3× bet depending on how dominant the win was
+      var winMultiplier = Math.min(3, 1.5 + speedRatio * 0.5);
+      payout = Math.round(raceState.bet * winMultiplier);
+      profit = payout - raceState.bet;
+    } else if (playerBest.finishOrder === 2) {
+      // 2nd: get bet back + small bonus if close to winner
+      var secondBonus = speedRatio > 1 ? Math.round(raceState.bet * 0.2) : 0;
+      payout = raceState.bet + secondBonus;
+      profit = payout - raceState.bet;
+    } else if (playerBest.finishOrder === 3) {
+      // 3rd: get half bet back
+      payout = Math.round(raceState.bet * 0.5);
+      profit = payout - raceState.bet;
+    } else {
+      // 4th: lose full bet
+      payout = 0;
+      profit = -raceState.bet;
+    }
   }
 
   // Deduct energy from player pets (AFTER race)
@@ -4289,13 +4320,15 @@ function race_renderResults(runners, payout, playerBest) {
   var resultRows = runners.map(function(r, i) {
     var medals = ['🥇','🥈','🥉','4️⃣'];
     var isPlayer = !r.pet.isCpu;
+    var spdVal = r.speed.toFixed(1);
+    var spdColor = r.speed > 8 ? '#4ade80' : r.speed > 5 ? '#fbbf24' : '#ff9966';
     return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(153,102,255,0.08);' +
       (isPlayer ? 'font-weight:700;' : '') + '">' +
       '<span style="font-size:1.1rem;">' + (medals[i] || (i+1)+'.') + '</span>' +
       '<span style="font-size:0.9rem;flex:1;color:' + (isPlayer ? 'var(--purple-dark)' : 'var(--text-light)') + ';">' +
         escapeHtml(r.pet.nickname || r.pet.pet_type || 'CPU') + (isPlayer ? ' (You)' : '') +
       '</span>' +
-      '<span style="font-size:0.78rem;color:var(--text-light);">💨 ' + r.speed.toFixed(1) + '</span>' +
+      '<span style="font-size:0.78rem;color:' + spdColor + ';font-weight:700;">💨 ' + spdVal + '</span>' +
     '</div>';
   }).join('');
 
