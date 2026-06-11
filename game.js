@@ -10387,7 +10387,7 @@ async function loadBattlePets() {
   try {
     var res = await supabaseClient
       .from('user_pets')
-      .select('id, nickname, level, base_hp, base_attack, base_defense, base_speed, current_hp, max_hp, energy, max_energy, pet_id, pets(name, image_file)')
+      .select('id, nickname, level, base_hp, base_attack, base_defense, base_speed, current_hp, max_hp, energy, max_energy, pet_id, current_variant')
       .eq('user_id', currentUser.id);
 
     if (res.error) throw res.error;
@@ -10412,20 +10412,27 @@ async function loadBattlePets() {
       // Hide pets currently on expedition
       if (_battleExpeditionPetIds.indexOf(userPet.id) !== -1) return;
 
-      var pet = userPet.pets;
-      // If join returned null (table name mismatch / RLS), use nickname and placeholder
-      var petName = (pet && (pet.name)) || userPet.nickname || 'Pet';
-      var petImage = (pet && pet.image_file) ? 'images/pets/' + pet.image_file : null;
+      var petName = userPet.nickname || 'Pet';
+      // No image without JOIN — show emoji placeholder, onerror already handles missing files
+      var petImage = null;
 
       var card = makeEl('div', { class: 'battle-pet-card' });
       card.onclick = function() { selectBattlePet(userPet.id, card); };
 
+      // Try to show image if we have pet_id for lookup, otherwise emoji fallback
       var img = makeEl('img');
-      if (petImage) {
-        img.src = petImage;
+      var knownPet = petState[userPet.id];
+      var imgFile = knownPet && knownPet.pets && knownPet.pets.image_file ? knownPet.pets.image_file : null;
+      if (imgFile) {
+        img.src = 'images/pets/' + imgFile;
         img.alt = petName;
-        img.onerror = function() { this.style.display = 'none'; };
+        img.onerror = function() { this.outerHTML = '<div style="font-size:2rem;text-align:center;">🐾</div>'; };
         card.appendChild(img);
+      } else {
+        var icon = makeEl('div');
+        icon.style.cssText = 'font-size:2rem;text-align:center;';
+        icon.textContent = '🐾';
+        card.appendChild(icon);
       }
 
       var name = makeEl('div', { class: 'battle-pet-card-name' });
