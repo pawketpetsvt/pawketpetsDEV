@@ -16800,3 +16800,38 @@ body.night-mode .item-icon-img {
   .gp-training-btn    { width: 100%; }
 }
 
+
+/* ── Equipment shop: center cards, no "All" button gap ───────────────────── */
+.equipment-shop-columns {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 30px !important;
+  justify-items: center !important;
+  width: 100% !important;
+}
+
+.equipment-column {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+.equipment-grid-column {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
+  gap: 20px !important;
+  width: 100% !important;
+  justify-items: center !important;
+}
+
+.equipment-card {
+  width: 100% !important;
+  max-width: 300px !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 640px) {
+  .equipment-shop-columns { grid-template-columns: 1fr !important; }
+}
+

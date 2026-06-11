@@ -2460,7 +2460,7 @@ async function confirmAdopt() {
     Tutorial.onPetAdopted();
   }
   
-  ownedPetIds.push(selectedPet.id); 
+  if (selectedPet) ownedPetIds.push(selectedPet.id); 
   totalOwnedCount++;
   tabsLoaded['mypets'] = false;
   btn.textContent = 'Adopt!'; 
@@ -3639,13 +3639,13 @@ function expedition_renderSelector() {
   var area = document.getElementById('expedition-area');
   if (!area) return;
 
-  // Eligible pets: level 5+, energy >= 10, not on expedition
+  // Eligible pets: any level, any energy — don't gate expedition access
   var eligiblePets = Object.values(petState).filter(function(p) {
-    return (p.level || 1) >= 5 && (p.energy || 0) >= 10;
+    return (p.level || 1) >= 1;
   });
 
   var petOptions = eligiblePets.length === 0
-    ? '<p style="color:#ff6b6b;text-align:center;font-size:0.88rem;">No eligible pets — need level 5+ and 10+ energy.</p>'
+    ? '<p style="color:#ff6b6b;text-align:center;font-size:0.88rem;">No pets available — adopt one first! 🐾</p>'
     : '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px;">' +
       eligiblePets.map(function(p) {
         return '<button class="btn btn-outline expedition-pet-btn" data-pet-id="' + p.id + '" onclick="expedition_selectPet(\'' + p.id + '\')" style="padding:8px 14px;font-size:0.82rem;">' +
@@ -4154,14 +4154,16 @@ async function race_start() {
   }
 
   // Save to race_history
-  await supabaseClient.from('race_history').insert({
-    user_id:   currentUser.id,
-    winner_pet_id: winner.pet.isCpu ? null : winner.pet.id,
-    bet_amount: raceState.bet,
-    payout:    payout,
-    placement: playerBest ? playerBest.finishOrder : null,
-    zone:      null
-  }).catch(function(){});
+  try {
+    await supabaseClient.from('race_history').insert({
+      user_id:      currentUser.id,
+      winner_pet_id:winner.pet.isCpu ? null : winner.pet.id,
+      bet_amount:   raceState.bet,
+      payout:       payout,
+      placement:    playerBest ? playerBest.finishOrder : null,
+      zone:         null
+    });
+  } catch(e) { dbg('[Race] race_history insert failed:', e); }
 
   // Award payout if any
   if (payout > 0) await awardPP(payout, 'race_win');
@@ -8303,7 +8305,7 @@ async function loadProfileBadges(userId) {
 // EQUIPMENT SYSTEM
 // ═══════════════════════════════════════════════════════════════════════════
 
-var currentEquipmentFilter = 'all';
+var currentEquipmentFilter = 'weapon';
 
 
 async function buyEquipment(equipmentId, equipmentName, price) {
@@ -9375,7 +9377,7 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
       );
       
       // Store level up info for the rewards modal
-      if (lu.leveled) {
+      if (lu.leveled && battleRewards) {
         var oldStage = getEvolutionStage(pet.level);
         var newStage = getEvolutionStage(lu.level);
         
@@ -9553,43 +9555,34 @@ function showBattleUI(playerStats, enemyStats, battleResult) {
     enemyHPBar.classList.remove('boss-hp-bar');
   }
   
-  // Set enemy sprite based on species
+  // Set enemy sprite based on species — emoji fallback (no broken sprite sheets)
   var enemySprite = el('enemy-battle-sprite');
-  
-  // Clear any existing content and classes
   enemySprite.innerHTML = '';
   enemySprite.className = 'battle-sprite enemy-sprite';
-  
-  // BOSS SPRITE - Show glitchy question mark
+  enemySprite.style.backgroundImage = 'none';
+  enemySprite.style.transform = '';
+
+  var speciesEmoji = {
+    'bird': '🐦', 'bunny': '🐰', 'baby bunny': '🐰', 'rabbit': '🐰',
+    'squirrel': '🐿️', 'fox': '🦊', 'boar': '🐗', 'wolf': '🐺',
+    'bear': '🐻', 'deer': '🦌', 'mushroom': '🍄', 'slime': '💚',
+    'raccoon': '🦝', 'spider': '🕷️', 'snake': '🐍', 'bat': '🦇',
+    'ghost': '👻', 'bee': '🐝', 'cat': '🐱', 'dog': '🐶',
+    'frog': '🐸', 'crab': '🦀', 'fish': '🐟', 'owl': '🦉',
+    'rat': '🐀', 'mouse': '🐭', 'pig': '🐷', 'sheep': '🐑',
+    'goat': '🐐', 'chicken': '🐔', 'turtle': '🐢', 'lizard': '🦎'
+  };
+
   if (enemyStats.is_boss) {
-    enemySprite.style.backgroundImage = 'none';
-    enemySprite.innerHTML = '<div class="boss-sprite">?</div>';
+    enemySprite.innerHTML = '<div class="boss-sprite" style="font-size:3rem;line-height:1;text-align:center;">?</div>';
   } else {
-    // Get sprite configuration
-    var config = getSpriteConfig(enemyStats.species);
-    
-    // Calculate full sheet dimensions
-    var sheetWidth = config.frameWidth * config.framesPerRow;
-    var sheetHeight = config.frameHeight;
-    
-    // CRITICAL: Show ONLY the FIRST frame (col 0, row 0)
-    enemySprite.style.backgroundImage = 'url(images/' + config.file + ')';
-    enemySprite.style.backgroundSize = sheetWidth + 'px ' + sheetHeight + 'px';
-    enemySprite.style.backgroundRepeat = 'no-repeat';
-    enemySprite.style.backgroundPosition = '0 0';  // First frame only
-    enemySprite.style.width = config.frameWidth + 'px';
-    enemySprite.style.height = config.frameHeight + 'px';
-    
-    // SCALE UP the sprite to make it more visible
-    enemySprite.style.transform = 'scale(1.5)';
-    enemySprite.style.imageRendering = 'pixelated';
-    
-    dbg('Sprite set to first frame only - width:', config.frameWidth, 'height:', config.frameHeight);
-    
-    // Apply special variant visual effect (if any)
-    if (enemyStats.specialVariant) {
-      enemySprite.classList.add('variant-' + enemyStats.specialVariant);
-    }
+    var speciesKey = (enemyStats.species || '').toLowerCase();
+    var emoji = speciesEmoji[speciesKey] || '👾';
+    enemySprite.innerHTML = '<div style="font-size:3.5rem;line-height:1;text-align:center;">' + emoji + '</div>';
+  }
+
+  if (enemyStats.specialVariant) {
+    enemySprite.classList.add('variant-' + enemyStats.specialVariant);
   }
   
   // Clear battle log
@@ -22274,7 +22267,7 @@ async function loadEquipmentShop() {
     var equipment = res.data || [];
 
     // Apply active filter
-    if (typeof currentEquipmentFilter !== 'undefined' && currentEquipmentFilter !== 'all') {
+    if (typeof currentEquipmentFilter !== 'undefined' && currentEquipmentFilter !== 'all' && currentEquipmentFilter !== '') {
       equipment = equipment.filter(function(item) {
         return item.equipment_type === currentEquipmentFilter;
       });
@@ -23718,7 +23711,7 @@ async function scrapbook_addMemory(userPetId, memoryType, variables) {
             });
         
         if (res.error) {
-            console.error('Scrapbook insert error:', res.error);
+            dbg('Scrapbook insert error (schema mismatch — user_pet_id may need to be uuid):', res.error.code);
             return false;
         }
         
