@@ -10374,81 +10374,87 @@ async function addPetXP(petId, xpAmount) {
 }
 
 async function loadBattlePets() {
+  console.log('[Battle] loadBattlePets started');
   var grid = el('battle-pet-select');
-  if (!grid) return; // element not in DOM yet
+  if (!grid) {
+    console.log('[Battle] grid element not found');
+    return;
+  }
 
   grid.innerHTML = '<div class="spinner"></div>';
 
   if (!currentUser) {
+    console.log('[Battle] No user logged in');
     grid.innerHTML = '<div class="empty-state"><p>Please log in first! 🐾</p></div>';
     return;
   }
 
   try {
+    console.log('[Battle] Fetching pets for user:', currentUser.id);
     var res = await supabaseClient
       .from('user_pets')
       .select('id, nickname, level, base_hp, base_attack, base_defense, base_speed, current_hp, max_hp, energy, max_energy, pet_id, current_variant')
       .eq('user_id', currentUser.id);
 
-    if (res.error) throw res.error;
+    console.log('[Battle] Query result:', res);
+
+    if (res.error) {
+      console.error('[Battle] Supabase error:', res.error);
+      grid.innerHTML = '<div class="empty-state"><p>Error loading pets: ' + res.error.message + '</p></div>';
+      return;
+    }
 
     if (!res.data || res.data.length === 0) {
+      console.log('[Battle] No pets found');
       grid.innerHTML = '<div class="empty-state"><p>You need a pet to battle! Adopt one first. 🐾</p></div>';
       return;
     }
 
-    // Refresh exploring pet IDs — only exclude pets still actively exploring (ends_at in future)
-    var now = new Date().toISOString();
+    console.log('[Battle] Found', res.data.length, 'pets');
+
     var expRes = await supabaseClient
       .from('expeditions')
       .select('pet_id')
       .eq('user_id', currentUser.id)
-      .eq('claimed', false)
-      .gt('ends_at', now);  // only truly active (not yet ended) expeditions
-    _battleExpeditionPetIds = (expRes.data || []).map(function(r) { return r.pet_id; });
+      .eq('claimed', false);
+
+    window._battleExpeditionPetIds = (expRes.data || []).map(function(r) { return r.pet_id; });
+    console.log('[Battle] Exploring pets:', window._battleExpeditionPetIds);
+
+    var availablePets = res.data.filter(function(pet) {
+      return window._battleExpeditionPetIds.indexOf(pet.id) === -1;
+    });
+
+    if (availablePets.length === 0) {
+      grid.innerHTML = '<div class="empty-state"><p>All your pets are exploring! Wait for them to return. 🧭</p></div>';
+      return;
+    }
 
     grid.innerHTML = '';
-    var rendered = 0;
 
-    res.data.forEach(function(userPet) {
-      // Hide pets currently on expedition
-      if (_battleExpeditionPetIds.indexOf(userPet.id) !== -1) return;
-
-      var petName = userPet.nickname || 'Pet';
-      // No image without JOIN — show emoji placeholder, onerror already handles missing files
-      var petImage = null;
-
+    availablePets.forEach(function(userPet) {
       var card = makeEl('div', { class: 'battle-pet-card' });
       card.onclick = function() { selectBattlePet(userPet.id, card); };
 
-      // Try to show image if we have pet_id for lookup, otherwise emoji fallback
-      var img = makeEl('img');
-      var knownPet = petState[userPet.id];
-      var imgFile = knownPet && knownPet.pets && knownPet.pets.image_file ? knownPet.pets.image_file : null;
-      if (imgFile) {
-        img.src = 'images/pets/' + imgFile;
-        img.alt = petName;
-        img.onerror = function() { this.outerHTML = '<div style="font-size:2rem;text-align:center;">🐾</div>'; };
-        card.appendChild(img);
-      } else {
-        var icon = makeEl('div');
-        icon.style.cssText = 'font-size:2rem;text-align:center;';
-        icon.textContent = '🐾';
-        card.appendChild(icon);
-      }
+      var petName = userPet.nickname || 'Pet';
+      var petLevel = userPet.level || 1;
+      var currentHP = (userPet.current_hp !== null && userPet.current_hp !== undefined) ? userPet.current_hp : (userPet.base_hp || 30);
+      var maxHP = userPet.max_hp || userPet.base_hp || 30;
+
+      var icon = makeEl('div');
+      icon.style.cssText = 'font-size: 2rem; text-align: center; margin-bottom: 8px;';
+      icon.textContent = '🐾';
+      card.appendChild(icon);
 
       var name = makeEl('div', { class: 'battle-pet-card-name' });
-      name.textContent = userPet.nickname || petName;
+      name.textContent = petName;
       card.appendChild(name);
 
       var level = makeEl('div', { class: 'battle-pet-card-level' });
-      level.textContent = 'Level ' + (userPet.level || 1);
+      level.textContent = 'Level ' + petLevel;
       card.appendChild(level);
 
       var stats = makeEl('div', { class: 'battle-pet-card-stats' });
-
-      var currentHP = (userPet.current_hp !== null && userPet.current_hp !== undefined) ? userPet.current_hp : (userPet.base_hp || 30);
-      var maxHP = userPet.max_hp || userPet.base_hp || 30;
 
       var hpStat = makeEl('div', { class: 'battle-pet-stat' });
       hpStat.innerHTML = '<div class="battle-pet-stat-label">HP</div><div class="battle-pet-stat-value">' + currentHP + '/' + maxHP + '</div>';
@@ -10476,24 +10482,13 @@ async function loadBattlePets() {
       }
 
       grid.appendChild(card);
-      rendered++;
     });
 
-    if (rendered === 0) {
-      var expCount = _battleExpeditionPetIds.length;
-      var totalCount = res.data.length;
-      grid.innerHTML = '<div class="empty-state"><p>' +
-        (expCount > 0 && expCount === totalCount
-          ? 'All your pets are exploring! Wait for them to return. 🧭'
-          : 'No battle-ready pets found. Adopt a pet first! 🐾') +
-        '</p><button class="btn btn-outline btn-sm" onclick="loadBattlePets()" style="margin-top:8px;">🔄 Retry</button></div>';
-    }
-
     var helperText = el('battle-helper-text');
-    if (helperText) helperText.textContent = 'Select a pet to battle (' + rendered + ' available)';
+    if (helperText) helperText.textContent = 'Select a pet to battle (' + availablePets.length + ' available)';
 
   } catch(err) {
-    dbg('loadBattlePets error:', err);
+    console.error('[Battle] Error in loadBattlePets:', err);
     grid.innerHTML = '<div class="empty-state"><p>Error loading pets: ' + escapeHtml(err.message) + '</p>' +
       '<button class="btn btn-primary" onclick="loadBattlePets()" style="margin-top:8px;">Retry</button></div>';
   }
