@@ -63,7 +63,7 @@
 .tutorial-mascot-worried .tutorial-mascot-image{filter:drop-shadow(0 8px 24px rgba(255,100,100,0.3))}
 .tutorial-mascot-scared .tutorial-mascot-image{filter:drop-shadow(0 8px 24px rgba(255,0,0,0.5));animation:tutorial-mascot-shake 0.3s ease-in-out infinite}
 .tutorial-mascot-serious .tutorial-mascot-image{filter:grayscale(0.3) drop-shadow(0 8px 24px rgba(100,0,150,0.4))}
-.tutorial-dialogue-box{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);width:90%;max-width:700px;z-index:1000002;background:linear-gradient(135deg,#fff,#fff5ff);border:4px solid var(--purple);border-radius:24px;padding:30px;box-shadow:0 12px 48px rgba(153,102,255,0.4);animation:tutorial-dialogue-enter 0.3s ease-out;pointer-events:all}
+.tutorial-dialogue-box{position:fixed;bottom:20px;left:20px;transform:none;width:320px;max-width:320px;z-index:1000002;background:linear-gradient(135deg,#fff,#fff5ff);border:4px solid var(--purple);border-radius:24px;padding:30px;box-shadow:0 12px 48px rgba(153,102,255,0.4);animation:tutorial-dialogue-enter 0.3s ease-out;pointer-events:all}
 .tutorial-dialogue-content{position:relative}
 .tutorial-dialogue-text{font-family:'Chewy',cursive;font-size:1.3rem;color:var(--purple-dark);line-height:1.6;margin-bottom:20px;min-height:80px}
 .tutorial-progress{display:flex;justify-content:center;gap:8px;margin-bottom:20px}
@@ -88,7 +88,7 @@
 .tutorial-recap-list{text-align:left;margin:16px 0;list-style:none;padding:0}
 .tutorial-recap-list li{padding:8px 0;border-bottom:1px solid var(--purple-light);font-size:1rem;color:var(--text)}
 .tutorial-recap-list li:before{content:"✅ ";margin-right:6px}
-@keyframes tutorial-dialogue-enter{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes tutorial-dialogue-enter{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes tutorial-mascot-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 @keyframes tutorial-mascot-float{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-15px) rotate(3deg)}}
 @keyframes tutorial-mascot-excited{0%,100%{transform:scale(1) rotate(0)}25%{transform:scale(1.1) rotate(-5deg)}75%{transform:scale(1.1) rotate(5deg)}}
@@ -102,7 +102,7 @@ body.night-mode .tutorial-skip{color:#b589ff!important}
 body.night-mode .tutorial-recap-modal{background:linear-gradient(135deg,#2a2440,#3a3050);border-color:#9966ff}
 body.night-mode .tutorial-recap-modal h2{color:#e8d5ff}
 body.night-mode .tutorial-recap-list li{color:#e8d5ff;border-color:#4a3a6a}
-@media (max-width:768px){.tutorial-mascot{right:20px;bottom:220px;transform:scale(0.7)}.tutorial-mascot-image{font-size:6rem}.tutorial-dialogue-box{bottom:20px;width:95%;padding:20px}.tutorial-dialogue-text{font-size:1.1rem;min-height:60px}.tutorial-buttons{flex-direction:column;gap:8px}.tutorial-skip,.tutorial-next{width:100%}}
+@media (max-width:768px){.tutorial-mascot{right:20px;bottom:220px;transform:scale(0.7)}.tutorial-mascot-image{font-size:6rem}.tutorial-dialogue-box{bottom:20px;left:50%;transform:translateX(-50%);width:90%;max-width:90%;padding:20px}.tutorial-dialogue-text{font-size:1.1rem;min-height:60px}.tutorial-buttons{flex-direction:column;gap:8px}.tutorial-skip,.tutorial-next{width:100%}}
 @media (max-width:480px){.tutorial-mascot{right:10px;bottom:200px;transform:scale(0.5)}.tutorial-dialogue-text{font-size:1rem}}
 .settings-modal-item{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:24px;background:var(--cream);border:3px solid var(--purple);border-radius:16px;box-shadow:0 4px 12px rgba(153,102,255,0.2)}
 .settings-modal-label{flex:1}
@@ -2535,13 +2535,20 @@ var Tutorial = {
   },
 
   _highlightTabBtn: function(tabId) {
-    // Remove previous highlight
     this._clearTabHighlight();
     if (!tabId) return;
     var btn = document.getElementById('sidebar-btn-' + tabId);
     if (!btn) return;
     this._highlightedTab = btn;
     btn.classList.add('tutorial-tab-highlight');
+    // Reduce backdrop so highlighted button is clearly visible
+    var backdrop = document.querySelector('.tutorial-backdrop');
+    if (backdrop) {
+      this._savedBackdropFilter = backdrop.style.backdropFilter;
+      this._savedBackdropBg     = backdrop.style.background;
+      backdrop.style.backdropFilter = 'blur(1px)';
+      backdrop.style.background     = 'rgba(0,0,0,0.3)';
+    }
     // Position bouncing arrow
     var rect = btn.getBoundingClientRect();
     var arrow = document.createElement('div');
@@ -2560,6 +2567,14 @@ var Tutorial = {
     if (this._arrowEl && this._arrowEl.parentNode) {
       this._arrowEl.parentNode.removeChild(this._arrowEl);
       this._arrowEl = null;
+    }
+    // Restore backdrop to default
+    var backdrop = document.querySelector('.tutorial-backdrop');
+    if (backdrop && this._savedBackdropFilter !== undefined) {
+      backdrop.style.backdropFilter = this._savedBackdropFilter || '';
+      backdrop.style.background     = this._savedBackdropBg     || '';
+      this._savedBackdropFilter = undefined;
+      this._savedBackdropBg     = undefined;
     }
   },
 
@@ -2629,6 +2644,18 @@ var Tutorial = {
     var step = this.steps[this.currentStep];
     if (!step) { this.complete(false); return; }
     this._saveProgress();
+    // Unblur background for steps requiring player interaction
+    var interactiveIds = ['adoption', 'shop', 'mypets', 'equipment', 'battle', 'minigames'];
+    var backdrop = document.querySelector('.tutorial-backdrop');
+    if (backdrop) {
+      if (interactiveIds.indexOf(step.id) !== -1) {
+        backdrop.style.backdropFilter = 'none';
+        backdrop.style.background = 'rgba(0,0,0,0.15)';
+      } else {
+        backdrop.style.backdropFilter = 'blur(2px)';
+        backdrop.style.background = 'rgba(0,0,0,0.5)';
+      }
+    }
     if (step.tab && typeof showTab === 'function') { showTab(step.tab); }
     var self = this;
     setTimeout(function() { self.showDialogue(0); }, 500);
@@ -2709,19 +2736,30 @@ var Tutorial = {
   onPetAdopted: function() {
     if (!this.active || !this.waitingForPet) return;
     this.waitingForPet = false;
-    // Restore backdrop
-    var backdrop = this.overlay ? this.overlay.querySelector('.tutorial-backdrop') : null;
-    if (backdrop) {
-      backdrop.style.backdropFilter = 'blur(2px)';
-      backdrop.style.background = 'rgba(0,0,0,0.5)';
-    }
-    var buttonsEl = document.getElementById('tutorial-buttons');
-    if (buttonsEl) {
-      buttonsEl.innerHTML =
-        '<button class="btn tutorial-skip" onclick="Tutorial.promptSkip()">Skip Tutorial</button>' +
-        '<button class="btn btn-primary tutorial-next" onclick="Tutorial.next()">Continue</button>';
-    }
-    setTimeout(function() { Tutorial.next(); }, 1500);
+    // DON'T restore backdrop immediately — success modal is still visible
+    // Wait for success modal to dismiss before re-blurring and advancing
+    var self = this;
+    var checkModal = setInterval(function() {
+      var successModal = document.getElementById('success-modal');
+      if (!successModal || !successModal.classList.contains('show')) {
+        clearInterval(checkModal);
+        // Now restore backdrop and show Continue button
+        var backdrop = self.overlay ? self.overlay.querySelector('.tutorial-backdrop') : null;
+        if (backdrop) {
+          backdrop.style.backdropFilter = 'blur(2px)';
+          backdrop.style.background = 'rgba(0,0,0,0.5)';
+        }
+        var buttonsEl = document.getElementById('tutorial-buttons');
+        if (buttonsEl) {
+          buttonsEl.innerHTML =
+            '<button class="btn tutorial-skip" onclick="Tutorial.promptSkip()">Skip Tutorial</button>' +
+            '<button class="btn btn-primary tutorial-next" onclick="Tutorial.next()">Continue</button>';
+        }
+        setTimeout(function() { Tutorial.next(); }, 500);
+      }
+    }, 150);
+    // Safety: if modal never closes after 10s, advance anyway
+    setTimeout(function() { clearInterval(checkModal); }, 10000);
   },
 
   makeChoice: function(enableSpooky) {
