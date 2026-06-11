@@ -1493,9 +1493,9 @@ function showTab(tab) {
   } else if (tab === 'profile' && window.currentProfileUsername) {
     loadProfile(window.currentProfileUsername);
   } else if (tab === 'battle') {
-    // Always reload battle pets (tabsLoaded['battle'] is overridden by battleExp_init)
-    if (!tabsLoaded[tab] || tabsLoaded[tab] === true) { tabsLoaded[tab] = true; loadTab(tab); }
+    // Always run both systems when battle tab opens
     setTimeout(function() { loadBattlePets(); }, 100);
+    setTimeout(function() { battleExp_init(); }, 150);
   } else if (!tabsLoaded[tab]) { 
     tabsLoaded[tab] = true; 
     loadTab(tab); 
@@ -10157,12 +10157,11 @@ async function battleExp_renderForm() {
 
     var petOptions = pets.map(function(p) {
       var exploring = _battleExpeditionPetIds.indexOf(p.id) !== -1;
-      var tooLow = (p.level || 1) < 5;
-      var disabled = exploring || tooLow;
+      var disabled = exploring;
       var petName = p.nickname || (p.pets && p.pets.name) || 'Pet';
       return '<option value="' + p.id + '"' + (disabled ? ' disabled' : '') + '>' +
         escapeHtml(petName) + ' Lv.' + (p.level||1) + ' ⚡' + Math.floor(p.energy||0) +
-        (exploring ? ' [Exploring]' : tooLow ? ' [Need Lv5]' : '') +
+        (exploring ? ' [Exploring]' : '') +
       '</option>';
     }).join('');
 

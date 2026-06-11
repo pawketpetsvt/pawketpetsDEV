@@ -1096,7 +1096,7 @@ body.night .empty-state{color:rgba(255,245,230,0.7)!important}
           </div>
 
           <!-- Send on expedition -->
-          <details style="border:2px solid var(--border);border-radius:14px;padding:0;overflow:hidden;">
+          <details style="border:2px solid var(--border);border-radius:14px;padding:0;overflow:hidden;" ontoggle="if(this.open && document.getElementById('battle-exp-loading')) battleExp_renderForm()">
             <summary style="padding:12px 16px;font-weight:700;font-size:0.88rem;color:var(--purple-dark);cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;">
               🚀 Send a Pet on Expedition
             </summary>
