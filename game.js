@@ -3639,7 +3639,25 @@ function expedition_renderSelector() {
   var area = document.getElementById('expedition-area');
   if (!area) return;
 
-  // Eligible pets: any level, any energy — don't gate expedition access
+  // If petState hasn't loaded yet (user came directly to Battle tab),
+  // fetch pets from DB and then re-render
+  if (Object.keys(petState).length === 0 && currentUser) {
+    supabaseClient
+      .from('user_pets')
+      .select('id, nickname, pet_type, level, energy, max_energy, happiness')
+      .eq('user_id', currentUser.id)
+      .then(function(res) {
+        if (res.data) {
+          res.data.forEach(function(p) { if (!petState[p.id]) petState[p.id] = p; });
+        }
+        expedition_renderSelector();
+      })
+      .catch(function() { expedition_renderSelector(); });
+    area.innerHTML = '<div class="spinner"></div>';
+    return;
+  }
+
+  // All pets eligible — no level/energy gate
   var eligiblePets = Object.values(petState).filter(function(p) {
     return (p.level || 1) >= 1;
   });
@@ -10385,10 +10403,10 @@ async function loadBattlePets() {
   }
 
   try {
-    // Fetch user pets — no JOIN to avoid RLS issues on pets table
+    // Use the same JOIN as loadMyPets — this works because it's how the rest of the app loads images
     var petRes = await supabaseClient
       .from('user_pets')
-      .select('*')
+      .select('*, pets(name, image_file, vtuber_name)')
       .eq('user_id', currentUser.id);
 
     if (petRes.error) throw petRes.error;
@@ -10396,28 +10414,6 @@ async function loadBattlePets() {
       grid.innerHTML = '<div class="empty-state"><p>You have no pets! Adopt one first.</p></div>';
       return;
     }
-
-    // Fetch pet images separately using pet_type — avoids the JOIN RLS issue
-    var petTypes = [];
-    petRes.data.forEach(function(p) { if (p.pet_type && petTypes.indexOf(p.pet_type) === -1) petTypes.push(p.pet_type); });
-
-    var imageMap = {};
-    if (petTypes.length > 0) {
-      var imageRes = await supabaseClient
-        .from('pets')
-        .select('name, image_file')
-        .in('name', petTypes);
-      if (imageRes.data) {
-        imageRes.data.forEach(function(pet) { imageMap[pet.name] = pet.image_file; });
-      }
-    }
-
-    // Fallback images for known pets
-    var fallbackImages = {
-      'Ember': 'ember.png', 'Pyxie': 'pyxie.png', 'Blushimia': 'blushimia.png',
-      'Gnarly': 'gnarly.png', 'Aria': 'aria.png', 'Jess': 'jess.png',
-      'Cowbee': 'cowbee.png', 'Kelta': 'kelta.png'
-    };
 
     // Get active expedition pet IDs
     var expRes = await supabaseClient
@@ -10442,27 +10438,35 @@ async function loadBattlePets() {
       var card = makeEl('div', { class: 'battle-pet-card' });
       card.onclick = function() { selectBattlePet(pet.id, card); };
 
-      var petType   = pet.pet_type;
-      var imageFile = imageMap[petType] || fallbackImages[petType] || null;
-      var currentHP = (pet.current_hp !== null && pet.current_hp !== undefined) ? pet.current_hp : (pet.base_hp || 30);
-      var maxHP     = pet.max_hp || pet.base_hp || 30;
+      // Same image logic as makeMyPetCard — pet.pets is the joined row
+      var petInfo = pet.pets || {};
+      var imageFile = petInfo.image_file || null;
 
-      // Image or emoji
+      var imgContainer = makeEl('div');
+      imgContainer.style.cssText = 'width:72px;height:72px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;';
+
       if (imageFile) {
         var img = makeEl('img');
         img.src = 'images/pets/' + imageFile;
-        img.style.cssText = 'width:60px;height:60px;object-fit:contain;margin:0 auto;display:block;';
-        img.onerror = function() { this.outerHTML = '<div style="font-size:2rem;text-align:center;">🐾</div>'; };
-        card.appendChild(img);
+        img.style.cssText = 'max-width:72px;max-height:72px;object-fit:contain;';
+        img.onerror = function() {
+          this.style.display = 'none';
+          var fallback = makeEl('span');
+          fallback.style.fontSize = '2rem';
+          fallback.textContent = '🐾';
+          imgContainer.appendChild(fallback);
+        };
+        imgContainer.appendChild(img);
       } else {
-        var icon = makeEl('div');
-        icon.style.cssText = 'font-size:2rem;text-align:center;margin-bottom:4px;';
-        icon.textContent = '🐾';
-        card.appendChild(icon);
+        var fallback = makeEl('span');
+        fallback.style.fontSize = '2rem';
+        fallback.textContent = '🐾';
+        imgContainer.appendChild(fallback);
       }
+      card.appendChild(imgContainer);
 
       var name = makeEl('div', { class: 'battle-pet-card-name' });
-      name.textContent = escapeHtml(pet.nickname || 'Pet');
+      name.textContent = escapeHtml(pet.nickname || petInfo.name || 'Pet');
       card.appendChild(name);
 
       var levelEl = makeEl('div', { class: 'battle-pet-card-level' });
@@ -10470,6 +10474,9 @@ async function loadBattlePets() {
       card.appendChild(levelEl);
 
       var stats = makeEl('div', { class: 'battle-pet-card-stats' });
+      var currentHP = (pet.current_hp !== null && pet.current_hp !== undefined) ? pet.current_hp : (pet.base_hp || 30);
+      var maxHP = pet.max_hp || pet.base_hp || 30;
+
       var hpStat = makeEl('div', { class: 'battle-pet-stat' });
       hpStat.innerHTML = '<div class="battle-pet-stat-label">HP</div><div class="battle-pet-stat-value">' + currentHP + '/' + maxHP + '</div>';
       stats.appendChild(hpStat);
@@ -14077,12 +14084,14 @@ async function furniture_buy(furnitureId, cost) {
 }
 
 async function furniture_loadUserInventory() {
-  if (!currentUser) return;
-  var { data } = await supabaseClient
-    .from('user_furniture')
-    .select('id, furniture_id, quantity, furniture_items(name, emoji, description, happiness_bonus, category)')
-    .eq('user_id', currentUser.id);
-  userFurnCache = data || [];
+  if (!currentUser) { userFurnCache = []; return; }
+  try {
+    var { data, error } = await supabaseClient
+      .from('user_furniture')
+      .select('id, furniture_id, quantity')
+      .eq('user_id', currentUser.id);
+    userFurnCache = error ? [] : (data || []);
+  } catch(e) { userFurnCache = []; }
 }
 
 // ── Room modal ────────────────────────────────────────────────────────────

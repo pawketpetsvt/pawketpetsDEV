@@ -9234,8 +9234,8 @@ body.night-mode .stat-item.global .stat-value {
 }
 
 .equipment-grid-column {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
 }
 
@@ -9244,6 +9244,15 @@ body.night-mode .stat-item.global .stat-value {
   .equipment-shop-columns {
     grid-template-columns: 1fr;
     gap: 24px;
+  }
+  .equipment-grid-column {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .equipment-grid-column {
+    grid-template-columns: 1fr;
   }
 }
 
