@@ -10068,8 +10068,8 @@ async function battleExp_refreshActive() {
     }
   }
 
-  // Update global pet ID list (for loadBattlePets filter)
-  _battleExpeditionPetIds = rows.filter(function(r) { return !r.completed; }).map(function(r) { return r.pet_id; });
+  // Update global pet ID list — only active (ends_at in future, not yet complete)
+  _battleExpeditionPetIds = rows.filter(function(r) { return !r.completed && new Date(r.ends_at) > new Date(); }).map(function(r) { return r.pet_id; });
 
   battleExp_renderActive(rows);
   // Also refresh battle pet selector if it's rendered
@@ -10397,12 +10397,14 @@ async function loadBattlePets() {
       return;
     }
 
-    // Refresh exploring pet IDs from DB — filter only active (unclaimed) expeditions
+    // Refresh exploring pet IDs — only exclude pets still actively exploring (ends_at in future)
+    var now = new Date().toISOString();
     var expRes = await supabaseClient
       .from('expeditions')
       .select('pet_id')
       .eq('user_id', currentUser.id)
-      .eq('claimed', false);
+      .eq('claimed', false)
+      .gt('ends_at', now);  // only truly active (not yet ended) expeditions
     _battleExpeditionPetIds = (expRes.data || []).map(function(r) { return r.pet_id; });
 
     grid.innerHTML = '';
