@@ -13998,15 +13998,18 @@ var ROOM_MAX_ITEMS = 8;
 async function furniture_loadShop() {
   var grid = document.getElementById('furniture-shop-grid');
   if (!grid) return;
+  if (!currentUser) {
+    grid.innerHTML = '<div class="empty-state"><p>Log in to browse furniture! 🪑</p></div>';
+    return;
+  }
   grid.innerHTML = '<div class="spinner"></div>';
 
   try {
-    // Load catalog — re-fetch if cache is null OR was previously an empty array
-    if (!furnitureCache || furnitureCache.length === 0) {
-      var { data, error } = await supabaseClient.from('furniture_items').select('*').order('cost', { ascending: true });
-      if (error) throw error;
-      furnitureCache = data || [];
-    }
+    // Always re-fetch catalog (don't rely on cache that may have been set during failed auth)
+    furnitureCache = null;
+    var { data, error } = await supabaseClient.from('furniture_items').select('*').order('cost', { ascending: true });
+    if (error) { console.error('furniture_items fetch error:', error); throw error; }
+    furnitureCache = data || [];
 
     // Load what user already owns (so we can show "Owned" badge)
     await furniture_loadUserInventory();
@@ -14432,32 +14435,38 @@ async function guild_create() {
   if (name.length < 3 || name.length > 20) { showToast('Guild name must be 3–20 characters', 3000); return; }
   if (!/^[A-Z0-9]{3,5}$/.test(tag))         { showToast('Tag must be 3–5 uppercase letters/numbers', 3000); return; }
   if (containsProfanity(name) || containsProfanity(tag) || containsProfanity(bio)) { showToast('Please keep the name/tag/bio family-friendly 💖', 3000); return; }
-  if (!Object.values(petState).some(function(p) { return (p.level||1) >= 5; })) { showToast('You need a level 5+ pet first!', 3000); return; }
-  if ((currentPoints||0) < 500) { showToast('Need 500 PP to create a guild!', 3000); return; }
 
+  // Check level 5+ pet directly from DB (not petState which may be empty)
+  var { data: myPets, error: petErr } = await supabaseClient
+    .from('user_pets').select('id, level, nickname').eq('user_id', currentUser.id);
+  if (petErr) { showToast('Error checking pets: ' + petErr.message, 3000); return; }
+  var hasHighPet = myPets && myPets.some(function(p) { return (p.level||1) >= 5; });
+  if (!hasHighPet) { showToast('You need a level 5+ pet to create a guild!', 3000); return; }
+
+  if ((currentPoints||0) < 500) { showToast('Need 500 PP to create a guild!', 3000); return; }
   if (!canPerformAction('guild_create', 5000)) return;
 
   try {
-    // Deduct PP
     await awardPP(-500, 'guild_creation');
 
-    // Create guild
     var { data: guild, error: gErr } = await supabaseClient.from('guilds').insert({
       name: name, tag: tag, emblem_emoji: emblem, description: bio,
       owner_id: currentUser.id, guild_level: 1, guild_xp: 0, guild_treasury: 0, member_count: 1
     }).select().single();
-    if (gErr) throw gErr;
+    if (gErr) { console.error('Guild insert error:', gErr); throw gErr; }
 
-    // Add as leader
     var { error: mErr } = await supabaseClient.from('guild_members').insert({
       guild_id: guild.id, user_id: currentUser.id, role: 'leader'
     });
-    if (mErr) throw mErr;
+    if (mErr) { console.error('Member insert error:', mErr); throw mErr; }
 
     // Auto-set highest level pet as liaison
-    var bestPet = Object.values(petState).filter(function(p) { return (p.level||1) >= 5; }).sort(function(a,b) { return (b.level||1)-(a.level||1); })[0];
+    var bestPet = myPets.sort(function(a,b){ return (b.level||1)-(a.level||1); })[0];
     if (bestPet) {
-      await supabaseClient.from('guild_liaisons').upsert({ guild_id: guild.id, user_id: currentUser.id, pet_id: bestPet.id, is_active: true }, { onConflict: 'guild_id,user_id' });
+      await supabaseClient.from('guild_liaisons').upsert(
+        { guild_id: guild.id, user_id: currentUser.id, pet_id: bestPet.id, is_active: true },
+        { onConflict: 'guild_id,user_id' }
+      ).catch(function(){});
     }
 
     showToast('🏛️ Guild "' + name + '" created!', 4000);
