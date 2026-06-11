@@ -6,6 +6,34 @@
 var _notifTabHidden = false;
 
 var DEBUG = false;
+
+// ── Global Tooltip System ──────────────────────────────────────────────────
+// Usage: add data-tooltip="text" to any element. Supports \n for line breaks.
+(function() {
+  var tip = null;
+  function show(el, text) {
+    hide();
+    tip = document.createElement('div');
+    tip.id = 'global-tooltip';
+    tip.innerHTML = text.replace(/\n/g, '<br>');
+    tip.style.cssText = 'position:fixed;background:#1a1a2e;color:#e8d5ff;padding:8px 13px;border-radius:10px;font-size:0.78rem;max-width:240px;z-index:100000;border:1px solid #9966ff;box-shadow:0 4px 16px rgba(0,0,0,0.4);pointer-events:none;line-height:1.5;';
+    document.body.appendChild(tip);
+    var r = el.getBoundingClientRect();
+    var left = Math.min(r.left, window.innerWidth - 260);
+    var top  = r.bottom + 8;
+    if (top + 120 > window.innerHeight) top = r.top - 10 - tip.offsetHeight;
+    tip.style.left = Math.max(8, left) + 'px';
+    tip.style.top  = top + 'px';
+  }
+  function hide() { if (tip) { tip.remove(); tip = null; } }
+  document.addEventListener('mouseover', function(e) {
+    var t = e.target.closest('[data-tooltip]');
+    if (t) show(t, t.getAttribute('data-tooltip'));
+    else hide();
+  }, true);
+  document.addEventListener('touchstart', hide, true);
+  document.addEventListener('scroll', hide, true);
+})();
 // Refresh notification badge when user returns to this tab
 document.addEventListener('visibilitychange', function() {
   if (document.hidden) {
@@ -3111,6 +3139,8 @@ function makeMyPetCard(pet) {
     var hpColor = hpPercent > 50 ? '#5dde7a' : hpPercent > 25 ? '#ffaa00' : '#ff6b6b';
     
     var hpStat = makeEl('div', {class:'battle-stat-mini'});
+    hpStat.setAttribute('data-tooltip', '❤️ HEALTH POINTS\nHP carries over between battles!\nAt 0 HP your pet faints — use a Revive Potion.\n\n💡 HP regenerates slowly over time.\nHeal faster with potions from the Shop.');
+    hpStat.style.cursor = 'help';
     hpStat.innerHTML = '<div style="font-size:0.7rem;color:var(--text-light);text-transform:uppercase;">HP</div>' +
       '<div style="font-weight:bold;color:var(--purple);font-size:1.1rem;">' + currentHP + '/' + maxHP + '</div>' +
       '<div style="width:60px;height:4px;background:#e0e0e0;border-radius:2px;margin-top:4px;overflow:hidden;">' +
@@ -3118,14 +3148,20 @@ function makeMyPetCard(pet) {
     battleStats.appendChild(hpStat);
     
     var atkStat = makeEl('div', {class:'battle-stat-mini', id:'atk-stat-'+pet.id});
+    atkStat.setAttribute('data-tooltip', '⚔️ ATTACK\nHow much damage your pet deals in battle.\n\n💡 Increase by:\n• Leveling up\n• Equipping weapons\n• Evolution');
+    atkStat.style.cursor = 'help';
     atkStat.innerHTML = '<div style="font-size:0.7rem;color:var(--text-light);text-transform:uppercase;">ATK</div><div style="font-weight:bold;color:var(--purple);font-size:1.1rem;">' + (pet.base_attack || 5) + '</div>';
     battleStats.appendChild(atkStat);
     
     var defStat = makeEl('div', {class:'battle-stat-mini', id:'def-stat-'+pet.id});
+    defStat.setAttribute('data-tooltip', '🛡️ DEFENSE\nReduces damage taken from enemy attacks.\n\n💡 Increase by:\n• Leveling up\n• Equipping armor\n• Evolution');
+    defStat.style.cursor = 'help';
     defStat.innerHTML = '<div style="font-size:0.7rem;color:var(--text-light);text-transform:uppercase;">DEF</div><div style="font-weight:bold;color:var(--purple);font-size:1.1rem;">' + (pet.base_defense || 3) + '</div>';
     battleStats.appendChild(defStat);
     
     var spdStat = makeEl('div', {class:'battle-stat-mini', id:'spd-stat-'+pet.id});
+    spdStat.setAttribute('data-tooltip', '💨 SPEED\nDetermines who attacks first in battles.\nAlso affects race performance!\n\n💡 Increase by:\n• Leveling up\n• Speed equipment\n• Certain variants');
+    spdStat.style.cursor = 'help';
     spdStat.innerHTML = '<div style="font-size:0.7rem;color:var(--text-light);text-transform:uppercase;">SPD</div><div style="font-weight:bold;color:var(--purple);font-size:1.1rem;">' + (pet.base_speed || 4) + '</div>';
     battleStats.appendChild(spdStat);
     
@@ -9290,6 +9326,8 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
   
   // CRITICAL: Ensure HP is properly updated after battle
   if (battleResult.victory || battleResult.playerFinalHP > 0) {
+    // Award Pass XP for battles (capped daily via 'battle' source)
+    addPassXP(battleResult.victory ? 15 : 5, 'battle').catch(function(){});
     var hpUpdate = await supabaseClient
       .from('user_pets')
       .update({ current_hp: battleResult.playerFinalHP })
@@ -22843,17 +22881,18 @@ async function addPassXP(amount, source) {
     levelsGained++;
   }
   
-  // Save to database
-  await supabaseClient
+  // Save to database — upsert so it works even if row doesn't exist yet
+  var { error: saveErr } = await supabaseClient
     .from('user_pass_progress')
-    .update({
+    .upsert({
+      user_id: currentUser.id,
+      season: 1,
       level: passProgress.level,
       xp: passProgress.xp,
       updated_at: new Date().toISOString()
-    })
-    .eq('user_id', currentUser.id)
-    .eq('season', 1);
-  
+    }, { onConflict: 'user_id,season' });
+
+  if (saveErr) dbg('[Pass] Save error:', saveErr);
   updatePassUI();
   
   if (levelsGained > 0) {
@@ -28778,4 +28817,65 @@ async function adminDeletePoll(pollId) {
   if (error) { showToast('Error: ' + error.message, 4000); return; }
   showToast('Poll deleted', 2000);
   showAdminPollModal();
+}
+
+// ── Quick Reference Help Modal ────────────────────────────────────────────
+function showHelpModal() {
+  var modal = makeModal();
+  modal.innerHTML =
+    '<div style="max-width:480px;padding:4px;">' +
+      '<h2 style="text-align:center;margin-bottom:18px;color:var(--purple-dark);">📚 Quick Guide</h2>' +
+      '<div style="margin-bottom:16px;">' +
+        '<div style="font-weight:700;color:var(--purple-dark);margin-bottom:6px;font-size:0.9rem;">🐾 Pet Stats</div>' +
+        '<div style="font-size:0.82rem;color:var(--text-light);line-height:1.7;">' +
+          '<b>❤️ HP</b> — Health Points. Carries between battles! Heal with potions or wait for regen.<br>' +
+          '<b>⚔️ Attack</b> — Battle damage dealt. Increase via level-ups &amp; weapons.<br>' +
+          '<b>🛡️ Defense</b> — Damage reduction. Increase via level-ups &amp; armor.<br>' +
+          '<b>💨 Speed</b> — Turn order in battles &amp; race performance. Level up or equip speed gear.' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-bottom:16px;">' +
+        '<div style="font-weight:700;color:var(--purple-dark);margin-bottom:6px;font-size:0.9rem;">🪙 PawketPoints (PP)</div>' +
+        '<div style="font-size:0.82rem;color:var(--text-light);line-height:1.7;">' +
+          'Earn from: Daily login · Battles · Racing · Bingo · PawketPass rewards · Expeditions · Guilds<br>' +
+          'Spend on: Shop items · Equipment · Furniture · Guild creation' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-bottom:16px;">' +
+        '<div style="font-weight:700;color:var(--purple-dark);margin-bottom:6px;font-size:0.9rem;">🎫 PawketPass XP Sources</div>' +
+        '<div style="font-size:0.82rem;color:var(--text-light);line-height:1.7;">' +
+          '🍖 Feed pets: 2 XP (cap 20/day)<br>' +
+          '🎾 Play with pets: 2 XP (cap 20/day)<br>' +
+          '⚔️ Battles: 15 XP win / 5 XP loss (cap 50/day)<br>' +
+          '📅 Daily login: 10 XP<br>' +
+          '🎯 Bingo square: 15 XP · Line: 50 XP · Blackout: 200 XP<br>' +
+          '🌲 Expeditions: 10 XP · 🏁 Race: 5 XP · 🏆 Grand Prix: up to 250 XP' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-bottom:16px;">' +
+        '<div style="font-weight:700;color:var(--purple-dark);margin-bottom:6px;font-size:0.9rem;">🏁 Racing</div>' +
+        '<div style="font-size:0.82rem;color:var(--text-light);line-height:1.7;">' +
+          '1st: Win 1.5×–3× your bet · 2nd: Get bet back · 3rd: Half bet back · 4th: Lose bet<br>' +
+          'Higher Speed stat = better odds and bigger wins!' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-bottom:16px;">' +
+        '<div style="font-weight:700;color:var(--purple-dark);margin-bottom:6px;font-size:0.9rem;">🎯 Daily Bingo</div>' +
+        '<div style="font-size:0.82rem;color:var(--text-light);line-height:1.7;">' +
+          'Complete tasks to mark squares — each gives PP + Pass XP.<br>' +
+          'Complete a full line for bonus rewards! Blackout for BIG rewards.<br>' +
+          'Resets daily at midnight.' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-bottom:18px;">' +
+        '<div style="font-weight:700;color:var(--purple-dark);margin-bottom:6px;font-size:0.9rem;">💡 Tips</div>' +
+        '<div style="font-size:0.82rem;color:var(--text-light);line-height:1.7;">' +
+          'Hover any stat (ATK/DEF/SPD/HP) on a pet card for more info.<br>' +
+          'Furniture bought once works in ALL pet rooms and gives daily happiness.<br>' +
+          'Guilds unlock Dungeons, treasury perks, and XP boosts for the whole team.' +
+        '</div>' +
+      '</div>' +
+      '<button class="btn btn-primary" onclick="closeModal()" style="width:100%;">Got it! 👍</button>' +
+    '</div>';
+  openModal(modal);
 }
