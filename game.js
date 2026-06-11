@@ -10534,7 +10534,9 @@ async function loadBattlePets() {
 
       if (imageFile) {
         var img = makeEl('img');
-        img.src = 'images/pets/' + imageFile;
+        // DB image_file already contains 'pets/' prefix (e.g. 'pets/ember.png')
+        // so use 'images/' not 'images/pets/' to match makeMyPetCard and adopt page
+        img.src = 'images/' + imageFile;
         img.style.cssText = 'max-width:72px;max-height:72px;object-fit:contain;';
         img.onerror = function() {
           this.style.display = 'none';
@@ -21265,7 +21267,7 @@ function makeMyPetCardWithTitles(pet) {
   // Pet image with variant effect
   var imageWrap = makeEl('div', {class: 'pet-image-wrap ' + getPetVariantClass(pet.variant)});
   var img = makeEl('img', {
-    src: 'images/pets/' + (pet.image_file || pet.pets?.image_file || 'placeholder.png'),
+    src: 'images/' + (pet.image_file || (pet.pets && pet.pets.image_file) || 'pets/placeholder.png'),
     alt: pet.nickname,
     onerror: "this.style.display='none';"
   });
@@ -26433,7 +26435,7 @@ async function screenshot_generate(petId) {
     // ── Pet image with circular clip ──
     var imgLoaded = false;
     var imgPaths = [];
-    if (species.image_file) imgPaths.push('images/pets/' + species.image_file);
+    if (species.image_file) imgPaths.push('images/' + species.image_file);
     var nameMap = { Ember:'ember.png', Pyxie:'pyxie.png', Steve:'cowbee.png', Kleat:'kelta.png', Blushimia:'blushimia.png', Aria:'aria.png', Jess:'jess.png', Gnarly:'gnarly.png' };
     if (nameMap[petType]) imgPaths.push('images/pets/' + nameMap[petType]);
     imgPaths.push('images/pets/' + petType.toLowerCase() + '.png');
