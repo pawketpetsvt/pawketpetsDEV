@@ -1912,7 +1912,22 @@ async function updateSidebarStats() {
       pointsEl.textContent = ppValue.toLocaleString() + ' PP';
     }
     if (itemsEl) itemsEl.textContent = totalItems;
-    if (streakEl) streakEl.textContent = streak;
+    if (streakEl) {
+      streakEl.textContent = streak;
+      // Show next milestone
+      var milestones = [3, 7, 14, 30, 60, 100];
+      var nextMs = milestones.find(function(m) { return streak < m; });
+      var msEl = document.getElementById('sidebar-streak-milestone');
+      if (!msEl) {
+        msEl = makeEl('div');
+        msEl.id = 'sidebar-streak-milestone';
+        msEl.style.cssText = 'font-size:0.68rem;color:#ffaa00;text-align:center;margin-top:2px;line-height:1.3;';
+        if (streakEl.parentElement) streakEl.parentElement.appendChild(msEl);
+      }
+      msEl.textContent = nextMs
+        ? '🎯 ' + (nextMs - streak) + ' more for ' + nextMs + '-day reward!'
+        : '🏆 Legendary streak!';
+    }
     
   } catch (err) {
     console.error('Error updating sidebar stats:', err);
@@ -8397,6 +8412,12 @@ var currentEquipmentFilter = 'weapon';
 
 async function buyEquipment(equipmentId, equipmentName, price) {
   if (!currentUser) return;
+  if (currentPoints < price) { showToast('Not enough PawketPoints!'); return; }
+  confirmPurchase(equipmentName, price, function() { _buyEquipmentCore(equipmentId, equipmentName, price); });
+}
+
+async function _buyEquipmentCore(equipmentId, equipmentName, price) {
+  if (!currentUser) return;
   if (currentPoints < price) {
     showToast('Not enough PawketPoints!');
     return;
@@ -9311,7 +9332,7 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
     console.error('❌ Battle save error:', rpcError);
     // Fall back to client-side if server function fails
     expGained = battleResult.victory ? (enemyStats.exp_reward || 10) : 0;
-    ppGained = battleResult.victory ? (enemyStats.pp_reward || 10) : 0;
+    ppGained = battleResult.victory ? Math.round((enemyStats.pp_reward || 10) * 1.5) : 0;
   } else {
     expGained = result.exp_gained || 0;
     ppGained = result.pp_gained || 0;
@@ -10473,6 +10494,26 @@ async function addPetXP(petId, xpAmount) {
     await supabaseClient.from('user_pets').update({ xp: newXP }).eq('id', petId);
     if (petState[petId]) petState[petId].xp = newXP;
   } catch(e) { dbg('addPetXP error:', e); }
+}
+
+// ── Confirm Purchase Modal ─────────────────────────────────────────────────
+function confirmPurchase(itemName, price, onConfirm) {
+  var modal = makeModal();
+  modal.innerHTML =
+    '<div style="text-align:center;padding:10px;max-width:320px;">' +
+      '<div style="font-size:2rem;margin-bottom:10px;">🛒</div>' +
+      '<h3 style="margin-bottom:8px;">Confirm Purchase</h3>' +
+      '<p style="color:var(--text-light);font-size:0.9rem;margin-bottom:18px;">Buy <strong>' + escapeHtml(itemName) + '</strong> for <strong>' + price + ' PP</strong>?</p>' +
+      '<div style="display:flex;gap:10px;">' +
+        '<button class="btn btn-outline" onclick="closeModal()" style="flex:1;">Cancel</button>' +
+        '<button class="btn btn-primary" id="confirm-buy-btn" style="flex:1;">Buy</button>' +
+      '</div>' +
+    '</div>';
+  openModal(modal);
+  document.getElementById('confirm-buy-btn').onclick = function() {
+    closeModal();
+    onConfirm();
+  };
 }
 
 async function loadBattlePets() {
@@ -14146,6 +14187,15 @@ async function furniture_loadShop() {
 var loadFurnitureShop = function() { return furniture_loadShop(); };
 
 async function furniture_buy(furnitureId, cost) {
+  if (!currentUser) { showToast('Log in first!', 2000); return; }
+  if ((currentPoints || 0) < cost) { showToast('Not enough PP!', 2500); return; }
+  // Find item name for the modal
+  var item = (furnitureCache || []).find(function(f) { return f.id === furnitureId; });
+  var itemName = item ? item.name : 'Furniture';
+  confirmPurchase(itemName, cost, function() { _furniture_buyCore(furnitureId, cost); });
+}
+
+async function _furniture_buyCore(furnitureId, cost) {
   if (!currentUser) { showToast('Log in first!', 2000); return; }
   if ((currentPoints || 0) < cost) { showToast('Not enough PP!', 2500); return; }
   if (!canPerformAction('buy_furniture', 1500)) return;
@@ -22417,7 +22467,21 @@ async function loadEquipmentShop() {
       var isOwned = ownedEquipment.indexOf(item.id) !== -1;
       var isBossDrop = item.is_boss_drop;
       
-      var cardHtml = '<div class="equipment-card ' + (isOwned ? 'owned' : '') + ' rarity-' + (item.rarity || 'common') + '">';
+      var cardHtml = '<div class="equipment-card ' + (isOwned ? 'owned' : '') + ' rarity-' + (item.rarity || 'common') + '"' +
+        // Build stat tooltip for hover
+        ' title="' + (item.equipment_type === 'weapon' ? '⚔️ Weapon' : '🛡️ Armor') +
+        (item.attack_bonus  > 0 ? ' | +' + item.attack_bonus  + ' ATK' : '') +
+        (item.defense_bonus > 0 ? ' | +' + item.defense_bonus + ' DEF' : '') +
+        (item.speed_bonus   > 0 ? ' | +' + item.speed_bonus   + ' SPD' : '') +
+        (item.hp_bonus      > 0 ? ' | +' + item.hp_bonus      + ' HP'  : '') +
+        ' | Tier ' + item.tier + ' — hover to compare stats"' +
+        ' data-tooltip="' + (item.equipment_type === 'weapon' ? '⚔️ Weapon Stats' : '🛡️ Armor Stats') +
+        (item.attack_bonus  > 0 ? '\n+' + item.attack_bonus  + ' Attack'  : '') +
+        (item.defense_bonus > 0 ? '\n+' + item.defense_bonus + ' Defense' : '') +
+        (item.speed_bonus   > 0 ? '\n+' + item.speed_bonus   + ' Speed'   : '') +
+        (item.hp_bonus      > 0 ? '\n+' + item.hp_bonus      + ' HP'      : '') +
+        '\nTier ' + item.tier + ' · ' + item.weight_class +
+        '">';
       
       if (isBossDrop) {
         cardHtml += '<div class="boss-drop-badge">👑 BOSS DROP</div>';
@@ -23226,7 +23290,7 @@ function generateDailyBingo() {
     shuffled[j] = temp;
   }
   
-  return shuffled.slice(0, 12).map(function(task) {
+  var squares = shuffled.slice(0, 12).map(function(task) {
     return {
       id: task.id,
       name: task.name,
@@ -23237,6 +23301,16 @@ function generateDailyBingo() {
       completed: false
     };
   });
+
+  // Free space — auto-complete one easy square (lowest reward = simplest task)
+  var easiest = squares.reduce(function(best, s, i) {
+    return s.rewardPoints < squares[best].rewardPoints ? i : best;
+  }, 0);
+  squares[easiest].completed = true;
+  squares[easiest].progress  = squares[easiest].target;
+  squares[easiest].freeSpace = true; // Mark so UI can show the badge
+
+  return squares;
 }
 
 // Save bingo to localStorage
@@ -23482,6 +23556,12 @@ function showBingoModal() {
       check.style.cssText = 'font-size:20px;color:#4CAF50;margin-top:6px;font-weight:bold;';
       check.textContent = '✓';
       card.appendChild(check);
+      if (square.freeSpace) {
+        var badge = makeEl('div');
+        badge.style.cssText = 'font-size:0.62rem;color:#ffaa00;font-weight:700;margin-top:2px;';
+        badge.textContent = '🎁 FREE';
+        card.appendChild(badge);
+      }
     }
     
     grid.appendChild(card);
@@ -23762,6 +23842,12 @@ async function scrapbook_hasMemory(userPetId, memoryType) {
 
 // Add a memory
 async function scrapbook_addMemory(userPetId, memoryType, variables) {
+  // Validate UUID format before hitting DB (avoids bigint cast error)
+  var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!userPetId || !uuidRegex.test(userPetId)) {
+    dbg('Scrapbook: skipping — invalid UUID:', userPetId);
+    return false;
+  }
     if (!userPetId || !memoryType) {
         console.error('Scrapbook: missing petId or memoryType');
         return false;
