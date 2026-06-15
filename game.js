@@ -14688,10 +14688,24 @@ async function guild_create() {
   var emblem = (document.getElementById('guild-create-emblem') || {}).value.trim() || '🏛️';
   var bio    = (document.getElementById('guild-create-bio')    || {}).value.trim();
 
-  // Validate
+  // Validate form fields
   if (name.length < 3 || name.length > 20) { showToast('Guild name must be 3–20 characters', 3000); return; }
   if (!/^[A-Z0-9]{3,5}$/.test(tag))         { showToast('Tag must be 3–5 uppercase letters/numbers', 3000); return; }
   if (containsProfanity(name) || containsProfanity(tag) || containsProfanity(bio)) { showToast('Please keep the name/tag/bio family-friendly 💖', 3000); return; }
+
+  // Check not already in a guild
+  var { data: existingMembership } = await supabaseClient
+    .from('guild_members').select('guild_id').eq('user_id', currentUser.id).limit(1);
+  if (existingMembership && existingMembership.length > 0) {
+    showToast('❌ You are already in a guild. Leave it first!', 4000);
+    await loadGuildPage();
+    return;
+  }
+
+  // Check name not already taken
+  var { data: existingGuild } = await supabaseClient
+    .from('guilds').select('name').eq('name', name).maybeSingle();
+  if (existingGuild) { showToast('❌ Guild name "' + name + '" is already taken!', 4000); return; }
 
   // Check level 5+ pet directly from DB (not petState which may be empty)
   var { data: myPets, error: petErr } = await supabaseClient
@@ -14710,28 +14724,45 @@ async function guild_create() {
       name: name, tag: tag, emblem_emoji: emblem, description: bio,
       owner_id: currentUser.id, guild_level: 1, guild_xp: 0, guild_treasury: 0, member_count: 1
     }).select().single();
-    if (gErr) { console.error('Guild insert error:', gErr); throw gErr; }
 
-    var { error: mErr } = await supabaseClient.from('guild_members').insert({
-      guild_id: guild.id, user_id: currentUser.id, role: 'leader'
-    });
-    if (mErr) { console.error('Member insert error:', mErr); throw mErr; }
-
-    // Auto-set highest level pet as liaison
-    var bestPet = myPets.sort(function(a,b){ return (b.level||1)-(a.level||1); })[0];
-    if (bestPet) {
-      await supabaseClient.from('guild_liaisons').upsert(
-        { guild_id: guild.id, user_id: currentUser.id, pet_id: bestPet.id, is_active: true },
-        { onConflict: 'guild_id,user_id' }
-      ).catch(function(){});
+    if (gErr) {
+      // Refund immediately on guild insert failure
+      try { await awardPP(500, 'guild_creation_refund'); } catch(e) {}
+      if (gErr.code === '23505') { showToast('❌ Guild name already taken!', 4000); }
+      else { showToast('Failed to create guild: ' + gErr.message, 4000); }
+      return;
     }
 
-    showToast('🏛️ Guild "' + name + '" created!', 4000);
+    // Add as member — proper try/catch, NOT .catch() chain
+    try {
+      var { error: mErr } = await supabaseClient.from('guild_members').insert({
+        guild_id: guild.id, user_id: currentUser.id, role: 'leader'
+      });
+      if (mErr) throw mErr;
+    } catch(memberErr) {
+      console.error('Member insert error:', memberErr);
+      showToast('Guild created but error adding you as member. Please refresh.', 4000);
+      return;
+    }
+
+    // Auto-set highest level pet as liaison — proper try/catch, NOT .catch() chain
+    var bestPet = myPets.sort(function(a,b){ return (b.level||1)-(a.level||1); })[0];
+    if (bestPet) {
+      try {
+        await supabaseClient.from('guild_liaisons').upsert(
+          { guild_id: guild.id, user_id: currentUser.id, pet_id: bestPet.id, is_active: true },
+          { onConflict: 'guild_id,user_id' }
+        );
+      } catch(liaisonErr) {
+        dbg('Liaison set failed (non-critical):', liaisonErr);
+      }
+    }
+
+    showToast('🏛\ufe0f Guild "' + name + '" created!', 4000);
     await loadGuildPage();
   } catch(err) {
     showToast('Failed to create guild: ' + err.message, 4000);
-    // Refund PP on failure
-    await awardPP(500, 'guild_creation_refund').catch(function(){});
+    try { await awardPP(500, 'guild_creation_refund'); } catch(e) {}
   }
 }
 
