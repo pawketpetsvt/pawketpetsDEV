@@ -5313,7 +5313,10 @@ async function checkTwitchRewards() {
       var reward = rewards[i];
       if (reward.claimed) continue;
       await awardPP(reward.amount, 'twitch_' + reward.type);
-      showToast('🎬 Twitch Reward! +' + reward.amount + ' PP for ' + reward.reason, 5000);
+      showTwitchRewardNotification(reward);
+      // Also log to bell notification center
+      createNotification(currentUser.id, 'twitch_reward', '🎬 Twitch Reward!',
+        '+' + reward.amount + ' PP for ' + reward.reason, 'tab:twitch').catch(function(){});
       // Mark claimed
       await fetch(WORKER_URL + '/api/rewards/claim', {
         method: 'POST',
@@ -5322,6 +5325,26 @@ async function checkTwitchRewards() {
       }).catch(function(){});
     }
   } catch(e) { dbg('Twitch rewards check failed:', e); }
+}
+
+function showTwitchRewardNotification(reward) {
+  var notif = document.createElement('div');
+  notif.className = 'twitch-reward-notification';
+  notif.innerHTML =
+    '<div class="reward-notif-icon">🎬</div>' +
+    '<div class="reward-notif-content">' +
+      '<div class="reward-notif-title">Twitch Reward!</div>' +
+      '<div class="reward-notif-text">+' + reward.amount + ' PP for ' + escapeHtml(reward.reason) + '</div>' +
+      '<div class="reward-notif-sub">Keep chatting for more rewards!</div>' +
+    '</div>';
+  document.body.appendChild(notif);
+  // Slide in
+  setTimeout(function() { notif.classList.add('show'); }, 10);
+  // Slide out and remove
+  setTimeout(function() {
+    notif.classList.remove('show');
+    setTimeout(function() { if (notif.parentNode) notif.parentNode.removeChild(notif); }, 400);
+  }, 5000);
 }
 
 async function loadTwitchStats() {
