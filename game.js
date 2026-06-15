@@ -1047,13 +1047,37 @@ async function calendar_load(modal) {
     });
   }
 
-  // Today: use live in-memory state
+  // Today: use live in-memory state, then check daily_features for override
   if (typeof weatherSystem !== 'undefined' && weatherSystem.currentWeather) {
     days[0].weather = weatherSystem.currentWeather;
   }
   if (typeof worldEvents !== 'undefined' && worldEvents.currentEvent) {
     days[0].event = worldEvents.currentEvent;
   }
+
+  // Check daily_features for today's scheduled weather (may override in-memory)
+  try {
+    var { data: todayFeature } = await supabaseClient
+      .from('daily_features')
+      .select('weather, event_id')
+      .eq('date', days[0].dateStr)
+      .maybeSingle();
+
+    if (todayFeature && todayFeature.weather) {
+      var weatherId = typeof todayFeature.weather === 'object' ? todayFeature.weather.id : todayFeature.weather;
+      var WEATHER_TYPES = [
+        { id: 'clear',  name: 'Clear Skies', icon: '☀️',  description: 'Normal conditions today.' },
+        { id: 'foggy',  name: 'Foggy',        icon: '🌫️', description: 'Mysterious conditions — exploration bonuses!' },
+        { id: 'rainy',  name: 'Rainy',        icon: '🌧️', description: 'Water-type pets thrive today.' },
+        { id: 'starry', name: 'Starry Night', icon: '✨',  description: 'Magical bonuses tonight.' },
+        { id: 'stormy', name: 'Stormy',       icon: '⛈️', description: 'Rough conditions — be careful!' },
+        { id: 'snowy',  name: 'Snowy',        icon: '❄️',  description: 'Ice-type pets feel at home.' }
+      ];
+      var found = WEATHER_TYPES.find(function(w) { return w.id === weatherId; });
+      if (found) days[0].weather = found;
+      else if (weatherId) days[0].weather = { id: weatherId, name: weatherId, icon: '🌤️', description: 'Today\'s weather.' };
+    }
+  } catch(e) { /* silent — daily_features may not exist yet */ }
 
   // Future days: try scheduled_events table
   try {
@@ -14560,7 +14584,7 @@ function guild_renderCreateForm() {
       '<div style="margin-bottom:16px;"><label style="font-size:0.82rem;font-weight:700;display:block;margin-bottom:4px;">Bio (optional)</label>' +
         '<textarea id="guild-create-bio" maxlength="200" placeholder="Describe your guild..." style="width:100%;padding:8px 12px;border-radius:8px;border:2px solid var(--border);font-size:0.85rem;resize:vertical;min-height:70px;box-sizing:border-box;"></textarea></div>' +
       '<div style="font-size:0.78rem;color:var(--text-light);margin-bottom:14px;">⚠️ Cost: 500 PP · Requires level 5+ pet</div>' +
-      '<button class="btn btn-primary" onclick="guild_create()" style="width:100%;" ' + (hasEligiblePet && currentPoints >= 500 ? '' : 'disabled style="width:100%;opacity:0.5;"') + '>✨ Create Guild (500 PP)</button>' +
+      '<button class="btn btn-primary" onclick="guild_create()" style="width:100%;">✨ Create Guild (500 PP)</button>' +
     '</div>';
 }
 
@@ -15735,12 +15759,24 @@ async function checkExplorationStreak(petId, zone) {
 
   _explorationStreaks[key] = (_explorationStreaks[key] || 0) + 1;
   var streak = _explorationStreaks[key];
-  // Persist streak count (fire-and-forget — streak_count column optional)
-  supabaseClient.from('expeditions')
-    .update({ streak_count: streak })
-    .eq('pet_id', petId).eq('zone', zone).eq('user_id', currentUser.id)
-    .order('started_at', { ascending: false }).limit(1)
-    .catch(function(){});
+
+  // Persist streak count — fire-and-forget with proper try/catch (no .catch() on chain)
+  (async function() {
+    try {
+      var { data: recentExp } = await supabaseClient
+        .from('expeditions')
+        .select('id')
+        .eq('pet_id', petId)
+        .eq('zone', zone)
+        .eq('user_id', currentUser.id)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (recentExp && recentExp.id) {
+        await supabaseClient.from('expeditions').update({ streak_count: streak }).eq('id', recentExp.id);
+      }
+    } catch(e) { /* streak_count column optional — ignore */ }
+  })();
 
   var bonusMsg = '';
   if (streak >= 10) {
@@ -20676,8 +20712,9 @@ async function setActivePlayerTitle(playerTitleId) {
       showToast('Title removed', 3000, 'var(--text-light)');
     }
     
-    // Reload profile if on that tab
-    if (currentTab === 'myprofile') {
+    // Reload profile if on that tab — use DOM check, not undefined currentTab variable
+    var activeSection = document.querySelector('.page-section.active');
+    if (activeSection && activeSection.id === 'section-myprofile') {
       showTab('myprofile');
     }
     

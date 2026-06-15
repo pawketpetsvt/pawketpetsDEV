@@ -16844,3 +16844,22 @@ body.night-mode .item-icon-img {
   .equipment-shop-columns { grid-template-columns: 1fr !important; }
 }
 
+
+/* ── Equipment shop: final override for 2-per-row cards ─────────────────── */
+.equipment-grid-column {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 16px !important;
+}
+.equipment-shop-columns {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 24px !important;
+  width: 100% !important;
+}
+.equipment-card { width: 100% !important; box-sizing: border-box !important; }
+@media (max-width: 600px) {
+  .equipment-shop-columns,
+  .equipment-grid-column { grid-template-columns: 1fr !important; }
+}
+
