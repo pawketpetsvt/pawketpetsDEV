@@ -5287,7 +5287,74 @@ function showFlash(petId,msg,color) {
   setTimeout(function(){e.style.opacity='0';},2800);
 }
 
-// ── SHOP TAB ─────────────────────────────
+// ── Cloudflare Worker Integration ─────────────────────────────────────────
+// Worker handles: chat PP rewards, follow rewards, sub rewards, bit rewards
+var WORKER_URL = 'https://pawketpets-twitch.pawketpetsvt.workers.dev';
+
+async function checkTwitchRewards() {
+  if (!currentUser) return;
+  try {
+    var pr = await supabaseClient
+      .from('players')
+      .select('twitch_id')
+      .eq('id', currentUser.id)
+      .single();
+    if (!pr.data || !pr.data.twitch_id) return;
+    var twitchId = pr.data.twitch_id;
+
+    var res = await fetch(WORKER_URL + '/api/rewards?twitch_id=' + twitchId, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!res.ok) return;
+    var rewards = await res.json();
+    if (!Array.isArray(rewards) || rewards.length === 0) return;
+
+    for (var i = 0; i < rewards.length; i++) {
+      var reward = rewards[i];
+      if (reward.claimed) continue;
+      await awardPP(reward.amount, 'twitch_' + reward.type);
+      showToast('🎬 Twitch Reward! +' + reward.amount + ' PP for ' + reward.reason, 5000);
+      // Mark claimed
+      await fetch(WORKER_URL + '/api/rewards/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reward_id: reward.id, twitch_id: twitchId })
+      }).catch(function(){});
+    }
+  } catch(e) { dbg('Twitch rewards check failed:', e); }
+}
+
+async function loadTwitchStats() {
+  if (!currentUser) return;
+  var panel = document.getElementById('twitch-stats-panel');
+  if (!panel) return;
+  try {
+    var pr = await supabaseClient
+      .from('players')
+      .select('twitch_id, twitch_follow_rewards')
+      .eq('id', currentUser.id)
+      .single();
+    if (!pr.data || !pr.data.twitch_id) return;
+
+    var res = await fetch(WORKER_URL + '/api/rewards/stats?twitch_id=' + pr.data.twitch_id);
+    if (!res.ok) return;
+    var stats = await res.json();
+
+    var ppEl   = document.getElementById('twitch-pp-earned');
+    var chatEl = document.getElementById('twitch-chats');
+    var fwEl   = document.getElementById('twitch-follows');
+    var subEl  = document.getElementById('twitch-subs');
+
+    if (ppEl)   ppEl.textContent   = (stats.total_pp_earned || 0).toLocaleString();
+    if (chatEl) chatEl.textContent = (stats.chat_messages   || 0).toLocaleString();
+    if (fwEl)   fwEl.textContent   = Object.keys(pr.data.twitch_follow_rewards || {}).length;
+    if (subEl)  subEl.textContent  = (stats.subs || 0).toLocaleString();
+
+    panel.style.display = 'block';
+  } catch(e) { dbg('Twitch stats load failed:', e); }
+}
+
+
 function showShopTab(tab) {
   // Update Bingo progress for visiting shop
   if (typeof updateBingoProgress === 'function') {
@@ -7077,7 +7144,10 @@ async function initTwitchTab() {
     window.history.replaceState({},'',window.location.pathname);
   }
   await checkTwitchLinked();
-  // Team showcase removed - loadTeamShowcase() function still exists for other uses
+  // Load Twitch stats from worker (silent if worker not reachable)
+  loadTwitchStats().catch(function(){});
+  // Poll for pending worker rewards every 2 minutes
+  safeSetInterval(function() { checkTwitchRewards(); }, 120000);
 }
 
 // Team members config — add new members here as they join
@@ -7191,6 +7261,7 @@ async function checkTwitchLinked() {
     el('twitch-not-linked').style.display='none';
     el('twitch-linked').style.display='block';
     el('twitch-username').textContent=res.data.twitch_username;
+    loadTwitchStats().catch(function(){});
     var rewards=res.data.twitch_follow_rewards||{};
     if(rewards.embertail){var b=el('follow-ember-badge');b.textContent='Claimed';b.className='status-badge status-done';b.style.display='inline-block';}
     if(rewards.pyxshuul){var b2=el('follow-pyxs-badge');b2.textContent='Claimed';b2.className='status-badge status-done';b2.style.display='inline-block';}
