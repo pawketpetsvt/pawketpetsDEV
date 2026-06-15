@@ -13103,13 +13103,13 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function() {
     newsTicker.init();
     dayNightCycle.init();
-    if (typeof weatherSystem !== 'undefined') weatherSystem.init();
+    if (typeof weatherSystem !== 'undefined') weatherSystem.init().catch(function(){});
     if (typeof worldEvents !== 'undefined') worldEvents.init();
   });
 } else {
   newsTicker.init();
   dayNightCycle.init();
-  if (typeof weatherSystem !== 'undefined') weatherSystem.init();
+  if (typeof weatherSystem !== 'undefined') weatherSystem.init().catch(function(){});
   if (typeof worldEvents !== 'undefined') worldEvents.init();
 }
 
@@ -21752,138 +21752,159 @@ function getPetFullDisplayName(pet) {
 
 var weatherSystem = {
   weatherTypes: [
-    {
-      id: 'clear',
-      name: 'Clear',
-      icon: '☀️',
-      description: 'Perfect weather for pet adventures!',
-      weight: 50 // Most common - no weather effects
-    },
-    {
-      id: 'rainy',
-      name: 'Rainy',
-      icon: '🌧️',
-      description: 'The mushrooms are extra happy today.',
-      weight: 15
-    },
-    {
-      id: 'foggy',
-      name: 'Foggy',
-      icon: '🌫️',
-      description: 'Mysterious mists drift through the Deep Woods...',
-      weight: 12
-    },
-    {
-      id: 'windy',
-      name: 'Windy',
-      icon: '💨',
-      description: 'Hold onto your spoons! Gusty conditions today.',
-      weight: 10
-    },
-    {
-      id: 'starry',
-      name: 'Starry Night',
-      icon: '✨',
-      description: 'The cosmos align. Make a wish!',
-      weight: 8
-    },
-    {
-      id: 'cursed',
-      name: 'Cursed Fog',
-      icon: '🟣',
-      description: 'Strange purple fog emanates from the ruins. Proceed with caution.',
-      weight: 5 // Rare
-    }
+    { id: 'clear',  name: 'Clear',       icon: '☀️',  weight: 20, description: 'Perfect weather for pet adventures!',           effect: 'Normal conditions' },
+    { id: 'sunny',  name: 'Sunny',        icon: '🌤️', weight: 15, description: 'The sun is shining brightly!',                  effect: 'Pets are extra happy today' },
+    { id: 'rainy',  name: 'Rainy',        icon: '🌧️', weight: 20, description: 'The mushrooms are extra happy today.',           effect: 'Water types earn +25% XP' },
+    { id: 'foggy',  name: 'Foggy',        icon: '🌫️', weight: 15, description: 'Mysterious mists drift through the Deep Woods.', effect: 'Rare encounters +10% chance' },
+    { id: 'windy',  name: 'Windy',        icon: '💨',  weight: 15, description: 'Hold onto your spoons! Gusty conditions today.', effect: 'All pets move +15% faster' },
+    { id: 'starry', name: 'Starry Night', icon: '✨',  weight: 10, description: 'The cosmos align. Make a wish!',                 effect: 'Mystical bonuses active' },
+    { id: 'cursed', name: 'Cursed Fog',   icon: '🟣',  weight: 5,  description: 'Strange purple fog from the ruins. Beware.',    effect: 'Something feels different...' }
   ],
-  
+
   currentWeather: null,
+  currentDate:    null,
   changeInterval: null,
-  
-  init: function() {
-    // Load saved weather or generate new
-    var saved = localStorage.getItem('currentWeather');
-    var savedTime = localStorage.getItem('weatherTime');
-    var currentTime = Date.now();
-    var oneHour = 3600000; // 1 hour in milliseconds
-    
-    if (saved && savedTime && (currentTime - parseInt(savedTime)) < oneHour) {
-      // Use saved weather if less than 1 hour old
-      this.currentWeather = JSON.parse(saved);
-    } else {
-      // Generate new weather
-      this.generateWeather();
-    }
-    
-    this.applyWeather();
-    
-    // Change weather every 1 hour
-    this.changeInterval = setInterval(function() {
-      weatherSystem.generateWeather();
-    }, 3600000); // 1 hour
-  },
-  
-  generateWeather: function() {
-    // Weighted random selection
-    var totalWeight = this.weatherTypes.reduce(function(sum, w) { return sum + w.weight; }, 0);
-    var random = Math.random() * totalWeight;
-    var cumulative = 0;
-    
-    for (var i = 0; i < this.weatherTypes.length; i++) {
-      cumulative += this.weatherTypes[i].weight;
-      if (random <= cumulative) {
-        this.currentWeather = this.weatherTypes[i];
-        break;
+
+  init: async function() {
+    this.currentDate = new Date().toISOString().slice(0, 10);
+    // Try DB first, fall back to localStorage, then generate
+    var loaded = await this.loadFromDailyFeatures();
+    if (!loaded) {
+      var saved     = localStorage.getItem('currentWeather');
+      var savedDate = localStorage.getItem('weatherDate');
+      if (saved && savedDate === this.currentDate) {
+        try { this.currentWeather = JSON.parse(saved); loaded = true; } catch(e) {}
       }
     }
-    
-    // Save to localStorage with timestamp
+    if (!loaded || !this.currentWeather) {
+      this.generateWeather();
+      this.syncToDailyFeatures().catch(function(){});
+    }
+    this.applyWeather();
+    this.startMidnightChecker();
+  },
+
+  loadFromDailyFeatures: async function() {
+    try {
+      var { data, error } = await supabaseClient
+        .from('daily_features')
+        .select('weather')
+        .eq('date', this.currentDate)
+        .maybeSingle();
+      if (error || !data || !data.weather) return false;
+      var weatherId = (typeof data.weather === 'object') ? data.weather.id : data.weather;
+      var weather   = this.weatherTypes.find(function(w) { return w.id === weatherId; });
+      if (!weather) return false;
+      this.currentWeather = weather;
+      localStorage.setItem('currentWeather', JSON.stringify(weather));
+      localStorage.setItem('weatherDate', this.currentDate);
+      return true;
+    } catch(e) { return false; }
+  },
+
+  generateWeather: function() {
+    var totalWeight = this.weatherTypes.reduce(function(s, w) { return s + w.weight; }, 0);
+    var random = Math.random() * totalWeight;
+    var cumulative = 0;
+    for (var i = 0; i < this.weatherTypes.length; i++) {
+      cumulative += this.weatherTypes[i].weight;
+      if (random <= cumulative) { this.currentWeather = this.weatherTypes[i]; break; }
+    }
     localStorage.setItem('currentWeather', JSON.stringify(this.currentWeather));
-    localStorage.setItem('weatherTime', Date.now().toString());
-    
+    localStorage.setItem('weatherDate', this.currentDate || new Date().toISOString().slice(0, 10));
     this.applyWeather();
   },
-  
+
+  syncToDailyFeatures: async function() {
+    if (!this.currentWeather) return;
+    var bonusMap = {
+      clear:'normal', sunny:'happiness_boost', rainy:'water_xp',
+      foggy:'rare_encounters', windy:'speed_boost', starry:'mystery_bonus', cursed:'spooky_bonus'
+    };
+    try {
+      await supabaseClient.from('daily_features').upsert({
+        date:       this.currentDate,
+        weather:    this.currentWeather.id,
+        bonus_type: bonusMap[this.currentWeather.id] || 'normal',
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'date' });
+    } catch(e) { dbg('Weather sync to DB failed:', e); }
+  },
+
   applyWeather: function() {
     if (!this.currentWeather) return;
-    
-    var body = document.body;
-    
-    // Remove all weather classes
-    body.classList.remove('weather-clear', 'weather-rainy', 'weather-foggy', 
-                          'weather-windy', 'weather-starry', 'weather-cursed');
-    
-    // Add current weather class
-    body.classList.add('weather-' + this.currentWeather.id);
-    
-    // Update weather display if element exists
+    var allIds = this.weatherTypes.map(function(w) { return 'weather-' + w.id; });
+    document.body.classList.remove.apply(document.body.classList, allIds);
+    document.body.classList.add('weather-' + this.currentWeather.id);
     this.updateWeatherDisplay();
-    
-    dbg('🌤️ Weather changed to:', this.currentWeather.name);
+    // Cursed weather spawns extra glitch elements
+    if (this.currentWeather.id === 'cursed') {
+      this.addCursedGlitches();
+    } else {
+      document.querySelectorAll('.cursed-glitch').forEach(function(el) { el.remove(); });
+    }
+    dbg('🌤️ Weather applied:', this.currentWeather.name);
   },
-  
+
   updateWeatherDisplay: function() {
-    var weatherWidget = document.getElementById('weather-widget');
-    if (weatherWidget && this.currentWeather) {
-      weatherWidget.innerHTML = 
+    var widget = document.getElementById('weather-widget');
+    if (widget && this.currentWeather) {
+      widget.innerHTML =
         '<div class="weather-icon">' + this.currentWeather.icon + '</div>' +
         '<div class="weather-info">' +
           '<div class="weather-name">' + this.currentWeather.name + '</div>' +
           '<div class="weather-desc">' + this.currentWeather.description + '</div>' +
         '</div>';
     }
+    var iconEl = document.getElementById('event-status-icon');
+    var textEl = document.getElementById('event-status-text');
+    if (iconEl) iconEl.textContent = this.currentWeather.icon;
+    if (textEl) textEl.textContent = this.currentWeather.name;
   },
-  
-  getCurrentWeather: function() {
-    return this.currentWeather;
+
+  addCursedGlitches: function() {
+    document.querySelectorAll('.cursed-glitch').forEach(function(el) { el.remove(); });
+    if (!this.currentWeather || this.currentWeather.id !== 'cursed') return;
+    var numGlitches = Math.floor(Math.random() * 6) + 5;
+    for (var i = 0; i < numGlitches; i++) {
+      var g = document.createElement('div');
+      g.className = 'cursed-glitch';
+      g.style.cssText =
+        'position:fixed;left:' + (Math.random() * 100) + '%;top:' + (Math.random() * 100) + '%;' +
+        'width:' + (Math.random() * 200 + 50) + 'px;height:' + (Math.random() * 10 + 5) + 'px;' +
+        'background:' + (Math.random() > 0.5 ? 'rgba(255,0,255,0.2)' : 'rgba(0,255,255,0.2)') + ';' +
+        'pointer-events:none;z-index:10000;animation:glitchFlash ' + (Math.random() * 0.5 + 0.3) + 's ease-in-out infinite;';
+      document.body.appendChild(g);
+      (function(el) {
+        setTimeout(function() { if (el.parentNode) el.remove(); }, Math.random() * 3000 + 1000);
+      })(g);
+    }
+    // Respawn periodically while weather is cursed
+    var self = this;
+    setTimeout(function() { self.addCursedGlitches(); }, 4000);
   },
-  
-  // Manual change for testing
+
+  startMidnightChecker: function() {
+    var self = this;
+    safeSetInterval(function() {
+      var today = new Date().toISOString().slice(0, 10);
+      if (today !== self.currentDate) {
+        self.currentDate = today;
+        self.generateWeather();
+        self.syncToDailyFeatures().catch(function(){});
+      }
+    }, 60000); // check every minute
+  },
+
+  getCurrentWeather: function() { return this.currentWeather; },
+
   setWeather: function(weatherId) {
     var weather = this.weatherTypes.find(function(w) { return w.id === weatherId; });
     if (weather) {
       this.currentWeather = weather;
-      localStorage.setItem('currentWeather', JSON.stringify(this.currentWeather));
+      localStorage.setItem('currentWeather', JSON.stringify(weather));
       this.applyWeather();
+      this.syncToDailyFeatures().catch(function(){});
     }
   }
 };
