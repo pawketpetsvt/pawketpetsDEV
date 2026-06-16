@@ -14595,9 +14595,27 @@ async function loadGuildPage() {
   mount.innerHTML = '<div class="spinner"></div>';
 
   try {
-    // Check if user is in a guild
-    var { data: guildRows } = await supabaseClient.rpc('get_user_guild', { p_user_id: currentUser.id });
-    var guildRow = (guildRows && guildRows.length > 0) ? guildRows[0] : null;
+    // Try RPC first; fall back to direct query if RPC doesn't exist
+    var guildRow = null;
+    var rpcRes = await supabaseClient.rpc('get_user_guild', { p_user_id: currentUser.id });
+    if (!rpcRes.error && rpcRes.data && rpcRes.data.length > 0) {
+      guildRow = rpcRes.data[0];
+    } else if (rpcRes.error) {
+      // RPC missing — direct query fallback
+      var { data: memRows } = await supabaseClient
+        .from('guild_members')
+        .select('guild_id, role, guilds(id, name, tag, emblem_emoji, guild_level, guild_xp, guild_treasury, member_count, description, is_open, owner_id)')
+        .eq('user_id', currentUser.id)
+        .limit(1);
+      if (memRows && memRows.length > 0 && memRows[0].guilds) {
+        var m = memRows[0];
+        guildRow = Object.assign({}, m.guilds, {
+          guild_id: m.guild_id,
+          user_role: m.role,
+          is_liaison_set: false
+        });
+      }
+    }
 
     if (guildRow) {
       guildState.myGuild = guildRow;
@@ -14693,13 +14711,25 @@ async function guild_create() {
   if (!/^[A-Z0-9]{3,5}$/.test(tag))         { showToast('Tag must be 3–5 uppercase letters/numbers', 3000); return; }
   if (containsProfanity(name) || containsProfanity(tag) || containsProfanity(bio)) { showToast('Please keep the name/tag/bio family-friendly 💖', 3000); return; }
 
-  // Check not already in a guild
+  // Check not already in a guild — verify the guild actually exists (guards against orphaned rows)
   var { data: existingMembership } = await supabaseClient
-    .from('guild_members').select('guild_id').eq('user_id', currentUser.id).limit(1);
+    .from('guild_members')
+    .select('guild_id, guilds(id, name)')
+    .eq('user_id', currentUser.id)
+    .limit(1);
+
   if (existingMembership && existingMembership.length > 0) {
-    showToast('❌ You are already in a guild. Leave it first!', 4000);
-    await loadGuildPage();
-    return;
+    var mem = existingMembership[0];
+    if (mem.guilds && mem.guilds.id) {
+      // Real guild exists — show it
+      showToast('❌ You are already in "' + mem.guilds.name + '". Leave it first!', 4000);
+      await loadGuildPage();
+      return;
+    } else {
+      // Orphaned guild_members row (guild was deleted) — auto-clean it silently
+      await supabaseClient.from('guild_members').delete().eq('user_id', currentUser.id).catch(function(){});
+      await supabaseClient.from('guild_liaisons').update({ is_active: false }).eq('user_id', currentUser.id).catch(function(){});
+    }
   }
 
   // Check name not already taken
@@ -15370,21 +15400,66 @@ async function guild_castVote(voteId, inFavor) {
 
 async function guild_leave() {
   if (!guildState.myGuild) return;
+
   if (guildState.myRole === 'leader') {
-    showToast('Leaders cannot leave — transfer leadership or disband first.', 4000);
+    // Leaders can't just leave — offer disband
+    var modal = makeModal();
+    modal.innerHTML =
+      '<div style="text-align:center;max-width:340px;">' +
+        '<div style="font-size:2.5rem;margin-bottom:10px;">⚠️</div>' +
+        '<h3 style="color:var(--purple-dark);margin-bottom:10px;">You are the Guild Leader</h3>' +
+        '<p style="color:var(--text-light);font-size:0.88rem;margin-bottom:20px;">Leaders cannot leave without disbanding the guild. This will permanently remove the guild and all membership records.</p>' +
+        '<div style="display:flex;gap:10px;">' +
+          '<button class="btn btn-outline" onclick="closeModal()" style="flex:1;">Cancel</button>' +
+          '<button class="btn btn-primary" onclick="closeModal();guild_disband();" style="flex:1;background:#ff6b6b;border-color:#ff6b6b;">🗑️ Disband Guild</button>' +
+        '</div>' +
+      '</div>';
+    openModal(modal);
     return;
   }
-  if (!confirm('Leave this guild?')) return;
-  try {
-    // Clear perks for this guild BEFORE leaving
-    clearGuildPerks(guildState.myGuild.guild_id);
 
+  var modal = makeModal();
+  modal.innerHTML =
+    '<div style="text-align:center;max-width:320px;">' +
+      '<div style="font-size:2rem;margin-bottom:10px;">🚪</div>' +
+      '<h3 style="margin-bottom:10px;">Leave Guild?</h3>' +
+      '<p style="color:var(--text-light);font-size:0.88rem;margin-bottom:20px;">You will lose access to guild perks, dungeons, and the treasury.</p>' +
+      '<div style="display:flex;gap:10px;">' +
+        '<button class="btn btn-outline" onclick="closeModal()" style="flex:1;">Cancel</button>' +
+        '<button class="btn btn-primary" onclick="closeModal();guild_leaveConfirmed();" style="flex:1;background:#ff6b6b;border-color:#ff6b6b;">Leave</button>' +
+      '</div>' +
+    '</div>';
+  openModal(modal);
+}
+
+async function guild_leaveConfirmed() {
+  if (!guildState.myGuild) return;
+  try {
+    clearGuildPerks(guildState.myGuild.guild_id);
     await supabaseClient.from('guild_members').delete().eq('guild_id', guildState.myGuild.guild_id).eq('user_id', currentUser.id);
     await supabaseClient.from('guild_liaisons').update({ is_active: false }).eq('guild_id', guildState.myGuild.guild_id).eq('user_id', currentUser.id);
     guildState.myGuild = null;
+    guildState.myRole  = null;
     showToast('You left the guild.', 3000);
     loadGuildPage();
-  } catch(err) { showToast('Failed: ' + err.message, 3000); }
+  } catch(err) { showToast('Failed to leave: ' + err.message, 3000); }
+}
+
+async function guild_disband() {
+  if (!guildState.myGuild || guildState.myRole !== 'leader') return;
+  var guildId   = guildState.myGuild.guild_id;
+  var guildName = guildState.myGuild.name || 'this guild';
+  try {
+    // Delete in order: liaisons → members → guild
+    await supabaseClient.from('guild_liaisons').update({ is_active: false }).eq('guild_id', guildId);
+    await supabaseClient.from('guild_members').delete().eq('guild_id', guildId);
+    await supabaseClient.from('guilds').delete().eq('id', guildId);
+    guildState.myGuild = null;
+    guildState.myRole  = null;
+    clearGuildPerks(guildId);
+    showToast('🏛️ "' + guildName + '" has been disbanded.', 4000);
+    loadGuildPage();
+  } catch(err) { showToast('Failed to disband: ' + err.message, 3000); }
 }
 
 // ── Guild Dungeons ────────────────────────────────────────────────────────
