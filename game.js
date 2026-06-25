@@ -2201,9 +2201,12 @@ function containsProfanity(text) {
       return true;
     }
     
-    // Check for word with extra characters (f.u.c.k, f-u-c-k, etc)
-    var spacedWord = word.split('').join('[^a-z]*');
-    var spacedRegex = new RegExp(spacedWord, 'i');
+    // Check for word with extra separator characters (f.u.c.k, f-u-c-k, etc)
+    // FIX: require at least one separator between letters (use [^a-z]+ not *) AND
+    // word boundaries around the whole match, so "hello" doesn't trip on "hell"
+    // and "scrapbook" doesn't trip on "crap"
+    var spacedWord = word.split('').join('[^a-z0-9]+');
+    var spacedRegex = new RegExp('\\b' + spacedWord + '\\b', 'i');
     if (spacedRegex.test(lowerText)) {
       return true;
     }
@@ -14535,8 +14538,13 @@ async function furniture_equip(petId, furnitureKey) {
   if (equipped.indexOf(furnitureKey) !== -1) return;
 
   equipped.push(furnitureKey);
-  await supabaseClient.from('pet_rooms')
+  var { error } = await supabaseClient.from('pet_rooms')
     .upsert({ pet_id: petId, equipped_furniture: equipped }, { onConflict: 'pet_id' });
+  if (error) {
+    console.error('[Furniture Equip] upsert error:', error);
+    showToast('Could not equip: ' + error.message, 3500);
+    return;
+  }
   petRoomCache[petId] = Object.assign({}, room, { equipped_furniture: equipped });
 
   // Re-render modal content in place
@@ -14548,8 +14556,13 @@ async function furniture_unequip(petId, furnitureKey) {
   var room = petRoomCache[petId] || { equipped_furniture: [] };
   var equipped = (room.equipped_furniture || []).filter(function(k) { return k !== furnitureKey; });
 
-  await supabaseClient.from('pet_rooms')
+  var { error } = await supabaseClient.from('pet_rooms')
     .upsert({ pet_id: petId, equipped_furniture: equipped }, { onConflict: 'pet_id' });
+  if (error) {
+    console.error('[Furniture Unequip] upsert error:', error);
+    showToast('Could not unequip: ' + error.message, 3500);
+    return;
+  }
   petRoomCache[petId] = Object.assign({}, room, { equipped_furniture: equipped });
 
   var modal = document.querySelector('.modal-content');
