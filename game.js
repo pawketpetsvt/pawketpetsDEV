@@ -4107,7 +4107,7 @@ async function race_init() {
       .from('race_history')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', currentUser.id)
-      .gte('created_at', today + 'T00:00:00Z');
+      .eq('race_date', today);
     raceState.racesLeft = Math.max(0, RACE_DAILY_MAX - (count || 0));
   } catch(e) {
     dbg('race_init: race_history table not found, defaulting racesLeft to max');
@@ -4325,12 +4325,15 @@ async function race_start() {
   // Save to race_history
   try {
     await supabaseClient.from('race_history').insert({
-      user_id:      currentUser.id,
-      winner_pet_id:winner.pet.isCpu ? null : winner.pet.id,
-      bet_amount:   raceState.bet,
-      payout:       payout,
-      placement:    playerBest ? playerBest.finishOrder : null,
-      zone:         null
+      user_id:    currentUser.id,
+      pet_id:     playerBest ? playerBest.pet.id : null,
+      pet_name:   playerBest ? (playerBest.pet.nickname || playerBest.pet.pet_type || null) : null,
+      bet_amount: raceState.bet,
+      payout:     payout,
+      won:        !!playerWon,
+      position:   playerBest ? playerBest.finishOrder : null,
+      opponents:  racerunners.filter(function(r) { return !playerBest || r.pet !== playerBest.pet; })
+                          .map(function(r) { return { name: r.pet.nickname || r.pet.pet_type || 'CPU', speed: r.speed }; })
     });
   } catch(e) { dbg('[Race] race_history insert failed:', e); }
 
@@ -22622,6 +22625,9 @@ var weatherSystem = {
   setWeather: function(weatherId) {
     var weather = this.weatherTypes.find(function(w) { return w.id === weatherId; });
     if (weather) {
+      // Guard: currentDate is normally set by init(), but setWeather() can be called
+      // directly (e.g. from console for testing) before init() has run.
+      if (!this.currentDate) this.currentDate = new Date().toISOString().slice(0, 10);
       this.currentWeather = weather;
       localStorage.setItem('currentWeather', JSON.stringify(weather));
       localStorage.setItem('weatherSetAt', Date.now().toString());
