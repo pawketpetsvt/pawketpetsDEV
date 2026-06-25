@@ -14265,7 +14265,7 @@ var dailyBuffsActive = [];
 
 var furnitureCache   = null;  // all furniture_items rows
 var userFurnCache    = null;  // user_furniture rows for current user
-var petRoomCache     = {};    // { petId: { equipped_furniture:[], last_bonus_date } }
+var petRoomCache     = {};    // { petId: { furniture_list:[], last_bonus_date } }
 
 var ROOM_MAX_ITEMS = 8;
 
@@ -14423,10 +14423,10 @@ async function furniture_openRoom(petId) {
     if (!roomRow) {
       var { data: newRoom, error: insertErr } = await supabaseClient
         .from('pet_rooms')
-        .insert({ pet_id: petId, equipped_furniture: [] })
+        .insert({ pet_id: petId, furniture_list: [] })
         .select()
         .single();
-      roomRow = (!insertErr && newRoom) ? newRoom : { pet_id: petId, equipped_furniture: [] };
+      roomRow = (!insertErr && newRoom) ? newRoom : { pet_id: petId, furniture_list: [] };
     }
 
     petRoomCache[petId] = roomRow;
@@ -14437,10 +14437,10 @@ async function furniture_openRoom(petId) {
 }
 
 function furniture_renderRoomModal(petId) {
-  var room  = petRoomCache[petId] || { equipped_furniture: [] };
+  var room  = petRoomCache[petId] || { furniture_list: [] };
   var pet   = petState[petId] || {};
   var petName = pet.nickname || pet.pet_type || 'Your pet';
-  var equipped = room.equipped_furniture || [];
+  var equipped = room.furniture_list || [];
 
   // Resolve full furniture objects for equipped items (by catalog id)
   var equippedItems = equipped.map(function(fid) {
@@ -14532,20 +14532,20 @@ function generateRoomDescription(petName, items) {
 }
 
 async function furniture_equip(petId, furnitureKey) {
-  var room = petRoomCache[petId] || { equipped_furniture: [] };
-  var equipped = (room.equipped_furniture || []).slice();
+  var room = petRoomCache[petId] || { furniture_list: [] };
+  var equipped = (room.furniture_list || []).slice();
   if (equipped.length >= ROOM_MAX_ITEMS) { showToast('Room is full! (max ' + ROOM_MAX_ITEMS + ' items)', 2500); return; }
   if (equipped.indexOf(furnitureKey) !== -1) return;
 
   equipped.push(furnitureKey);
   var { error } = await supabaseClient.from('pet_rooms')
-    .upsert({ pet_id: petId, equipped_furniture: equipped }, { onConflict: 'pet_id' });
+    .upsert({ pet_id: petId, furniture_list: equipped }, { onConflict: 'pet_id' });
   if (error) {
     console.error('[Furniture Equip] upsert error:', error);
     showToast('Could not equip: ' + error.message, 3500);
     return;
   }
-  petRoomCache[petId] = Object.assign({}, room, { equipped_furniture: equipped });
+  petRoomCache[petId] = Object.assign({}, room, { furniture_list: equipped });
 
   // Re-render modal content in place
   var modal = document.querySelector('.modal-content');
@@ -14553,17 +14553,17 @@ async function furniture_equip(petId, furnitureKey) {
 }
 
 async function furniture_unequip(petId, furnitureKey) {
-  var room = petRoomCache[petId] || { equipped_furniture: [] };
-  var equipped = (room.equipped_furniture || []).filter(function(k) { return k !== furnitureKey; });
+  var room = petRoomCache[petId] || { furniture_list: [] };
+  var equipped = (room.furniture_list || []).filter(function(k) { return k !== furnitureKey; });
 
   var { error } = await supabaseClient.from('pet_rooms')
-    .upsert({ pet_id: petId, equipped_furniture: equipped }, { onConflict: 'pet_id' });
+    .upsert({ pet_id: petId, furniture_list: equipped }, { onConflict: 'pet_id' });
   if (error) {
     console.error('[Furniture Unequip] upsert error:', error);
     showToast('Could not unequip: ' + error.message, 3500);
     return;
   }
-  petRoomCache[petId] = Object.assign({}, room, { equipped_furniture: equipped });
+  petRoomCache[petId] = Object.assign({}, room, { furniture_list: equipped });
 
   var modal = document.querySelector('.modal-content');
   if (modal) modal.innerHTML = furniture_renderRoomModal(petId);
@@ -14581,7 +14581,7 @@ async function furniture_applyDailyBonus() {
 
     var { data: rooms } = await supabaseClient
       .from('pet_rooms')
-      .select('pet_id, equipped_furniture, last_bonus_date')
+      .select('pet_id, furniture_list, last_bonus_date')
       .in('pet_id', petIds);
 
     if (!rooms || rooms.length === 0) return;
@@ -14594,10 +14594,10 @@ async function furniture_applyDailyBonus() {
     for (var i = 0; i < rooms.length; i++) {
       var room = rooms[i];
       if (room.last_bonus_date === today) continue; // already applied today
-      if (!room.equipped_furniture || room.equipped_furniture.length === 0) continue;
+      if (!room.furniture_list || room.furniture_list.length === 0) continue;
 
       // Sum bonus
-      var bonus = room.equipped_furniture.reduce(function(sum, fid) {
+      var bonus = room.furniture_list.reduce(function(sum, fid) {
         var f = furnitureCache.find(function(fc) { return fc.id === fid; });
         return sum + (f ? (f.happiness_bonus || 0) : 0);
       }, 0);
