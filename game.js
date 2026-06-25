@@ -2264,6 +2264,8 @@ async function handleRegister() {
   suc.classList.remove('show');
   if (!username||!email||!password||!confirm) { err.textContent='Fill in all fields!'; err.classList.add('show'); return; }
   if (username.length < 3) { err.textContent='Username must be 3+ chars!'; err.classList.add('show'); return; }
+  if (username.length > 20) { err.textContent='Username must be 20 characters or fewer!'; err.classList.add('show'); return; }
+  if (!/^[a-zA-Z0-9_\- ]+$/.test(username)) { err.textContent='Username can only contain letters, numbers, spaces, _ and -'; err.classList.add('show'); return; }
   
   // Check for profanity
   if (containsProfanity(username)) {
@@ -7119,11 +7121,10 @@ async function checkDailyBonus(userId) {
   
   // Award daily bonus
   var bonusAmount = 50;
-  var pr = await supabaseClient.from('players').select('pawketpoints').eq('id', userId).single();
-  if (!pr.data) return { awarded: false };
-  
-  var newTotal = pr.data.pawketpoints + bonusAmount;
-  await supabaseClient.from('players').update({ pawketpoints: newTotal }).eq('id', userId);
+  var { data: newTotal, error: bonusErr } = await supabaseClient.rpc('award_pp_secure', {
+    p_amount: bonusAmount, p_reason: 'daily_login_bonus'
+  });
+  if (bonusErr) { dbg('Daily bonus award failed:', bonusErr); return { awarded: false }; }
   
   // Mark as claimed
   localStorage.setItem('daily_bonus_' + userId + '_' + today, 'claimed');
@@ -7425,8 +7426,16 @@ async function checkFollows() {
       }
     }catch(e){console.warn('Follow check error',key,e);}
   }
-  var np=(pr.data.pawketpoints||0)+earned;
-  await supabaseClient.from('players').update({pawketpoints:np,twitch_follow_rewards:rewards}).eq('id',currentUser.id);
+  var np = 0;
+  if (earned > 0) {
+    var { data: newPp, error: ppErr } = await supabaseClient.rpc('award_pp_secure', {
+      p_amount: earned, p_reason: 'twitch_follow'
+    });
+    if (ppErr) { dbg('Twitch follow PP award failed:', ppErr); }
+    else np = newPp;
+  }
+  // twitch_follow_rewards is just a tracking flag, not a currency/stat field — safe to write directly
+  await supabaseClient.from('players').update({ twitch_follow_rewards: rewards }).eq('id', currentUser.id);
   if(earned>0){updateAllPoints(np);showToast('You earned '+earned+' PP!');}
   else showToast('No new rewards. Follow our streamers!');
   btn.disabled=false; btn.textContent='Check Follows & Claim Rewards';
@@ -7657,43 +7666,40 @@ async function redeemCode() {
       return;
     }
 
-    // 3. Check if THIS player already redeemed it (skip for unlimited codes)
-    if (promo.max_uses !== null) {
-      var alreadyRes = await supabaseClient
-        .from('redeemed_codes')
-        .select('id')
-        .eq('player_id', currentUser.id)
-        .eq('code_id', promo.id)
-        .maybeSingle();
+    // 3. Check if THIS player already redeemed it — always check, regardless of
+    // whether the code has a total max_uses cap. Previously this check was only
+    // applied when max_uses was set, meaning any "unlimited use" code could be
+    // redeemed infinitely by the same account for repeated PP rewards.
+    var alreadyRes = await supabaseClient
+      .from('redeemed_codes')
+      .select('id')
+      .eq('player_id', currentUser.id)
+      .eq('code_id', promo.id)
+      .maybeSingle();
 
-      if (alreadyRes.data) {
-        errEl.textContent = 'You\'ve already redeemed this code! Each code is one per account.';
-        errEl.classList.add('show');
-        btn.textContent = '✨ Redeem!';
-        btn.disabled = false;
-        return;
-      }
+    if (alreadyRes.data) {
+      errEl.textContent = 'You\'ve already redeemed this code! Each code is one per account.';
+      errEl.classList.add('show');
+      btn.textContent = '✨ Redeem!';
+      btn.disabled = false;
+      return;
     }
 
     // 4. All good — award the PP
     if (promo.pp_reward && promo.pp_reward > 0) {
-      var newPoints = currentPoints + promo.pp_reward;
-      var ppRes = await supabaseClient
-        .from('players')
-        .update({ pawketpoints: newPoints })
-        .eq('id', currentUser.id);
-      if (ppRes.error) throw new Error(ppRes.error.message);
+      var { data: newPoints, error: ppErr } = await supabaseClient.rpc('award_pp_secure', {
+        p_amount: promo.pp_reward, p_reason: 'promo_code_' + code
+      });
+      if (ppErr) throw new Error(ppErr.message);
       updateAllPoints(newPoints);
     }
 
-    // 5. Log the redemption in redeemed_codes (only if max_uses is set)
-    if (promo.max_uses !== null) {
-      await supabaseClient.from('redeemed_codes').insert([{
-        player_id: currentUser.id,
-        code_id: promo.id,
-        redeemed_at: new Date().toISOString()
-      }]);
-    }
+    // 5. Log the redemption in redeemed_codes — always, so the per-player check above works correctly
+    await supabaseClient.from('redeemed_codes').insert([{
+      player_id: currentUser.id,
+      code_id: promo.id,
+      redeemed_at: new Date().toISOString()
+    }]);
 
     // 6. Increment times_used on promo_codes
     await supabaseClient
@@ -8192,7 +8198,7 @@ async function loadProfile(username) {
         var titleBadge = '<div class="player-title-badge" style="color: ' + color + '; font-size: 1.1rem; margin-top: 8px; font-weight: 600;">' +
           title.icon + ' ' + title.display_name +
           '</div>';
-        el('profile-username').innerHTML = profile.username + titleBadge;
+        el('profile-username').innerHTML = escapeHtml(profile.username) + titleBadge;
       }
     } catch (titleErr) {
       dbg('[loadProfile] Could not load player title:', titleErr);
@@ -8335,7 +8341,7 @@ async function loadMyProfile() {
     var titleDisplay = getPlayerTitleDisplay(currentUser.id);
     if (titleDisplay) {
       var usernameEl = el('myprofile-username-preview');
-      usernameEl.innerHTML = username + titleDisplay;
+      usernameEl.innerHTML = escapeHtml(username) + titleDisplay;
     }
     
     var joinDate = new Date(player.created_at).toLocaleDateString('en-US', { 
@@ -14541,13 +14547,12 @@ async function _furniture_buyCore(furnitureId, cost) {
   if (!canPerformAction('buy_furniture', 1500)) return;
 
   try {
-    // Deduct PP
-    var newPoints = currentPoints - cost;
-    var { error: ppError } = await supabaseClient
-      .from('players')
-      .update({ pawketpoints: newPoints })
-      .eq('id', currentUser.id);
+    // Deduct PP via secure RPC
+    var { data: newPoints, error: ppError } = await supabaseClient.rpc('award_pp_secure', {
+      p_amount: -cost, p_reason: 'furniture_purchase'
+    });
     if (ppError) throw ppError;
+    updateAllPoints(newPoints);
 
     // Add to user_furniture using id (not furniture_key)
     var { error: furnError } = await supabaseClient
@@ -14556,7 +14561,10 @@ async function _furniture_buyCore(furnitureId, cost) {
 
     if (furnError) {
       // Refund PP since the furniture grant failed
-      await supabaseClient.from('players').update({ pawketpoints: currentPoints }).eq('id', currentUser.id).catch(function(){});
+      var { data: refundedPoints } = await supabaseClient.rpc('award_pp_secure', {
+        p_amount: cost, p_reason: 'furniture_purchase_refund'
+      }).catch(function(){ return { data: null }; });
+      if (refundedPoints !== null && refundedPoints !== undefined) updateAllPoints(refundedPoints);
       if (furnError.code === '23505') {
         showToast('You already own this furniture!', 3000);
       } else {
@@ -14565,7 +14573,6 @@ async function _furniture_buyCore(furnitureId, cost) {
       return;
     }
 
-    updateAllPoints(newPoints);
     userFurnCache = null; // invalidate cache
     furnitureCache = null;
     showToast('🪑 Furniture purchased! Equip it from any pet\'s room. 🏠', 3000);
@@ -15706,9 +15713,11 @@ async function guild_donate() {
     });
 
     if (rpcErr) {
-      // Fallback: manual fetch+update if RPC not available
-      var { data: g } = await supabaseClient.from('guilds').select('guild_treasury').eq('id', guildState.myGuild.guild_id).single();
-      await supabaseClient.from('guilds').update({ guild_treasury: ((g && g.guild_treasury) || 0) + amount }).eq('id', guildState.myGuild.guild_id);
+      // Treasury RPC failed — refund the player rather than silently losing their donation
+      // (direct client writes to guild_treasury are blocked at the database level)
+      await awardPP(amount, 'guild_donation_refund').catch(function(){});
+      showToast('Could not process donation — refunded. Please try again later.', 3500);
+      return;
     }
 
     // Increment member contributions
@@ -15963,10 +15972,11 @@ async function guild_processPassedVote(vote) {
       p_description: vote.proposal + ' — proposal passed'
     });
     if (rpcErr) {
-      // Fallback: manual deduct if RPC unavailable
-      var { data: g } = await supabaseClient.from('guilds').select('guild_treasury').eq('id', vote.guild_id).single();
-      var newTreasury = Math.max(0, ((g && g.guild_treasury) || 0) - vote.cost);
-      await supabaseClient.from('guilds').update({ guild_treasury: newTreasury }).eq('id', vote.guild_id);
+      // Treasury RPC failed — don't mark the vote passed or apply the perk, since the
+      // cost was never actually paid (direct client writes to guild_treasury are blocked).
+      // Leave the vote active so it can be retried on the next check.
+      dbg('guild_processPassedVote: treasury deduction failed, leaving vote active:', rpcErr);
+      return;
     }
 
     await supabaseClient.from('guild_treasury_votes').update({ status: 'passed' }).eq('id', vote.id);
@@ -19990,7 +20000,8 @@ async function loadForumThreads(categoryId) {
     .select('*, players!forum_threads_author_id_fkey(username)')
     .eq('category_id', categoryId)
     .order('is_pinned', { ascending: false })
-    .order('last_reply_at', { ascending: false });
+    .order('last_reply_at', { ascending: false })
+    .limit(50);
   
   if (error) {
     list.innerHTML = '<div class="forum-empty-state"><div class="forum-empty-state-icon">😞</div><p>Error loading threads</p></div>';
@@ -20088,7 +20099,8 @@ async function showForumThread(threadId) {
     .from('forum_replies')
     .select('*, players!forum_replies_author_id_fkey(username, forum_post_count)')
     .eq('thread_id', threadId)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .limit(200);
   
   container.innerHTML = '';
   
@@ -20175,6 +20187,7 @@ function closeNewThreadModal() {
  */
 async function submitNewThread() {
   if (!currentUser) return;
+  if (!canPerformAction('forum_new_thread', 5000)) { showToast('Please slow down before creating another thread!'); return; }
   
   var title = el('new-thread-title').value.trim();
   var content = el('new-thread-content').value.trim();
@@ -20226,6 +20239,7 @@ async function submitNewThread() {
  * Submit reply to thread
  */
 async function submitReply() {
+  if (!canPerformAction('forum_reply', 3000)) { showToast('Please slow down before posting again!'); return; }
   if (!currentUser) {
     showToast('Please log in to reply!');
     return;
@@ -21815,10 +21829,11 @@ async function checkPetTitleUnlocks(petId, context) {
     var pet = petState[petId];
     if (!pet) return;
     
-    // Get battle history for this specific pet
+    // Get battle history for this specific pet — select only the columns
+    // actually used here, not '*' (battle_log text blobs add up fast)
     var battles = await supabaseClient
       .from('battle_history')
-      .select('*')
+      .select('victory, is_boss, enemy_name, final_hp, max_hp, max_damage_dealt, pet_energy_at_start, pet_level, turns')
       .eq('user_id', currentUser.id)
       .eq('pet_id', petId);
     
@@ -24543,10 +24558,10 @@ async function loadStatistics() {
     
     if (petsError) throw petsError;
     
-    // Fetch battle stats
+    // Fetch battle stats — only need winner_id for the win-rate count, not full rows
     var { data: battlesData, error: battlesError } = await supabaseClient
       .from('battle_history')
-      .select('*')
+      .select('winner_id')
       .eq('user_id', currentUser.id);
     
     // Calculate stats
@@ -29056,6 +29071,21 @@ var pollSystem = {
     if (!canPerformAction('poll_vote_' + pollId, 5000)) { showToast('Please wait before voting again!', 2000); return; }
 
     try {
+      // Check the database directly for an existing vote — the in-memory userVotes
+      // flag above resets on every page reload, so without this check a player
+      // could simply refresh and vote again repeatedly for free PP each time.
+      var { data: existingVote } = await supabaseClient
+        .from('poll_votes')
+        .select('id')
+        .eq('poll_id', pollId)
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+      if (existingVote) {
+        this.userVotes[pollId] = -1; // mark as voted locally so the button disables too
+        showToast('You already voted on this poll!', 2000);
+        return;
+      }
+
       // Double-check poll is still active
       var { data: poll } = await supabaseClient.from('polls').select('is_active, ends_at').eq('id', pollId).single();
       if (poll && (!poll.is_active || new Date(poll.ends_at) < new Date())) {
@@ -29064,7 +29094,15 @@ var pollSystem = {
       var { error } = await supabaseClient.from('poll_votes').insert({
         poll_id: pollId, user_id: currentUser.id, option_index: optionIndex
       });
-      if (error) throw error;
+      if (error) {
+        // Unique constraint violation = already voted (race condition caught at DB level)
+        if (error.code === '23505') {
+          this.userVotes[pollId] = -1;
+          showToast('You already voted on this poll!', 2000);
+          return;
+        }
+        throw error;
+      }
 
       // Increment total_votes
       await supabaseClient.rpc('increment_poll_votes', { poll_id_param: pollId }).catch(function() {
@@ -29846,4 +29884,119 @@ function showHelpModal() {
       '<button class="btn btn-primary" onclick="closeModal()" style="width:100%;">Got it! 👍</button>' +
     '</div>';
   openModal(modal);
+}
+
+// ── Player Report System ────────────────────────────────────────────────────
+function showReportModal() {
+  if (!currentUser) { showToast('Please log in to submit a report.', 2500); return; }
+
+  var modal = makeModal();
+  modal.innerHTML =
+    '<div style="max-width:420px;">' +
+      '<h3 style="color:var(--purple-dark);margin-bottom:14px;">🚩 Report an Issue</h3>' +
+      '<label style="font-size:0.82rem;font-weight:700;display:block;margin-bottom:4px;">What\'s this about?</label>' +
+      '<select id="report-type-select" style="width:100%;padding:8px 12px;border-radius:8px;border:2px solid var(--border);font-size:0.9rem;margin-bottom:14px;box-sizing:border-box;">' +
+        '<option value="bug">🐛 Bug / glitch</option>' +
+        '<option value="bad_username">🚫 Inappropriate username</option>' +
+        '<option value="bad_language">🤬 Bad language / harassment</option>' +
+        '<option value="cheating">⚖️ Cheating / exploiting</option>' +
+        '<option value="guestbook">📖 Guestbook / chat message</option>' +
+        '<option value="other">❓ Something else</option>' +
+      '</select>' +
+      '<label style="font-size:0.82rem;font-weight:700;display:block;margin-bottom:4px;">Who or what is this about? (optional)</label>' +
+      '<input id="report-target-input" type="text" maxlength="50" placeholder="Username, guild name, etc." style="width:100%;padding:8px 12px;border-radius:8px;border:2px solid var(--border);font-size:0.9rem;margin-bottom:14px;box-sizing:border-box;">' +
+      '<label style="font-size:0.82rem;font-weight:700;display:block;margin-bottom:4px;">Describe the issue</label>' +
+      '<textarea id="report-desc-textarea" maxlength="1000" placeholder="Please give as much detail as you can..." style="width:100%;padding:8px 12px;border-radius:8px;border:2px solid var(--border);font-size:0.85rem;resize:vertical;min-height:90px;margin-bottom:14px;box-sizing:border-box;"></textarea>' +
+      '<div style="display:flex;gap:10px;">' +
+        '<button class="btn btn-outline" onclick="closeModal()" style="flex:1;">Cancel</button>' +
+        '<button class="btn btn-primary" onclick="submitReport()" style="flex:1;">Submit Report</button>' +
+      '</div>' +
+    '</div>';
+  openModal(modal);
+}
+
+async function submitReport() {
+  if (!currentUser) return;
+  if (!canPerformAction('submit_report', 5000)) { showToast('Please wait before submitting another report.', 2500); return; }
+
+  var type = (document.getElementById('report-type-select') || {}).value || 'other';
+  var target = (document.getElementById('report-target-input') || {}).value.trim();
+  var desc = (document.getElementById('report-desc-textarea') || {}).value.trim();
+
+  if (!desc) { showToast('Please describe the issue before submitting.', 2500); return; }
+  if (desc.length > 1000) { showToast('Description is too long (max 1000 characters).', 2500); return; }
+
+  try {
+    var { error } = await supabaseClient.from('player_reports').insert({
+      reporter_id: currentUser.id,
+      report_type: type,
+      target_text: target || null,
+      description: desc,
+      status: 'open'
+    });
+    if (error) throw error;
+
+    closeModal();
+    showToast('🚩 Report submitted — thank you for helping keep PawketPets safe!', 4000);
+  } catch(err) {
+    showToast('Could not submit report: ' + err.message, 3500);
+  }
+}
+
+// ── Admin: Report Inbox ─────────────────────────────────────────────────────
+async function adminShowReportInbox() {
+  if (!await isAdmin()) { showToast('Admin access required', 3000); return; }
+
+  var { data: reports, error } = await supabaseClient
+    .from('player_reports')
+    .select('id, reporter_id, report_type, target_text, description, status, created_at, players(username)')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) { showToast('Could not load reports: ' + error.message, 3500); return; }
+
+  var typeLabels = {
+    bug: '🐛 Bug', bad_username: '🚫 Username', bad_language: '🤬 Language',
+    cheating: '⚖️ Cheating', guestbook: '📖 Guestbook', other: '❓ Other'
+  };
+  var statusColors = { open: '#ff6b6b', reviewing: '#fbbf24', resolved: '#5dde7a', dismissed: 'var(--text-light)' };
+
+  var modal = makeModal();
+  var openCount = (reports || []).filter(function(r) { return r.status === 'open'; }).length;
+
+  var listHtml = (reports || []).map(function(r) {
+    var reporterName = r.players ? escapeHtml(r.players.username) : 'Unknown';
+    var statusColor = statusColors[r.status] || 'var(--text-light)';
+    return '<div style="border:2px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;background:' + (r.status === 'open' ? 'rgba(255,107,107,0.05)' : 'transparent') + ';">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+        '<span style="font-weight:700;font-size:0.85rem;">' + (typeLabels[r.report_type] || r.report_type) + '</span>' +
+        '<span style="font-size:0.72rem;font-weight:700;color:' + statusColor + ';text-transform:uppercase;">' + r.status + '</span>' +
+      '</div>' +
+      '<div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">' +
+        'From: ' + reporterName + (r.target_text ? ' · About: ' + escapeHtml(r.target_text) : '') + ' · ' + new Date(r.created_at).toLocaleString() +
+      '</div>' +
+      '<div style="font-size:0.85rem;color:var(--purple-dark);margin-bottom:10px;white-space:pre-wrap;">' + escapeHtml(r.description) + '</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+        (r.status !== 'reviewing' ? '<button class="btn btn-sm btn-outline" onclick="adminUpdateReportStatus(\'' + r.id + '\',\'reviewing\')">👀 Mark Reviewing</button>' : '') +
+        (r.status !== 'resolved'  ? '<button class="btn btn-sm btn-outline" onclick="adminUpdateReportStatus(\'' + r.id + '\',\'resolved\')">✅ Resolve</button>'      : '') +
+        (r.status !== 'dismissed' ? '<button class="btn btn-sm btn-outline" style="color:#ff6b6b;" onclick="adminUpdateReportStatus(\'' + r.id + '\',\'dismissed\')">🗑️ Dismiss</button>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('') || '<div style="text-align:center;color:var(--text-light);padding:30px;">No reports yet.</div>';
+
+  modal.innerHTML =
+    '<h2 style="text-align:center;margin-bottom:6px;">🚩 Player Reports</h2>' +
+    '<div style="text-align:center;color:var(--text-light);font-size:0.85rem;margin-bottom:16px;">' + openCount + ' open · showing last ' + (reports ? reports.length : 0) + '</div>' +
+    '<div style="max-height:60vh;overflow-y:auto;">' + listHtml + '</div>' +
+    '<button onclick="closeModal()" class="btn btn-outline" style="width:100%;margin-top:14px;">Close</button>';
+  openModal(modal);
+}
+
+async function adminUpdateReportStatus(reportId, newStatus) {
+  if (!await isAdmin()) return;
+  try {
+    await supabaseClient.from('player_reports').update({ status: newStatus }).eq('id', reportId);
+    showToast('Report marked as ' + newStatus, 2000);
+    adminShowReportInbox();
+  } catch(err) { showToast('Failed: ' + err.message, 3000); }
 }
