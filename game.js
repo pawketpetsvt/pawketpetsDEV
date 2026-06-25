@@ -22293,12 +22293,17 @@ var weatherSystem = {
   },
 
   generateWeather: function() {
-    var totalWeight = this.weatherTypes.reduce(function(s, w) { return s + w.weight; }, 0);
+    var hour = new Date().getHours();
+    var isNight = hour >= 18 || hour < 6;
+    // Starry only available at night — exclude it during the day so it doesn't waste its weight
+    var pool = isNight ? this.weatherTypes : this.weatherTypes.filter(function(w) { return w.id !== 'starry'; });
+
+    var totalWeight = pool.reduce(function(s, w) { return s + w.weight; }, 0);
     var random = Math.random() * totalWeight;
     var cumulative = 0;
-    for (var i = 0; i < this.weatherTypes.length; i++) {
-      cumulative += this.weatherTypes[i].weight;
-      if (random <= cumulative) { this.currentWeather = this.weatherTypes[i]; break; }
+    for (var i = 0; i < pool.length; i++) {
+      cumulative += pool[i].weight;
+      if (random <= cumulative) { this.currentWeather = pool[i]; break; }
     }
     localStorage.setItem('currentWeather', JSON.stringify(this.currentWeather));
     localStorage.setItem('weatherDate', this.currentDate || new Date().toISOString().slice(0, 10));

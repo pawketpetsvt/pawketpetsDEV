@@ -8368,38 +8368,62 @@ body.night-mode .news-widget .news-item {
    WEATHER SYSTEM - ENHANCED VISUAL EFFECTS
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* SUNNY - Warm glow from above */
+/* SUNNY - Warm glow + soft light rays, clearly distinct from Clear */
 body.weather-sunny::before {
   content: '';
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
   pointer-events: none;
   z-index: 9998;
-  background: radial-gradient(circle at 50% 0%, rgba(255,200,100,0.18) 0%, transparent 55%);
+  background: radial-gradient(circle at 50% 0%, rgba(255,200,100,0.22) 0%, transparent 55%);
   animation: sunGlow 4s ease-in-out infinite;
 }
 @keyframes sunGlow {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
 }
+body.weather-sunny::after {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 9997;
+  background:
+    conic-gradient(from 200deg at 50% -10%,
+      transparent 0deg, rgba(255,225,150,0.12) 8deg, transparent 16deg,
+      transparent 30deg, rgba(255,225,150,0.10) 38deg, transparent 46deg,
+      transparent 60deg, rgba(255,225,150,0.12) 68deg, transparent 76deg,
+      transparent 90deg, rgba(255,225,150,0.10) 98deg, transparent 106deg,
+      transparent 120deg, rgba(255,225,150,0.12) 128deg, transparent 136deg,
+      transparent 150deg, rgba(255,225,150,0.10) 158deg, transparent 166deg,
+      transparent 180deg
+    );
+  animation: sunRays 12s linear infinite;
+  opacity: 0.8;
+}
+@keyframes sunRays {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 
-/* RAINY - Falling rain streaks */
+/* RAINY - Individual falling raindrop particles, varying sizes & speed */
 body.weather-rainy::before {
   content: '';
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
   pointer-events: none;
   z-index: 9998;
-  background-image: repeating-linear-gradient(
-    0deg, transparent, transparent 8px,
-    rgba(100,180,250,0.35) 8px, rgba(100,180,250,0.35) 12px
-  );
-  background-size: 100% 20px;
-  animation: rainDrop 0.4s linear infinite;
-}
-@keyframes rainDrop {
-  0%   { background-position: 0 0; }
-  100% { background-position: 0 20px; }
+  background-image:
+    radial-gradient(1.5px 5px at 8%  0%,  rgba(140,190,255,0.65), transparent),
+    radial-gradient(1px   4px at 22% 0%,  rgba(140,190,255,0.55), transparent),
+    radial-gradient(2px   7px at 37% 0%,  rgba(140,190,255,0.70), transparent),
+    radial-gradient(1px   4px at 51% 0%,  rgba(140,190,255,0.50), transparent),
+    radial-gradient(1.5px 6px at 64% 0%,  rgba(140,190,255,0.60), transparent),
+    radial-gradient(1px   4px at 78% 0%,  rgba(140,190,255,0.55), transparent),
+    radial-gradient(2px   7px at 91% 0%,  rgba(140,190,255,0.65), transparent);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  animation: rainFall1 0.9s linear infinite;
 }
 body.weather-rainy::after {
   content: '';
@@ -8408,18 +8432,26 @@ body.weather-rainy::after {
   pointer-events: none;
   z-index: 9997;
   background-image:
-    radial-gradient(circle at 15% 25%, rgba(150,200,255,0.6) 1px, transparent 1px),
-    radial-gradient(circle at 35% 55%, rgba(150,200,255,0.5) 1px, transparent 1px),
-    radial-gradient(circle at 60% 15%, rgba(150,200,255,0.7) 1px, transparent 1px),
-    radial-gradient(circle at 80% 70%, rgba(150,200,255,0.5) 1px, transparent 1px),
-    radial-gradient(circle at 25% 85%, rgba(150,200,255,0.6) 1px, transparent 1px);
-  background-size: 200px 200px, 280px 280px, 320px 320px, 260px 260px, 350px 350px;
-  animation: rainFloat 1.2s linear infinite;
-  opacity: 0.65;
+    radial-gradient(1px   4px at 5%  0%,  rgba(160,205,255,0.5), transparent),
+    radial-gradient(1.5px 6px at 18% 0%,  rgba(160,205,255,0.6), transparent),
+    radial-gradient(1px   3px at 29% 0%,  rgba(160,205,255,0.45),transparent),
+    radial-gradient(2px   8px at 44% 0%,  rgba(160,205,255,0.65),transparent),
+    radial-gradient(1px   4px at 58% 0%,  rgba(160,205,255,0.5), transparent),
+    radial-gradient(1.5px 5px at 71% 0%,  rgba(160,205,255,0.55),transparent),
+    radial-gradient(1px   4px at 84% 0%,  rgba(160,205,255,0.5), transparent),
+    radial-gradient(2px   7px at 96% 0%,  rgba(160,205,255,0.6), transparent);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  animation: rainFall2 1.3s linear infinite;
+  animation-delay: 0.4s;
 }
-@keyframes rainFloat {
-  0%   { transform: translateY(0); }
-  100% { transform: translateY(30px); }
+@keyframes rainFall1 {
+  0%   { background-position: 0% -10%, 0% -15%, 0% -5%, 0% -20%, 0% -8%, 0% -18%, 0% -12%; }
+  100% { background-position: 0% 110%, 0% 115%, 0% 105%, 0% 120%, 0% 108%, 0% 118%, 0% 112%; }
+}
+@keyframes rainFall2 {
+  0%   { background-position: 0% -12%, 0% -6%, 0% -18%, 0% -9%, 0% -15%, 0% -10%, 0% -20%, 0% -7%; }
+  100% { background-position: 0% 112%, 0% 106%, 0% 118%, 0% 109%, 0% 115%, 0% 110%, 0% 120%, 0% 107%; }
 }
 
 /* FOGGY - Thick drifting mist */
@@ -8499,7 +8531,7 @@ body.weather-windy::after {
   100% { transform: translateX(-100%) translateY(-45px) rotate(360deg); }
 }
 
-/* STARRY - Twinkling stars */
+/* STARRY - Twinkling stars, many particles, no scan band */
 body.weather-starry::before {
   content: '';
   position: fixed;
@@ -8518,7 +8550,21 @@ body.weather-starry::before {
     radial-gradient(2px 2px at 8%  52%, #fff, transparent),
     radial-gradient(3px 3px at 91% 78%, #ffd700, transparent),
     radial-gradient(2px 2px at 49% 8%,  #fff, transparent),
-    radial-gradient(3px 3px at 77% 48%, #ffd700, transparent);
+    radial-gradient(3px 3px at 77% 48%, #ffd700, transparent),
+    radial-gradient(1.5px 1.5px at 5%  35%, #fff, transparent),
+    radial-gradient(2px   2px   at 17% 64%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 28% 22%, #ffd700, transparent),
+    radial-gradient(2.5px 2.5px at 38% 90%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 46% 30%, #fff, transparent),
+    radial-gradient(2px   2px   at 58% 70%, #ffd700, transparent),
+    radial-gradient(1.5px 1.5px at 66% 18%, #fff, transparent),
+    radial-gradient(2.5px 2.5px at 73% 92%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 80% 8%,  #ffd700, transparent),
+    radial-gradient(2px   2px   at 88% 58%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 95% 28%, #fff, transparent),
+    radial-gradient(2.5px 2.5px at 96% 88%, #ffd700, transparent),
+    radial-gradient(1.5px 1.5px at 3%  88%, #fff, transparent),
+    radial-gradient(2px   2px   at 14% 6%,  #fff, transparent);
   background-size: 100% 100%;
   background-repeat: no-repeat;
   animation: starTwinkle 3s ease-in-out infinite;
@@ -8530,13 +8576,31 @@ body.weather-starry::before {
 body.weather-starry::after {
   content: '';
   position: fixed;
-  top: 0; left: 0; width: 100%; height: 40%;
+  top: 0; left: 0; width: 100%; height: 100%;
   pointer-events: none;
   z-index: 9997;
-  background: linear-gradient(180deg, rgba(10,10,46,0.35) 0%, transparent 100%);
+  background-image:
+    radial-gradient(1px 1px at 25% 45%, #fff, transparent),
+    radial-gradient(1px 1px at 41% 75%, #ffd700, transparent),
+    radial-gradient(1px 1px at 55% 25%, #fff, transparent),
+    radial-gradient(1px 1px at 68% 55%, #fff, transparent),
+    radial-gradient(1px 1px at 81% 15%, #ffd700, transparent),
+    radial-gradient(1px 1px at 10% 60%, #fff, transparent),
+    radial-gradient(1px 1px at 90% 40%, #fff, transparent),
+    radial-gradient(1px 1px at 35% 10%, #ffd700, transparent),
+    radial-gradient(1px 1px at 60% 95%, #fff, transparent),
+    radial-gradient(1px 1px at 75% 70%, #fff, transparent);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  animation: starTwinkleSlow 5s ease-in-out infinite;
+  animation-delay: 1.2s;
+}
+@keyframes starTwinkleSlow {
+  0%, 100% { opacity: 0.3; }
+  50%       { opacity: 0.85; }
 }
 
-/* CURSED - Purple fog + scanlines + JS-injected glitch rects */
+/* CURSED - Purple fog + softened scanlines + JS-injected glitch rects */
 body.weather-cursed::before {
   content: '';
   position: fixed;
@@ -8545,14 +8609,14 @@ body.weather-cursed::before {
   z-index: 9998;
   background: linear-gradient(
     135deg,
-    rgba(138,43,226,0.35) 0%, rgba(75,0,130,0.28) 30%,
-    rgba(138,43,226,0.35) 60%, rgba(75,0,130,0.28) 100%
+    rgba(138,43,226,0.22) 0%, rgba(75,0,130,0.16) 30%,
+    rgba(138,43,226,0.22) 60%, rgba(75,0,130,0.16) 100%
   );
-  animation: cursedFogDrift 5s ease-in-out infinite;
+  animation: cursedFogDrift 6s ease-in-out infinite;
 }
 @keyframes cursedFogDrift {
-  0%, 100% { transform: translateX(0)  scaleX(1);    opacity: 0.55; }
-  50%       { transform: translateX(4%) scaleX(1.04); opacity: 0.85; }
+  0%, 100% { transform: translateX(0)  scaleX(1);    opacity: 0.45; }
+  50%       { transform: translateX(4%) scaleX(1.04); opacity: 0.65; }
 }
 body.weather-cursed::after {
   content: '';
@@ -8561,23 +8625,23 @@ body.weather-cursed::after {
   pointer-events: none;
   z-index: 9999;
   background: repeating-linear-gradient(
-    0deg, transparent, transparent 2px,
-    rgba(255,0,255,0.08) 2px, rgba(255,0,255,0.08) 4px
+    0deg, transparent, transparent 4px,
+    rgba(255,0,255,0.04) 4px, rgba(255,0,255,0.04) 6px
   );
-  animation: cursedScanline 10s linear infinite;
+  animation: cursedScanline 16s linear infinite;
 }
 @keyframes cursedScanline {
   0%   { transform: translateY(0); }
   100% { transform: translateY(100%); }
 }
-/* JS-injected cursed glitch rectangles */
+/* JS-injected cursed glitch rectangles — softer, slower flicker */
 .cursed-glitch {
-  animation: glitchFlash 0.5s ease-in-out infinite;
+  animation: glitchFlash 1.2s ease-in-out infinite;
 }
 @keyframes glitchFlash {
   0%, 100% { opacity: 0; }
-  15%       { opacity: 1; }
-  30%       { opacity: 0; }
+  20%       { opacity: 0.5; }
+  35%       { opacity: 0; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
