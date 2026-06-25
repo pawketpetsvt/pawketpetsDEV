@@ -22271,18 +22271,19 @@ function getPetFullDisplayName(pet) {
 
 var weatherSystem = {
   weatherTypes: [
-    { id: 'clear',  name: 'Clear',       icon: '☀️',  weight: 20, description: 'Perfect weather for pet adventures!',           effect: 'Normal conditions' },
-    { id: 'sunny',  name: 'Sunny',        icon: '🌤️', weight: 15, description: 'The sun is shining brightly!',                  effect: 'Pets are extra happy today' },
-    { id: 'rainy',  name: 'Rainy',        icon: '🌧️', weight: 20, description: 'The mushrooms are extra happy today.',           effect: 'Water types earn +25% XP' },
-    { id: 'foggy',  name: 'Foggy',        icon: '🌫️', weight: 15, description: 'Mysterious mists drift through the Deep Woods.', effect: 'Rare encounters +10% chance' },
-    { id: 'windy',  name: 'Windy',        icon: '💨',  weight: 15, description: 'Hold onto your spoons! Gusty conditions today.', effect: 'All pets move +15% faster' },
-    { id: 'starry', name: 'Starry Night', icon: '✨',  weight: 10, description: 'The cosmos align. Make a wish!',                 effect: 'Mystical bonuses active' },
-    { id: 'cursed', name: 'Cursed Fog',   icon: '🟣',  weight: 5,  description: 'Strange purple fog from the ruins. Beware.',    effect: 'Something feels different...' }
+    { id: 'clear',  name: 'Clear',       icon: '☀️',  weight: 22, description: 'Perfect weather for pet adventures!',           effect: 'Normal conditions' },
+    { id: 'sunny',  name: 'Sunny',        icon: '🌤️', weight: 20, description: 'The sun is shining brightly!',                  effect: 'Pets are extra happy today' },
+    { id: 'rainy',  name: 'Rainy',        icon: '🌧️', weight: 18, description: 'The mushrooms are extra happy today.',           effect: 'Water types earn +25% XP' },
+    { id: 'foggy',  name: 'Foggy',        icon: '🌫️', weight: 16, description: 'Mysterious mists drift through the Deep Woods.', effect: 'Rare encounters +10% chance' },
+    { id: 'windy',  name: 'Windy',        icon: '💨',  weight: 16, description: 'Hold onto your spoons! Gusty conditions today.', effect: 'All pets move +15% faster' },
+    { id: 'starry', name: 'Starry Night', icon: '✨',  weight: 6,  description: 'The cosmos align. Make a wish!',                 effect: 'Mystical bonuses active' },
+    { id: 'cursed', name: 'Cursed Fog',   icon: '🟣',  weight: 2,  description: 'Strange purple fog from the ruins. Beware.',    effect: 'Something feels different...' }
   ],
 
   currentWeather: null,
   currentDate:    null,
   changeInterval: null,
+  ROTATION_HOURS: 6, // weather rotates every N hours, shared by all players
 
   init: async function() {
     this.currentDate = new Date().toISOString().slice(0, 10);
@@ -22290,8 +22291,8 @@ var weatherSystem = {
     var loaded = await this.loadFromDailyFeatures();
     if (!loaded) {
       var saved     = localStorage.getItem('currentWeather');
-      var savedDate = localStorage.getItem('weatherDate');
-      if (saved && savedDate === this.currentDate) {
+      var savedTime = localStorage.getItem('weatherSetAt');
+      if (saved && savedTime && (Date.now() - parseInt(savedTime, 10)) < this.ROTATION_HOURS * 3600000) {
         try { this.currentWeather = JSON.parse(saved); loaded = true; } catch(e) {}
       }
     }
@@ -22300,23 +22301,30 @@ var weatherSystem = {
       this.syncToDailyFeatures().catch(function(){});
     }
     this.applyWeather();
-    this.startMidnightChecker();
+    this.startRotationChecker();
   },
 
   loadFromDailyFeatures: async function() {
     try {
       var { data, error } = await supabaseClient
         .from('daily_features')
-        .select('weather')
+        .select('weather, created_at')
         .eq('date', this.currentDate)
         .maybeSingle();
       if (error || !data || !data.weather) return false;
+
+      // Staleness check: if this row's weather was set more than ROTATION_HOURS ago, treat as expired
+      if (data.created_at) {
+        var ageMs = Date.now() - new Date(data.created_at).getTime();
+        if (ageMs > this.ROTATION_HOURS * 3600000) return false;
+      }
+
       var weatherId = (typeof data.weather === 'object') ? data.weather.id : data.weather;
       var weather   = this.weatherTypes.find(function(w) { return w.id === weatherId; });
       if (!weather) return false;
       this.currentWeather = weather;
       localStorage.setItem('currentWeather', JSON.stringify(weather));
-      localStorage.setItem('weatherDate', this.currentDate);
+      localStorage.setItem('weatherSetAt', Date.now().toString());
       return true;
     } catch(e) { return false; }
   },
@@ -22335,7 +22343,7 @@ var weatherSystem = {
       if (random <= cumulative) { this.currentWeather = pool[i]; break; }
     }
     localStorage.setItem('currentWeather', JSON.stringify(this.currentWeather));
-    localStorage.setItem('weatherDate', this.currentDate || new Date().toISOString().slice(0, 10));
+    localStorage.setItem('weatherSetAt', Date.now().toString());
     this.applyWeather();
   },
 
@@ -22407,16 +22415,21 @@ var weatherSystem = {
     setTimeout(function() { self.addCursedGlitches(); }, 4000);
   },
 
-  startMidnightChecker: function() {
+  startRotationChecker: function() {
     var self = this;
     safeSetInterval(function() {
       var today = new Date().toISOString().slice(0, 10);
-      if (today !== self.currentDate) {
-        self.currentDate = today;
+      var dateChanged = today !== self.currentDate;
+      var setAt = parseInt(localStorage.getItem('weatherSetAt') || '0', 10);
+      var rotationDue = !setAt || (Date.now() - setAt) > self.ROTATION_HOURS * 3600000;
+
+      if (dateChanged) self.currentDate = today;
+
+      if (dateChanged || rotationDue) {
         self.generateWeather();
         self.syncToDailyFeatures().catch(function(){});
       }
-    }, 60000); // check every minute
+    }, 60000); // check every minute, but only acts when a rotation window has actually elapsed
   },
 
   getCurrentWeather: function() { return this.currentWeather; },
@@ -22426,6 +22439,7 @@ var weatherSystem = {
     if (weather) {
       this.currentWeather = weather;
       localStorage.setItem('currentWeather', JSON.stringify(weather));
+      localStorage.setItem('weatherSetAt', Date.now().toString());
       this.applyWeather();
       this.syncToDailyFeatures().catch(function(){});
     }
