@@ -14581,10 +14581,13 @@ async function furniture_applyDailyBonus() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 var guildState = {
-  myGuild:     null,   // result of get_user_guild RPC
-  myRole:      null,   // 'leader' | 'officer' | 'member'
-  liaisonPetId: null,  // current liaison pet for user
-  view:        'home'  // 'home' | 'dungeons' | 'browse' | 'create'
+  myGuild:       null,   // full guild row { id, name, tag, ... } when in a guild, else null
+  myRole:        null,   // 'leader' | 'officer' | 'member'
+  liaisonPetId:  null,   // current liaison pet for user
+  view:          'browse', // 'browse' | 'myGuild' | 'create'
+  currentPage:   1,
+  guildsPerPage: 10,
+  totalGuilds:   0
 };
 
 // ── Entry point ───────────────────────────────────────────────────────────
@@ -14594,97 +14597,157 @@ async function loadGuildPage() {
   if (!currentUser) { mount.innerHTML = '<div class="empty-state"><p>Log in to access guilds!</p></div>'; return; }
   mount.innerHTML = '<div class="spinner"></div>';
 
+  var inGuild = await guild_checkUserStatus();
+  if (inGuild) {
+    guildState.view = 'myGuild';
+    await guild_renderMemberView(mount);
+  } else {
+    guildState.view = 'browse';
+    await guild_renderBrowser(mount);
+  }
+}
+
+// Single source of truth for "am I in a guild" — direct query, joined, verified
+async function guild_checkUserStatus() {
   try {
-    // Try RPC first; fall back to direct query if RPC doesn't exist
-    var guildRow = null;
-    var rpcRes = await supabaseClient.rpc('get_user_guild', { p_user_id: currentUser.id });
-    if (!rpcRes.error && rpcRes.data && rpcRes.data.length > 0) {
-      guildRow = rpcRes.data[0];
-    } else if (rpcRes.error) {
-      // RPC missing — direct query fallback
-      var { data: memRows } = await supabaseClient
-        .from('guild_members')
-        .select('guild_id, role, guilds(id, name, tag, emblem_emoji, guild_level, guild_xp, guild_treasury, member_count, description, is_open, owner_id)')
+    var { data, error } = await supabaseClient
+      .from('guild_members')
+      .select('guild_id, role, guilds(*)')
+      .eq('user_id', currentUser.id)
+      .maybeSingle();
+
+    if (error) { dbg('guild_checkUserStatus error:', error); guildState.myGuild = null; guildState.myRole = null; return false; }
+
+    if (data && data.guilds) {
+      guildState.myGuild = Object.assign({}, data.guilds, { guild_id: data.guild_id });
+      guildState.myRole  = data.role;
+
+      var { data: liaison } = await supabaseClient
+        .from('guild_liaisons')
+        .select('pet_id')
+        .eq('guild_id', data.guild_id)
         .eq('user_id', currentUser.id)
-        .limit(1);
-      if (memRows && memRows.length > 0 && memRows[0].guilds) {
-        var m = memRows[0];
-        guildRow = Object.assign({}, m.guilds, {
-          guild_id: m.guild_id,
-          user_role: m.role,
-          is_liaison_set: false
-        });
+        .eq('is_active', true)
+        .maybeSingle();
+      guildState.liaisonPetId = liaison ? liaison.pet_id : null;
+      return true;
+    }
+
+    // Orphaned guild_members row (guild_id points nowhere) — auto-clean
+    if (data && !data.guilds) {
+      await supabaseClient.from('guild_members').delete().eq('user_id', currentUser.id).catch(function(){});
+      await supabaseClient.from('guild_liaisons').update({ is_active: false }).eq('user_id', currentUser.id).catch(function(){});
+    }
+
+    guildState.myGuild = null;
+    guildState.myRole = null;
+    guildState.liaisonPetId = null;
+    return false;
+  } catch(err) {
+    dbg('guild_checkUserStatus exception:', err);
+    return false;
+  }
+}
+
+// ── Browse guilds (paginated) ───────────────────────────────────────────────
+async function guild_renderBrowser(mount) {
+  if (!mount) return;
+  mount.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    var { count: totalCount } = await supabaseClient
+      .from('guilds').select('*', { count: 'exact', head: true });
+    guildState.totalGuilds = totalCount || 0;
+
+    var offset = (guildState.currentPage - 1) * guildState.guildsPerPage;
+    var { data: guilds, error } = await supabaseClient
+      .from('guilds')
+      .select('*')
+      .order('member_count', { ascending: false })
+      .range(offset, offset + guildState.guildsPerPage - 1);
+    if (error) throw error;
+
+    var html =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px;">' +
+        '<h3 style="margin:0;color:var(--purple-dark);">🏛️ Browse Guilds</h3>' +
+        '<button class="btn btn-primary" onclick="guild_renderCreateForm()">✨ Create Guild</button>' +
+      '</div>';
+
+    if (!guilds || guilds.length === 0) {
+      html +=
+        '<div class="empty-state">' +
+          '<div style="font-size:3rem;margin-bottom:12px;">🏛️</div>' +
+          '<h3>No Guilds Yet!</h3>' +
+          '<p style="color:var(--text-light);">Be the first to create a guild!</p>' +
+          '<button class="btn btn-primary" onclick="guild_renderCreateForm()" style="margin-top:12px;">✨ Create the First Guild</button>' +
+        '</div>';
+    } else {
+      html += '<div style="display:grid;grid-template-columns:1fr;gap:12px;">';
+      guilds.forEach(function(g) {
+        var memberCount = g.member_count || 0;
+        var isFull = memberCount >= 50;
+        var isOpen = g.is_open !== false;
+        html +=
+          '<div style="border:2px solid var(--border);border-radius:14px;padding:16px 18px;display:flex;align-items:center;gap:14px;">' +
+            '<div style="font-size:2.3rem;min-width:46px;text-align:center;">' + (g.emblem_emoji || '🏛️') + '</div>' +
+            '<div style="flex:1;min-width:0;">' +
+              '<div style="font-weight:700;font-size:1.02rem;color:var(--purple-dark);">' + escapeHtml(g.name) +
+                ' <span style="font-size:0.78rem;color:var(--text-light);font-weight:400;">[' + escapeHtml(g.tag||'???') + ']</span></div>' +
+              '<div style="font-size:0.82rem;color:var(--text-light);">Level ' + (g.guild_level||1) + ' · ' + memberCount + '/50 members · ' + (isOpen ? '🟢 Open' : '🔴 Closed') + '</div>' +
+              (g.description ? '<div style="font-size:0.78rem;color:var(--text-light);font-style:italic;margin-top:4px;">' + escapeHtml(g.description.slice(0,100)) + '</div>' : '') +
+            '</div>' +
+            '<div>' +
+              (isFull
+                ? '<span style="color:#ff6b6b;font-weight:700;font-size:0.85rem;">Full</span>'
+                : isOpen
+                  ? '<button class="btn btn-primary btn-sm" onclick="guild_join(\'' + g.id + '\')" style="min-width:76px;">Join</button>'
+                  : '<button class="btn btn-outline btn-sm" onclick="guild_requestJoin(\'' + g.id + '\')" style="min-width:76px;">Request</button>'
+              ) +
+            '</div>' +
+          '</div>';
+      });
+      html += '</div>';
+
+      var totalPages = Math.ceil(guildState.totalGuilds / guildState.guildsPerPage);
+      if (totalPages > 1) {
+        html +=
+          '<div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:20px;">' +
+            '<button class="btn btn-outline btn-sm" onclick="guild_changePage(-1)" ' + (guildState.currentPage <= 1 ? 'disabled' : '') + '>← Prev</button>' +
+            '<span style="padding:0 10px;color:var(--text-light);font-size:0.85rem;">Page ' + guildState.currentPage + ' of ' + totalPages + '</span>' +
+            '<button class="btn btn-outline btn-sm" onclick="guild_changePage(1)" ' + (guildState.currentPage >= totalPages ? 'disabled' : '') + '>Next →</button>' +
+          '</div>';
       }
     }
 
-    if (guildRow) {
-      guildState.myGuild = guildRow;
-      guildState.myRole  = guildRow.user_role;
-      guildState.liaisonPetId = guildRow.is_liaison_set ? true : null; // will be fetched on demand
-      guild_renderMemberView(mount);
-    } else {
-      guildState.myGuild = null;
-      guildState.view = 'browse';
-      guild_renderNoGuild(mount);
-    }
+    mount.innerHTML = html;
   } catch(err) {
-    mount.innerHTML = '<div class="empty-state"><p>Could not load guild: ' + escapeHtml(err.message) + '</p>' +
+    mount.innerHTML = '<div class="empty-state"><p>Error loading guilds: ' + escapeHtml(err.message) + '</p>' +
       '<button class="btn btn-primary" onclick="loadGuildPage()">Retry</button></div>';
   }
 }
 
-// ── No guild view ─────────────────────────────────────────────────────────
-async function guild_renderNoGuild(mount) {
-  mount.innerHTML = '<div class="spinner"></div>';
-  try {
-    var { data: guilds } = await supabaseClient
-      .from('guilds')
-      .select('id, name, tag, emblem_emoji, guild_level, member_count, description, is_open')
-      .order('member_count', { ascending: false })
-      .limit(20);
-
-    var listHtml = (guilds || []).map(function(g) {
-      return '<div style="border:2px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:14px;">' +
-        '<div style="font-size:2rem;">' + (g.emblem_emoji||'🏛️') + '</div>' +
-        '<div style="flex:1;">' +
-          '<div style="font-weight:700;font-size:0.95rem;color:var(--purple-dark);">' + escapeHtml(g.name) + ' <span style="color:var(--text-light);font-size:0.8rem;">[' + escapeHtml(g.tag) + ']</span></div>' +
-          '<div style="font-size:0.78rem;color:var(--text-light);">Lv.' + g.guild_level + ' · ' + (g.member_count||1) + ' members · ' + (g.is_open ? '🟢 Open' : '🔴 Closed') + '</div>' +
-          (g.description ? '<div style="font-size:0.78rem;color:var(--text-light);margin-top:3px;font-style:italic;">' + escapeHtml(g.description.slice(0,80)) + '</div>' : '') +
-        '</div>' +
-        (g.is_open
-          ? '<button class="btn btn-primary btn-sm" onclick="guild_join(\'' + g.id + '\')" style="white-space:nowrap;">Join</button>'
-          : '<button class="btn btn-outline btn-sm" onclick="guild_requestJoin(\'' + g.id + '\')" style="white-space:nowrap;">Request</button>'
-        ) +
-      '</div>';
-    }).join('') || '<div style="color:var(--text-light);text-align:center;padding:20px;">No guilds yet — be the first to create one!</div>';
-
-    mount.innerHTML =
-      '<div style="display:flex;gap:10px;margin-bottom:20px;">' +
-        '<button class="btn btn-primary" onclick="guild_renderCreateForm()" style="flex:1;">✨ Create a Guild</button>' +
-        '<button class="btn btn-outline" onclick="loadGuildPage()" style="flex:0 0 auto;">🔄 Refresh</button>' +
-      '</div>' +
-      '<div style="font-weight:700;font-size:0.9rem;color:var(--purple-dark);margin-bottom:12px;">🏛️ Browse Guilds</div>' +
-      listHtml;
-  } catch(err) {
-    mount.innerHTML = '<div class="empty-state"><p>Could not load guilds: ' + escapeHtml(err.message) + '</p></div>';
-  }
+function guild_changePage(direction) {
+  guildState.currentPage = Math.max(1, guildState.currentPage + direction);
+  loadGuildPage();
 }
 
-// ── Create guild form ─────────────────────────────────────────────────────
+// ── Create guild form ────────────────────────────────────────────────────
 function guild_renderCreateForm() {
   var mount = document.getElementById('guild-content');
   if (!mount) return;
 
-  // Check if player has a level 5+ pet
+  if (guildState.myGuild) { showToast('You are already in a guild!', 3000); loadGuildPage(); return; }
+
   var hasEligiblePet = Object.values(petState).some(function(p) { return (p.level||1) >= 5; });
+  var canAfford = (currentPoints||0) >= 500;
 
   mount.innerHTML =
     '<div style="max-width:480px;">' +
-      '<button class="btn btn-outline btn-sm" onclick="guild_renderNoGuild(document.getElementById(\'guild-content\'))" style="margin-bottom:16px;">← Back</button>' +
+      '<button class="btn btn-outline btn-sm" onclick="loadGuildPage()" style="margin-bottom:16px;">← Back</button>' +
       '<h3 style="color:var(--purple);margin-bottom:16px;">✨ Create a Guild</h3>' +
       (!hasEligiblePet
         ? '<div style="background:rgba(255,107,107,0.1);border:1px solid #ff6b6b;border-radius:10px;padding:12px;margin-bottom:14px;font-size:0.85rem;color:#cc3333;">⚠️ You need a level 5+ pet to create a guild. Keep training!</div>'
-        : (currentPoints < 500
+        : (!canAfford
             ? '<div style="background:rgba(255,107,107,0.1);border:1px solid #ff6b6b;border-radius:10px;padding:12px;margin-bottom:14px;font-size:0.85rem;color:#cc3333;">⚠️ You need 500 PP to create a guild. You have ' + (currentPoints||0) + ' PP.</div>'
             : '')) +
       '<div style="margin-bottom:12px;"><label style="font-size:0.82rem;font-weight:700;display:block;margin-bottom:4px;">Guild Name (3–20 chars)</label>' +
@@ -14696,7 +14759,7 @@ function guild_renderCreateForm() {
       '<div style="margin-bottom:16px;"><label style="font-size:0.82rem;font-weight:700;display:block;margin-bottom:4px;">Bio (optional)</label>' +
         '<textarea id="guild-create-bio" maxlength="200" placeholder="Describe your guild..." style="width:100%;padding:8px 12px;border-radius:8px;border:2px solid var(--border);font-size:0.85rem;resize:vertical;min-height:70px;box-sizing:border-box;"></textarea></div>' +
       '<div style="font-size:0.78rem;color:var(--text-light);margin-bottom:14px;">⚠️ Cost: 500 PP · Requires level 5+ pet</div>' +
-      '<button class="btn btn-primary" onclick="guild_create()" style="width:100%;">✨ Create Guild (500 PP)</button>' +
+      '<button id="guild-create-submit-btn" class="btn btn-primary" onclick="guild_create()" style="width:100%;">✨ Create Guild (500 PP)</button>' +
     '</div>';
 }
 
@@ -14706,38 +14769,17 @@ async function guild_create() {
   var emblem = (document.getElementById('guild-create-emblem') || {}).value.trim() || '🏛️';
   var bio    = (document.getElementById('guild-create-bio')    || {}).value.trim();
 
-  // Validate form fields
   if (name.length < 3 || name.length > 20) { showToast('Guild name must be 3–20 characters', 3000); return; }
   if (!/^[A-Z0-9]{3,5}$/.test(tag))         { showToast('Tag must be 3–5 uppercase letters/numbers', 3000); return; }
   if (containsProfanity(name) || containsProfanity(tag) || containsProfanity(bio)) { showToast('Please keep the name/tag/bio family-friendly 💖', 3000); return; }
 
-  // Check not already in a guild — verify the guild actually exists (guards against orphaned rows)
-  var { data: existingMembership } = await supabaseClient
-    .from('guild_members')
-    .select('guild_id, guilds(id, name)')
-    .eq('user_id', currentUser.id)
-    .limit(1);
+  // Re-verify guild membership right before creating (covers race conditions)
+  var inGuild = await guild_checkUserStatus();
+  if (inGuild) { showToast('❌ You are already in "' + guildState.myGuild.name + '". Leave it first!', 4000); await loadGuildPage(); return; }
 
-  if (existingMembership && existingMembership.length > 0) {
-    var mem = existingMembership[0];
-    if (mem.guilds && mem.guilds.id) {
-      // Real guild exists — show it
-      showToast('❌ You are already in "' + mem.guilds.name + '". Leave it first!', 4000);
-      await loadGuildPage();
-      return;
-    } else {
-      // Orphaned guild_members row (guild was deleted) — auto-clean it silently
-      await supabaseClient.from('guild_members').delete().eq('user_id', currentUser.id).catch(function(){});
-      await supabaseClient.from('guild_liaisons').update({ is_active: false }).eq('user_id', currentUser.id).catch(function(){});
-    }
-  }
-
-  // Check name not already taken
-  var { data: existingGuild } = await supabaseClient
-    .from('guilds').select('name').eq('name', name).maybeSingle();
+  var { data: existingGuild } = await supabaseClient.from('guilds').select('name').eq('name', name).maybeSingle();
   if (existingGuild) { showToast('❌ Guild name "' + name + '" is already taken!', 4000); return; }
 
-  // Check level 5+ pet directly from DB (not petState which may be empty)
   var { data: myPets, error: petErr } = await supabaseClient
     .from('user_pets').select('id, level, nickname').eq('user_id', currentUser.id);
   if (petErr) { showToast('Error checking pets: ' + petErr.message, 3000); return; }
@@ -14747,23 +14789,25 @@ async function guild_create() {
   if ((currentPoints||0) < 500) { showToast('Need 500 PP to create a guild!', 3000); return; }
   if (!canPerformAction('guild_create', 5000)) return;
 
+  var btn = document.getElementById('guild-create-submit-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Creating...'; }
+
   try {
     await awardPP(-500, 'guild_creation');
 
     var { data: guild, error: gErr } = await supabaseClient.from('guilds').insert({
       name: name, tag: tag, emblem_emoji: emblem, description: bio,
-      owner_id: currentUser.id, guild_level: 1, guild_xp: 0, guild_treasury: 0, member_count: 1
+      owner_id: currentUser.id, guild_level: 1, guild_xp: 0, guild_treasury: 0, member_count: 1, is_open: true
     }).select().single();
 
     if (gErr) {
-      // Refund immediately on guild insert failure
       try { await awardPP(500, 'guild_creation_refund'); } catch(e) {}
       if (gErr.code === '23505') { showToast('❌ Guild name already taken!', 4000); }
       else { showToast('Failed to create guild: ' + gErr.message, 4000); }
+      if (btn) { btn.disabled = false; btn.textContent = '✨ Create Guild (500 PP)'; }
       return;
     }
 
-    // Add as member — proper try/catch, NOT .catch() chain
     try {
       var { error: mErr } = await supabaseClient.from('guild_members').insert({
         guild_id: guild.id, user_id: currentUser.id, role: 'leader'
@@ -14775,7 +14819,6 @@ async function guild_create() {
       return;
     }
 
-    // Auto-set highest level pet as liaison — proper try/catch, NOT .catch() chain
     var bestPet = myPets.sort(function(a,b){ return (b.level||1)-(a.level||1); })[0];
     if (bestPet) {
       try {
@@ -14783,33 +14826,43 @@ async function guild_create() {
           { guild_id: guild.id, user_id: currentUser.id, pet_id: bestPet.id, is_active: true },
           { onConflict: 'guild_id,user_id' }
         );
-      } catch(liaisonErr) {
-        dbg('Liaison set failed (non-critical):', liaisonErr);
-      }
+      } catch(liaisonErr) { dbg('Liaison set failed (non-critical):', liaisonErr); }
     }
 
-    showToast('🏛\ufe0f Guild "' + name + '" created!', 4000);
+    showToast('🏛️ Guild "' + name + '" created!', 4000);
     await loadGuildPage();
   } catch(err) {
     showToast('Failed to create guild: ' + err.message, 4000);
     try { await awardPP(500, 'guild_creation_refund'); } catch(e) {}
+    if (btn) { btn.disabled = false; btn.textContent = '✨ Create Guild (500 PP)'; }
   }
 }
 
 // ── Join / request join ───────────────────────────────────────────────────
 async function guild_join(guildId) {
   if (!canPerformAction('guild_join', 3000)) return;
+
+  var inGuild = await guild_checkUserStatus();
+  if (inGuild) { showToast('You are already in a guild!', 3000); loadGuildPage(); return; }
+
   try {
+    var { data: guild } = await supabaseClient.from('guilds').select('member_count').eq('id', guildId).single();
+    if (guild && (guild.member_count||0) >= 50) { showToast('This guild is full!', 3000); return; }
+
     var { error } = await supabaseClient.from('guild_members').insert({ guild_id: guildId, user_id: currentUser.id, role: 'member' });
     if (error) throw error;
 
-    // Auto-set liaison
+    await supabaseClient.from('guilds').update({ member_count: (guild?.member_count||0) + 1 }).eq('id', guildId);
+
     var bestPet = Object.values(petState).filter(function(p) { return (p.level||1) >= 5; }).sort(function(a,b) { return (b.level||1)-(a.level||1); })[0];
     if (bestPet) {
-      await supabaseClient.from('guild_liaisons').upsert({ guild_id: guildId, user_id: currentUser.id, pet_id: bestPet.id, is_active: true }, { onConflict: 'guild_id,user_id' });
+      await supabaseClient.from('guild_liaisons').upsert(
+        { guild_id: guildId, user_id: currentUser.id, pet_id: bestPet.id, is_active: true },
+        { onConflict: 'guild_id,user_id' }
+      ).catch(function(){});
     }
 
-    showToast('🏛️ Joined the guild!', 3000);
+    showToast('✅ Joined the guild!', 3000);
     await loadGuildPage();
     loadActiveGuildPerks().catch(function(){});
   } catch(err) {
@@ -14819,16 +14872,21 @@ async function guild_join(guildId) {
 
 async function guild_requestJoin(guildId) {
   if (!canPerformAction('guild_request', 3000)) return;
+
+  var inGuild = await guild_checkUserStatus();
+  if (inGuild) { showToast('You are already in a guild!', 3000); loadGuildPage(); return; }
+
   try {
-    var { error } = await supabaseClient.from('guild_join_requests').insert({ guild_id: guildId, user_id: currentUser.id });
+    var { error } = await supabaseClient.from('guild_join_requests').insert({ guild_id: guildId, user_id: currentUser.id, status: 'pending' });
     if (error) throw error;
     showToast('📨 Join request sent!', 3000);
   } catch(err) {
-    showToast('Could not send request: ' + err.message, 3000);
+    if (err.code === '23505') showToast('You already have a pending request for this guild.', 3000);
+    else showToast('Failed to send request: ' + err.message, 3000);
   }
 }
 
-// ── Member view ───────────────────────────────────────────────────────────
+// ── My Guild view ────────────────────────────────────────────────────────
 async function guild_renderMemberView(mount) {
   var g = guildState.myGuild;
   if (!g) return;
@@ -14836,16 +14894,12 @@ async function guild_renderMemberView(mount) {
   mount.innerHTML = '<div class="spinner"></div>';
 
   try {
-    // Fetch full guild data
-    var { data: guildData } = await supabaseClient.from('guilds').select('*').eq('id', g.guild_id).single();
-    // Fetch members with liaisons
     var { data: members } = await supabaseClient
       .from('guild_members')
       .select('user_id, role, total_contributions, players(username)')
       .eq('guild_id', g.guild_id)
       .order('role', { ascending: true });
 
-    // Fetch liaisons
     var { data: liaisons } = await supabaseClient
       .from('guild_liaisons')
       .select('user_id, pet_id, user_pets(nickname, level, current_variant, pets(name, image_file))')
@@ -14855,25 +14909,24 @@ async function guild_renderMemberView(mount) {
     var liaisonMap = {};
     (liaisons||[]).forEach(function(l) { liaisonMap[l.user_id] = l; });
 
-    // Fetch my liaison
     var myLiaison = liaisonMap[currentUser.id];
     guildState.liaisonPetId = myLiaison ? myLiaison.pet_id : null;
 
-    // Fetch pending join requests (leader/officer only)
     var joinRequests = [];
     if (guildState.myRole === 'leader' || guildState.myRole === 'officer') {
       var { data: reqs } = await supabaseClient
         .from('guild_join_requests')
         .select('id, user_id, players(username), created_at')
         .eq('guild_id', g.guild_id)
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true });
       joinRequests = reqs || [];
     }
 
-    var xpNeeded = (guildData ? guildData.guild_level : 1) * 100;
-    var xpCurrent = guildData ? guildData.guild_xp : 0;
-    var xpPct = Math.round((xpCurrent / xpNeeded) * 100);
-    var treasury = guildData ? guildData.guild_treasury : 0;
+    var xpNeeded  = (g.guild_level || 1) * 100;
+    var xpCurrent = g.guild_xp || 0;
+    var xpPct     = Math.min(100, Math.round((xpCurrent / xpNeeded) * 100));
+    var treasury  = g.guild_treasury || 0;
 
     var roleIcons = { leader: '👑', officer: '⭐', member: '👤' };
 
@@ -14884,11 +14937,13 @@ async function guild_renderMemberView(mount) {
         var up = liaison.user_pets;
         petName = (up.nickname || (up.pets && up.pets.name) || 'Pet') + ' Lv.' + (up.level||1);
       }
+      var isCurrentUser = m.user_id === currentUser.id;
       return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(153,102,255,0.08);font-size:0.82rem;">' +
         '<span>' + (roleIcons[m.role]||'👤') + '</span>' +
-        '<span style="flex:1;font-weight:' + (m.role==='leader'?'700':'400') + ';color:var(--purple-dark);">' + escapeHtml(m.players ? m.players.username : 'Unknown') + '</span>' +
+        '<span style="flex:1;font-weight:' + (isCurrentUser?'700':'400') + ';color:' + (isCurrentUser?'var(--purple)':'var(--purple-dark)') + ';">' +
+          escapeHtml(m.players ? m.players.username : 'Unknown') + (isCurrentUser ? ' (You)' : '') + '</span>' +
         '<span style="color:var(--text-light);font-size:0.75rem;">Guild Pet: ' + escapeHtml(petName) + '</span>' +
-        (guildState.myRole==='leader' && m.user_id!==currentUser.id
+        (guildState.myRole==='leader' && !isCurrentUser
           ? '<button class="btn btn-sm btn-outline" onclick="guild_kickMember(\'' + g.guild_id + '\',\'' + m.user_id + '\')" style="font-size:0.68rem;padding:2px 6px;color:#ff6b6b;border-color:#ff6b6b;">Kick</button>'
           : '') +
       '</div>';
@@ -14898,93 +14953,69 @@ async function guild_renderMemberView(mount) {
       ? '<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">' +
           '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:8px;">📬 Join Requests (' + joinRequests.length + ')</div>' +
           joinRequests.map(function(r) {
-            return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:0.82rem;">' +
-              '<span style="flex:1;">' + escapeHtml(r.players ? r.players.username : 'Unknown') + '</span>' +
-              '<button class="btn btn-primary btn-sm" onclick="guild_acceptRequest(\'' + r.id + '\',\'' + g.guild_id + '\',\'' + r.user_id + '\')" style="font-size:0.72rem;">Accept</button>' +
-              '<button class="btn btn-outline btn-sm" onclick="guild_declineRequest(\'' + r.id + '\')" style="font-size:0.72rem;">Decline</button>' +
+            return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(153,102,255,0.08);">' +
+              '<span style="flex:1;font-size:0.85rem;">' + escapeHtml(r.players ? r.players.username : 'Unknown') + '</span>' +
+              '<button class="btn btn-primary btn-sm" onclick="guild_acceptRequest(\'' + r.id + '\',\'' + g.guild_id + '\',\'' + r.user_id + '\')">Accept</button>' +
+              '<button class="btn btn-outline btn-sm" onclick="guild_declineRequest(\'' + r.id + '\')">Decline</button>' +
             '</div>';
           }).join('') +
         '</div>'
       : '';
 
-    // Set liaison section
-    var myEligiblePets = Object.values(petState).filter(function(p) { return (p.level||1) >= 5; });
-    var liaisonSection = '<div style="background:rgba(153,102,255,0.06);border-radius:12px;padding:12px 14px;margin:14px 0;">' +
-      '<div style="font-weight:700;font-size:0.82rem;margin-bottom:8px;">🏛️ Your Guild Pet (Liaison)</div>' +
-      (myLiaison && myLiaison.user_pets
-        ? '<div style="font-size:0.82rem;color:var(--purple-dark);margin-bottom:8px;">Current: ' + escapeHtml((myLiaison.user_pets.nickname || (myLiaison.user_pets.pets&&myLiaison.user_pets.pets.name) || 'Pet')) + ' Lv.' + (myLiaison.user_pets.level||1) + '</div>'
-        : '<div style="font-size:0.82rem;color:#ff6b6b;margin-bottom:8px;">Not set! Select a pet below.</div>') +
-      (myEligiblePets.length > 0
-        ? '<select id="guild-liaison-select" style="width:100%;padding:6px;border-radius:8px;border:2px solid var(--border);font-size:0.82rem;margin-bottom:8px;">' +
-            '<option value="">-- Choose a pet --</option>' +
-            myEligiblePets.map(function(p) {
-              return '<option value="' + p.id + '"' + (guildState.liaisonPetId===p.id?' selected':'') + '>' + escapeHtml(p.nickname||p.pet_type||'Pet') + ' Lv.' + (p.level||1) + '</option>';
-            }).join('') +
-          '</select>' +
-          '<button class="btn btn-primary btn-sm" onclick="guild_setLiaison()" style="width:100%;">Set Guild Pet</button>'
-        : '<div style="font-size:0.78rem;color:var(--text-light);">Need a level 5+ pet to set as guild liaison.</div>') +
-    '</div>';
-
-    // Bio edit (leader/officer only)
-    var bioEdit = '';
-    if (guildState.myRole === 'leader' || guildState.myRole === 'officer') {
-      bioEdit = '<div style="margin-top:10px;">' +
-        '<textarea id="guild-bio-edit" style="width:100%;padding:8px;border-radius:8px;border:2px solid var(--border);font-size:0.82rem;resize:vertical;min-height:60px;box-sizing:border-box;">' +
-          escapeHtml(guildData ? guildData.description||'' : '') +
-        '</textarea>' +
-        '<button class="btn btn-outline btn-sm" onclick="guild_saveBio()" style="margin-top:6px;width:100%;">Save Bio</button>' +
+    var eligiblePets = Object.values(petState).filter(function(p) { return (p.level||1) >= 5; });
+    var liaisonHtml =
+      '<div style="background:rgba(153,102,255,0.06);border-radius:12px;padding:14px;margin:16px 0;">' +
+        '<div style="font-weight:700;font-size:0.9rem;color:var(--purple-dark);margin-bottom:10px;">🏛️ Your Guild Pet</div>' +
+        (myLiaison && myLiaison.user_pets
+          ? '<div style="font-size:0.9rem;color:var(--purple-dark);margin-bottom:8px;">Current: ' + escapeHtml(myLiaison.user_pets.nickname||'Pet') + ' Lv.' + (myLiaison.user_pets.level||1) + '</div>'
+          : '<div style="font-size:0.9rem;color:#ff6b6b;margin-bottom:8px;">No guild pet set!</div>') +
+        (eligiblePets.length > 0
+          ? '<select id="guild-liaison-select" style="width:100%;padding:8px;border-radius:8px;border:2px solid var(--border);margin-bottom:8px;">' +
+              '<option value="">-- Choose a pet --</option>' +
+              eligiblePets.map(function(p) {
+                return '<option value="' + p.id + '"' + (guildState.liaisonPetId === p.id ? ' selected' : '') + '>' + escapeHtml(p.nickname||'Pet') + ' Lv.' + (p.level||1) + '</option>';
+              }).join('') +
+            '</select>' +
+            '<button class="btn btn-primary btn-sm" onclick="guild_setLiaison()" style="width:100%;">Set Guild Pet</button>'
+          : '<div style="font-size:0.8rem;color:var(--text-light);">Need a level 5+ pet to set as guild liaison.</div>') +
       '</div>';
-    }
-
-    // Donate section
-    var donateSection = '<div style="display:flex;gap:8px;margin-top:8px;">' +
-      '<input type="number" id="guild-donate-amount" placeholder="PP amount" min="10" style="flex:1;padding:6px;border-radius:8px;border:2px solid var(--border);font-size:0.85rem;">' +
-      '<button class="btn btn-primary btn-sm" onclick="guild_donate()">Donate</button>' +
-    '</div>';
 
     mount.innerHTML =
-      '<div style="display:flex;gap:8px;margin-bottom:16px;">' +
-        '<button class="btn btn-primary" onclick="guild_renderDungeons()" style="flex:1;">⚔️ Dungeons</button>' +
-        '<button class="btn btn-outline" onclick="guild_renderTreasury()" style="flex:1;">🏦 Treasury</button>' +
-        '<button class="btn btn-outline" onclick="loadGuildPage()" style="flex:0 0 auto;">🔄</button>' +
-      '</div>' +
+      '<div style="max-width:700px;">' +
+        '<div style="text-align:center;margin-bottom:20px;">' +
+          '<div style="font-size:3rem;">' + (g.emblem_emoji||'🏛️') + '</div>' +
+          '<div style="font-weight:800;font-size:1.3rem;color:var(--purple-dark);">' + escapeHtml(g.name) +
+            ' <span style="font-size:0.85rem;color:var(--text-light);font-weight:400;">[' + escapeHtml(g.tag||'???') + ']</span></div>' +
+          '<div style="font-size:0.85rem;color:var(--text-light);">Level ' + (g.guild_level||1) + ' · ' + (members?members.length:0) + '/50 members · Treasury: 🪙' + treasury.toLocaleString() + ' PP</div>' +
+          (g.description ? '<div style="font-size:0.82rem;color:var(--text-light);font-style:italic;margin-top:6px;">"' + escapeHtml(g.description) + '"</div>' : '') +
+        '</div>' +
 
-      // Guild header
-      '<div style="text-align:center;margin-bottom:16px;">' +
-        '<div style="font-size:3rem;">' + escapeHtml(guildData ? guildData.emblem_emoji||'🏛️' : '🏛️') + '</div>' +
-        '<div style="font-weight:800;font-size:1.2rem;color:var(--purple-dark);">' + escapeHtml(g.guild_name) + ' <span style="font-size:0.8rem;color:var(--text-light);">[' + escapeHtml(g.guild_tag) + ']</span></div>' +
-        '<div style="font-size:0.82rem;color:var(--text-light);">Lv.' + g.guild_level + ' · ' + (members ? members.length : g.member_count) + ' members · Treasury: 🪙' + treasury + ' PP</div>' +
-      '</div>' +
+        '<div style="margin-bottom:16px;">' +
+          '<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-light);"><span>Guild XP</span><span>' + xpCurrent + '/' + xpNeeded + '</span></div>' +
+          '<div style="background:rgba(153,102,255,0.12);border-radius:20px;height:8px;overflow:hidden;"><div style="width:' + xpPct + '%;height:100%;background:linear-gradient(90deg,#9966ff,#ff66cc);border-radius:20px;"></div></div>' +
+        '</div>' +
 
-      // XP bar
-      '<div style="margin-bottom:14px;">' +
-        '<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-light);margin-bottom:4px;"><span>Guild XP</span><span>' + xpCurrent + '/' + xpNeeded + '</span></div>' +
-        '<div style="background:rgba(153,102,255,0.12);border-radius:20px;height:8px;overflow:hidden;"><div style="width:' + xpPct + '%;height:100%;background:linear-gradient(90deg,#9966ff,#ff66cc);border-radius:20px;"></div></div>' +
-      '</div>' +
+        liaisonHtml +
 
-      // Bio
-      '<div style="background:rgba(153,102,255,0.05);border-radius:10px;padding:10px 12px;font-size:0.82rem;color:var(--text-light);font-style:italic;margin-bottom:4px;">' +
-        '"' + escapeHtml(guildData ? guildData.description||'No bio set.' : 'No bio set.') + '"' +
-      '</div>' +
-      bioEdit +
+        '<div style="font-weight:700;font-size:0.92rem;color:var(--purple-dark);margin-bottom:10px;">👥 Members (' + (members?members.length:0) + ')</div>' +
+        '<div>' + membersHtml + '</div>' +
+        requestsHtml +
 
-      // Liaison section
-      liaisonSection +
-
-      // Members
-      '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:8px;">👥 Members</div>' +
-      '<div style="margin-bottom:4px;">' + membersHtml + '</div>' +
-      requestsHtml +
-
-      // Leave
-      '<div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">' +
-        '<button class="btn btn-outline btn-sm" onclick="guild_leave()" style="color:#ff6b6b;border-color:#ff6b6b;">Leave Guild</button>' +
+        '<div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">' +
+          '<button class="btn btn-outline" onclick="loadGuildPage();guildState.view=\'dungeons\';guild_renderDungeons();" style="flex:1;">⚔️ Dungeons</button>' +
+          ((guildState.myRole==='leader'||guildState.myRole==='officer')
+            ? '<button class="btn btn-outline" onclick="guild_renderTreasury()" style="flex:1;">🏦 Treasury</button>'
+            : '') +
+          '<button class="btn btn-outline" onclick="guild_leave()" style="flex:1;color:#ff6b6b;border-color:#ff6b6b;">🚪 Leave Guild</button>' +
+        '</div>' +
       '</div>';
 
   } catch(err) {
-    mount.innerHTML = '<div class="empty-state"><p>Error loading guild: ' + escapeHtml(err.message) + '</p><button class="btn btn-primary" onclick="loadGuildPage()">Retry</button></div>';
+    mount.innerHTML = '<div class="empty-state"><p>Error loading guild: ' + escapeHtml(err.message) + '</p>' +
+      '<button class="btn btn-primary" onclick="loadGuildPage()">Retry</button></div>';
   }
 }
+
 
 // ── Liaison ───────────────────────────────────────────────────────────────
 async function guild_setLiaison() {
