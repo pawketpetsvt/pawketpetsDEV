@@ -7389,16 +7389,18 @@ function triggerSpookyEffect() {
   document.body.appendChild(overlay);
   document.body.appendChild(crtLines);
   
-  // Play spooky audio (Piper's flute)
+  // Play spooky audio (Piper's flute) — load on-demand since bossNormal isn't in the priority preload list
   try {
-    // Reuse cached Piper audio instead of creating new Audio() each time
-    var piperKey = 'bossNormal'; // Already in battleSounds
-    if (audioCache[piperKey]) {
-      var spookyAudio = audioCache[piperKey].cloneNode();
+    var piperKey = 'bossNormal';
+    var spookyAudioSrc = audioCache[piperKey] || loadSoundOnDemand(piperKey);
+    if (spookyAudioSrc) {
+      var spookyAudio = spookyAudioSrc.cloneNode();
       spookyAudio.volume = 0.3;
       spookyAudio.play().catch(function(err) {
         dbg('Spooky audio failed to play:', err);
       });
+    } else {
+      dbg('Spooky audio unavailable — sound file missing or SOUNDS_ENABLED is false');
     }
   } catch (err) {
     dbg('Could not load spooky audio');
@@ -17314,14 +17316,18 @@ async function simulateGrandPrix(eventId) {
     // Sort descending by score
     entries.sort(function(a, b) { return b._score - a._score; });
 
-    // Assign ranks and persist scores
+    // Assign ranks and persist scores — run updates in parallel instead of one-at-a-time
+    var rankUpdatePromises = [];
     for (var r = 0; r < entries.length; r++) {
       var rank = r + 1;
       entries[r]._rank = rank;
-      await supabaseClient.from('grand_prix_entries')
-        .update({ race_score: entries[r]._score, final_rank: rank })
-        .eq('id', entries[r].id);
+      rankUpdatePromises.push(
+        supabaseClient.from('grand_prix_entries')
+          .update({ race_score: entries[r]._score, final_rank: rank })
+          .eq('id', entries[r].id)
+      );
     }
+    await Promise.all(rankUpdatePromises);
 
     // Generate replay text for top 10
     var replayTemplates = {
@@ -17358,9 +17364,8 @@ async function simulateGrandPrix(eventId) {
       .update({ status: 'reward_claim' })
       .eq('id', eventId);
 
-    // Send notifications to all participants
-    for (var ni = 0; ni < entries.length; ni++) {
-      var ne = entries[ni];
+    // Send notifications to all participants — fire all at once, don't block
+    entries.forEach(function(ne) {
       var uname = (ne.user_pets && ne.user_pets.nickname) || 'Your pet';
       createNotification(
         ne.user_id,
@@ -17369,7 +17374,7 @@ async function simulateGrandPrix(eventId) {
         uname + ' placed #' + ne._rank + '! Claim your rewards now!',
         'tab:racing'
       ).catch(function(){});
-    }
+    });
 
     showToast('🏆 Grand Prix simulation complete! ' + entries.length + ' entries ranked.', 5000);
     gp_load();
