@@ -3906,10 +3906,10 @@ async function expedition_start() {
   if (error) { showToast('Failed to start expedition: ' + error.message, 4000); if (btn) { btn.disabled = false; expedition_updateStartBtn(); } return; }
 
   // Deduct energy AFTER successful DB insert (use zone's actual energyCost)
-  await supabaseClient.from('user_pets')
-    .update({ energy: Math.max(0, (pet.energy || 0) - zone.energyCost) })
-    .eq('id', _expeditionPetId);
-  if (petState[_expeditionPetId]) petState[_expeditionPetId].energy = Math.max(0, (pet.energy || 0) - zone.energyCost);
+  var { data: newEnergyVal, error: energyErr } = await supabaseClient.rpc('adjust_pet_stat_secure', {
+    p_pet_id: _expeditionPetId, p_stat: 'energy', p_delta: -zone.energyCost, p_reason: 'expedition_start'
+  });
+  if (!energyErr && petState[_expeditionPetId]) petState[_expeditionPetId].energy = newEnergyVal;
 
   expeditionState.active = row;
   showToast('🏴‍☠️ ' + (pet.nickname || 'Your pet') + ' set off for the ' + zone.label + '!', 3000);
@@ -4318,9 +4318,10 @@ async function race_start() {
   for (var j = 0; j < raceState.selectedPets.length; j++) {
     var rp = raceState.selectedPets[j];
     if (!rp.isCpu) {
-      var newEnergy = Math.max(0, (petState[rp.id] ? petState[rp.id].energy : rp.energy) - RACE_ENERGY_COST);
-      await supabaseClient.from('user_pets').update({ energy: newEnergy }).eq('id', rp.id);
-      if (petState[rp.id]) petState[rp.id].energy = newEnergy;
+      var { data: newEnergyVal, error: energyErr } = await supabaseClient.rpc('adjust_pet_stat_secure', {
+        p_pet_id: rp.id, p_stat: 'energy', p_delta: -RACE_ENERGY_COST, p_reason: 'race_energy_cost'
+      });
+      if (!energyErr && petState[rp.id]) petState[rp.id].energy = newEnergyVal;
     }
   }
 
@@ -9501,39 +9502,17 @@ function calculateReward(enemyLevel, zone, type) {
 async function executeBattle(playerStats, enemyStats, petId) {
   // Deduct 5 energy from pet BEFORE battle
   // Get fresh energy value from database to be sure
-  var freshPet = await supabaseClient
-    .from('user_pets')
-    .select('energy')
-    .eq('id', petId)
-    .single();
-  
-  dbg('=== ENERGY DEDUCTION DEBUG ===');
-  dbg('Pet ID:', petId);
-  dbg('Fresh pet query result:', freshPet);
-  
-  if (freshPet.data) {
-    var currentEnergy = freshPet.data.energy || 100;
-    var newEnergy = Math.max(0, currentEnergy - 5);
-    
-    dbg('Energy deduction: ' + currentEnergy + ' -> ' + newEnergy);
-    showToast('⚡ Energy: ' + currentEnergy + ' → ' + newEnergy);
-    
-    var updateRes = await supabaseClient
-      .from('user_pets')
-      .update({ energy: newEnergy })
-      .eq('id', petId);
-    
-    dbg('Energy update result:', updateRes);
-    
-    if (updateRes.error) {
-      console.error('Energy update error:', updateRes.error);
-      showToast('❌ Energy update failed!');
-    } else {
-      dbg('Energy updated successfully!');
-      showToast('✅ Energy updated to ' + newEnergy);
-    }
+  var { data: newEnergy, error: energyErr } = await supabaseClient.rpc('adjust_pet_stat_secure', {
+    p_pet_id: petId, p_stat: 'energy', p_delta: -5, p_reason: 'battle_energy_cost'
+  });
+
+  if (!energyErr) {
+    dbg('Energy deducted via RPC, new value:', newEnergy);
+    showToast('⚡ Energy: ' + newEnergy);
+    if (petState[petId]) petState[petId].energy = newEnergy;
   } else {
-    console.error('Failed to fetch pet energy!');
+    console.error('Energy update error:', energyErr);
+    showToast('❌ Energy update failed!');
   }
   dbg('=== END ENERGY DEBUG ===');
   
@@ -10674,9 +10653,10 @@ async function battleExp_start() {
   if (error) { showToast('Failed: ' + error.message, 3000); if (btn) { btn.disabled = false; btn.textContent = '🚀 Send on Expedition'; } return; }
 
   // Deduct energy AFTER successful DB insert
-  var newEnergy = Math.max(0, (pet.energy || 0) - zone.energyCost);
-  await supabaseClient.from('user_pets').update({ energy: newEnergy }).eq('id', petId);
-  if (petState[petId]) petState[petId].energy = newEnergy;
+  var { data: newEnergy, error: energyErr } = await supabaseClient.rpc('adjust_pet_stat_secure', {
+    p_pet_id: petId, p_stat: 'energy', p_delta: -zone.energyCost, p_reason: 'expedition_start'
+  });
+  if (!energyErr && petState[petId]) petState[petId].energy = newEnergy;
 
   showToast('🌲 ' + (pet.nickname || 'Your pet') + ' set off for the ' + zone.label + '!', 3000);
   _battleExpZone = null;
@@ -14802,14 +14782,13 @@ async function furniture_applyDailyBonus() {
       var pet = petState[room.pet_id];
       if (!pet) continue;
 
-      var newHappiness = Math.min(pet.max_happiness || 100, (pet.happiness || 0) + bonus);
+      // Update pet happiness via secure RPC
+      var { data: confirmedHappiness, error: happinessErr } = await supabaseClient.rpc('adjust_pet_stat_secure', {
+        p_pet_id: room.pet_id, p_stat: 'happiness', p_delta: bonus, p_reason: 'furniture_daily_bonus'
+      });
+      if (happinessErr) { dbg('Furniture happiness bonus failed:', happinessErr); continue; }
 
-      // Update pet happiness
-      await supabaseClient.from('user_pets')
-        .update({ happiness: newHappiness })
-        .eq('id', room.pet_id);
-
-      if (petState[room.pet_id]) petState[room.pet_id].happiness = newHappiness;
+      if (petState[room.pet_id]) petState[room.pet_id].happiness = confirmedHappiness;
 
       // Mark bonus applied
       await supabaseClient.from('pet_rooms')
