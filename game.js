@@ -15893,9 +15893,25 @@ async function guild_renderDungeons() {
       return '<option value="' + l.user_id + '">' + escapeHtml(l.username) + ' — ' + escapeHtml(l.pet_name||'Pet') + ' Lv.' + (l.pet_level||1) + '</option>';
     }).join('') || '<option disabled>No guildmates have set a liaison yet</option>';
 
-    // My liaison
-    var myLiaisonPet = guildState.liaisonPetId ? petState[guildState.liaisonPetId] : null;
-    var myPetDisplay = myLiaisonPet ? escapeHtml(myLiaisonPet.nickname||myLiaisonPet.pet_type||'Pet') + ' Lv.' + (myLiaisonPet.level||1) : '⚠️ Not set — go set a Guild Pet first!';
+    // My liaison — re-fetch from DB directly rather than trusting possibly-stale
+    // guildState.liaisonPetId or an unpopulated petState cache (same fix pattern
+    // used for expeditions and battle arena)
+    var myLiaisonPet = null;
+    try {
+      var { data: myLiaisonRow } = await supabaseClient
+        .from('guild_liaisons')
+        .select('pet_id, user_pets(nickname, level, current_variant)')
+        .eq('guild_id', guildState.myGuild.guild_id)
+        .eq('user_id', currentUser.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (myLiaisonRow && myLiaisonRow.pet_id) {
+        guildState.liaisonPetId = myLiaisonRow.pet_id;
+        myLiaisonPet = myLiaisonRow.user_pets || null;
+      }
+    } catch(e) { dbg('Could not fetch liaison for dungeon page:', e); }
+
+    var myPetDisplay = myLiaisonPet ? escapeHtml(myLiaisonPet.nickname||'Pet') + ' Lv.' + (myLiaisonPet.level||1) : '⚠️ Not set — go set a Guild Pet first!';
 
     mount.innerHTML =
       '<button class="btn btn-outline btn-sm" onclick="loadGuildPage()" style="margin-bottom:16px;">← Back to Guild</button>' +
@@ -22333,8 +22349,7 @@ var weatherSystem = {
       await supabaseClient.from('daily_features').upsert({
         date:       this.currentDate,
         weather:    this.currentWeather.id,
-        bonus_type: bonusMap[this.currentWeather.id] || 'normal',
-        updated_at: new Date().toISOString()
+        bonus_type: bonusMap[this.currentWeather.id] || 'normal'
       }, { onConflict: 'date' });
     } catch(e) { dbg('Weather sync to DB failed:', e); }
   },
