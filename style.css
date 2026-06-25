@@ -8414,13 +8414,13 @@ body.weather-rainy::before {
   pointer-events: none;
   z-index: 9998;
   background-image:
-    radial-gradient(1.5px 5px at 8%  0%,  rgba(140,190,255,0.65), transparent),
-    radial-gradient(1px   4px at 22% 0%,  rgba(140,190,255,0.55), transparent),
-    radial-gradient(2px   7px at 37% 0%,  rgba(140,190,255,0.70), transparent),
-    radial-gradient(1px   4px at 51% 0%,  rgba(140,190,255,0.50), transparent),
-    radial-gradient(1.5px 6px at 64% 0%,  rgba(140,190,255,0.60), transparent),
-    radial-gradient(1px   4px at 78% 0%,  rgba(140,190,255,0.55), transparent),
-    radial-gradient(2px   7px at 91% 0%,  rgba(140,190,255,0.65), transparent);
+    radial-gradient(ellipse 1.5px 5px at 8%  0%,  rgba(140,190,255,0.65), transparent),
+    radial-gradient(ellipse 1px   4px at 22% 0%,  rgba(140,190,255,0.55), transparent),
+    radial-gradient(ellipse 2px   7px at 37% 0%,  rgba(140,190,255,0.70), transparent),
+    radial-gradient(ellipse 1px   4px at 51% 0%,  rgba(140,190,255,0.50), transparent),
+    radial-gradient(ellipse 1.5px 6px at 64% 0%,  rgba(140,190,255,0.60), transparent),
+    radial-gradient(ellipse 1px   4px at 78% 0%,  rgba(140,190,255,0.55), transparent),
+    radial-gradient(ellipse 2px   7px at 91% 0%,  rgba(140,190,255,0.65), transparent);
   background-size: 100% 100%;
   background-repeat: no-repeat;
   animation: rainFall1 0.9s linear infinite;
@@ -8432,14 +8432,14 @@ body.weather-rainy::after {
   pointer-events: none;
   z-index: 9997;
   background-image:
-    radial-gradient(1px   4px at 5%  0%,  rgba(160,205,255,0.5), transparent),
-    radial-gradient(1.5px 6px at 18% 0%,  rgba(160,205,255,0.6), transparent),
-    radial-gradient(1px   3px at 29% 0%,  rgba(160,205,255,0.45),transparent),
-    radial-gradient(2px   8px at 44% 0%,  rgba(160,205,255,0.65),transparent),
-    radial-gradient(1px   4px at 58% 0%,  rgba(160,205,255,0.5), transparent),
-    radial-gradient(1.5px 5px at 71% 0%,  rgba(160,205,255,0.55),transparent),
-    radial-gradient(1px   4px at 84% 0%,  rgba(160,205,255,0.5), transparent),
-    radial-gradient(2px   7px at 96% 0%,  rgba(160,205,255,0.6), transparent);
+    radial-gradient(ellipse 1px   4px at 5%  0%,  rgba(160,205,255,0.5), transparent),
+    radial-gradient(ellipse 1.5px 6px at 18% 0%,  rgba(160,205,255,0.6), transparent),
+    radial-gradient(ellipse 1px   3px at 29% 0%,  rgba(160,205,255,0.45),transparent),
+    radial-gradient(ellipse 2px   8px at 44% 0%,  rgba(160,205,255,0.65),transparent),
+    radial-gradient(ellipse 1px   4px at 58% 0%,  rgba(160,205,255,0.5), transparent),
+    radial-gradient(ellipse 1.5px 5px at 71% 0%,  rgba(160,205,255,0.55),transparent),
+    radial-gradient(ellipse 1px   4px at 84% 0%,  rgba(160,205,255,0.5), transparent),
+    radial-gradient(ellipse 2px   7px at 96% 0%,  rgba(160,205,255,0.6), transparent);
   background-size: 100% 100%;
   background-repeat: no-repeat;
   animation: rainFall2 1.3s linear infinite;
