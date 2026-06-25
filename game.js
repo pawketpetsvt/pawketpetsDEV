@@ -4386,17 +4386,17 @@ function race_renderResults(runners, payout, playerBest) {
   var playerWon = playerBest && playerBest.finishOrder === 1;
   var playerPlace = playerBest ? playerBest.finishOrder : null;
 
-  var placeText = playerPlace === 1 ? '🥇 1st Place!' :
-                  playerPlace === 2 ? '🥈 2nd Place' :
-                  playerPlace === 3 ? '🥉 3rd Place' :
-                  playerPlace === 4 ? '4️⃣ 4th Place' : 'No player entry';
+  var placeText = playerPlace === 1 ? '\ud83e\udd47 1st Place!' :
+                  playerPlace === 2 ? '\ud83e\udd48 2nd Place' :
+                  playerPlace === 3 ? '\ud83e\udd49 3rd Place' :
+                  playerPlace === 4 ? '4\ufe0f\u20e3 4th Place' : 'No player entry';
 
   var outcomeColor = payout > raceState.bet ? '#5dde7a' : payout > 0 ? '#fbbf24' : '#ff6b6b';
   var netChange = payout - raceState.bet;
   var netText = netChange > 0 ? '+' + netChange + ' PP' : netChange === 0 ? 'Break even' : netChange + ' PP';
 
   var resultRows = runners.map(function(r, i) {
-    var medals = ['🥇','🥈','🥉','4️⃣'];
+    var medals = ['\ud83e\udd47','\ud83e\udd48','\ud83e\udd49','4\ufe0f\u20e3'];
     var isPlayer = !r.pet.isCpu;
     var spdVal = r.speed.toFixed(1);
     var spdColor = r.speed > 8 ? '#4ade80' : r.speed > 5 ? '#fbbf24' : '#ff9966';
@@ -4406,76 +4406,122 @@ function race_renderResults(runners, payout, playerBest) {
       '<span style="font-size:0.9rem;flex:1;color:' + (isPlayer ? 'var(--purple-dark)' : 'var(--text-light)') + ';">' +
         escapeHtml(r.pet.nickname || r.pet.pet_type || 'CPU') + (isPlayer ? ' (You)' : '') +
       '</span>' +
-      '<span style="font-size:0.78rem;color:' + spdColor + ';font-weight:700;">💨 ' + spdVal + '</span>' +
+      '<span style="font-size:0.78rem;color:' + spdColor + ';font-weight:700;">\ud83d\udca8 ' + spdVal + '</span>' +
     '</div>';
   }).join('');
 
-  // Generate race log entries
-  var petName = playerBest ? escapeHtml(playerBest.pet.nickname || playerBest.pet.pet_type || 'Your pet') : 'Your pet';
-  var logLines = race_generateLog(petName, playerWon, playerPlace);
+  // Generate the richer multi-racer log (now references all runners, not just the player)
+  var logLines = race_generateLog(runners, playerBest, playerWon, playerPlace);
 
   area.innerHTML =
     '<div style="padding:4px;">' +
-      // Race log (animated)
+      // Race log (animated) — results stay hidden until this finishes
       '<div style="background:rgba(0,0,0,0.07);border-radius:12px;padding:12px 14px;margin-bottom:14px;">' +
-        '<div style="font-weight:700;font-size:0.8rem;color:var(--purple-dark);margin-bottom:8px;letter-spacing:1px;">🏁 RACE LOG</div>' +
-        '<div id="race-log-entries" style="font-size:0.8rem;color:var(--text-light);line-height:1.7;min-height:60px;"></div>' +
+        '<div style="font-weight:700;font-size:0.8rem;color:var(--purple-dark);margin-bottom:8px;letter-spacing:1px;">\ud83c\udfc1 RACE LOG</div>' +
+        '<div id="race-log-entries" style="font-size:0.82rem;color:var(--text-light);line-height:1.7;min-height:60px;max-height:280px;overflow-y:auto;"></div>' +
       '</div>' +
-      // Results
-      '<div style="text-align:center;margin-bottom:14px;">' +
-        '<div style="font-size:2rem;">' + (playerWon ? '🎉' : '😤') + '</div>' +
-        '<div style="font-weight:800;font-size:1.05rem;color:var(--purple-dark);">' + placeText + '</div>' +
-        '<div style="font-size:1.5rem;font-weight:800;color:' + outcomeColor + ';margin:6px 0;">' + netText + '</div>' +
-        (payout > 0 ? '<div style="font-size:0.8rem;color:var(--text-light);">Payout: ' + payout + ' PP</div>' : '') +
-      '</div>' +
-      '<div style="margin-bottom:14px;">' + resultRows + '</div>' +
-      '<div style="display:flex;gap:8px;">' +
-        '<button class="btn btn-primary" onclick="race_init()" style="flex:1;">' +
-          (raceState.racesLeft > 0 ? '🏁 Race Again! (' + raceState.racesLeft + ' left)' : '🏁 Come back tomorrow!') +
-        '</button>' +
+      // Results — hidden until the log finishes playing out
+      '<div id="race-results-block" style="display:none;">' +
+        '<div style="text-align:center;margin-bottom:14px;">' +
+          '<div style="font-size:2rem;">' + (playerWon ? '\ud83c\udf89' : '\ud83d\ude24') + '</div>' +
+          '<div style="font-weight:800;font-size:1.05rem;color:var(--purple-dark);">' + placeText + '</div>' +
+          '<div style="font-size:1.5rem;font-weight:800;color:' + outcomeColor + ';margin:6px 0;">' + netText + '</div>' +
+          (payout > 0 ? '<div style="font-size:0.8rem;color:var(--text-light);">Payout: ' + payout + ' PP</div>' : '') +
+        '</div>' +
+        '<div style="margin-bottom:14px;">' + resultRows + '</div>' +
+        '<div style="display:flex;gap:8px;">' +
+          '<button class="btn btn-primary" onclick="race_init()" style="flex:1;">' +
+            (raceState.racesLeft > 0 ? '\ud83c\udfc1 Race Again! (' + raceState.racesLeft + ' left)' : '\ud83c\udfc1 Come back tomorrow!') +
+          '</button>' +
+        '</div>' +
       '</div>' +
     '</div>';
 
-  // Animate the log progressively
+  // Animate the log progressively — slower pace (~950ms/line) so a full race log
+  // runs roughly 10-13 seconds. Results block only appears once the log finishes.
   var logEl = document.getElementById('race-log-entries');
   if (!logEl) return;
   var idx = 0;
   var interval = safeSetInterval(function() {
-    if (idx >= logLines.length) { clearInterval(interval); return; }
+    if (idx >= logLines.length) {
+      clearInterval(interval);
+      var resultsBlock = document.getElementById('race-results-block');
+      if (resultsBlock) {
+        resultsBlock.style.display = 'block';
+        resultsBlock.style.animation = 'fadeIn 0.5s ease';
+      }
+      return;
+    }
     var line = document.createElement('div');
     line.textContent = logLines[idx];
-    line.style.cssText = 'animation:fadeIn 0.3s ease;border-bottom:1px solid rgba(153,102,255,0.08);padding:2px 0;' +
+    line.style.cssText = 'animation:fadeIn 0.3s ease;border-bottom:1px solid rgba(153,102,255,0.08);padding:3px 0;' +
       (idx === logLines.length - 1 ? 'font-weight:700;color:' + outcomeColor + ';' : '');
     logEl.appendChild(line);
     logEl.scrollTop = logEl.scrollHeight;
     idx++;
-  }, 600);
+  }, 950);
 }
 
-function race_generateLog(petName, didWin, place) {
+function race_generateLog(runners, playerBest, playerWon, playerPlace) {
+  var pName = playerBest ? (playerBest.pet.nickname || playerBest.pet.pet_type || 'Your pet') : 'Your pet';
+  // Names of the other racers, in their finishing order, excluding the player
+  var others = runners.filter(function(r) { return playerBest ? r.pet !== playerBest.pet : true; })
+                      .map(function(r) { return r.pet.nickname || r.pet.pet_type || 'Rival'; });
+  var rival1 = others[0] || 'a rival';
+  var rival2 = others[1] || 'another racer';
+  var rival3 = others[2] || 'the pack';
+
   var lines = [];
-  lines.push('🏁 AND THEY\'RE OFF! ' + petName + ' charges from the gate!');
-  if (didWin) {
-    lines.push('Lap 1: ' + petName + ' takes an early lead! The crowd roars!');
-    lines.push('Lap 2: ' + petName + ' extends the advantage — no one can close the gap!');
-    lines.push('Final lap: ' + petName + ' enters the home stretch with a commanding lead!');
-    lines.push('🎉 ' + petName + ' crosses the finish line FIRST! VICTORY! 🏆');
-  } else if (place === 2) {
-    lines.push('Lap 1: ' + petName + ' gets a solid start, right in the pack!');
-    lines.push('Lap 2: ' + petName + ' battles hard, trading places at the front!');
-    lines.push('Final lap: A strong push, but the leader pulls ahead at the last moment!');
-    lines.push('🥈 ' + petName + ' finishes in 2nd! A great effort!');
-  } else if (place === 3) {
-    lines.push('Lap 1: ' + petName + ' settles into the pack, finding a rhythm.');
-    lines.push('Lap 2: ' + petName + ' makes a move, pushing towards the front!');
-    lines.push('Final lap: A hard-fought battle for the podium!');
-    lines.push('🥉 ' + petName + ' secures 3rd place! Well done!');
+  lines.push('\ud83c\udfc1 THE GATES OPEN! ' + pName + ', ' + rival1 + ', ' + rival2 + ', and ' + rival3 + ' burst onto the track!');
+
+  var openers = [
+    pName + ' gets a quick jump off the line!',
+    rival1 + ' shoots ahead early, setting a blistering pace!',
+    'A tight scramble at the first turn \u2014 everyone\'s neck and neck!',
+    pName + ' stumbles slightly at the start but quickly recovers!'
+  ];
+  lines.push(openers[Math.floor(Math.random() * openers.length)]);
+
+  lines.push('Lap 1: ' + rival2 + ' settles into a steady rhythm near the front of the pack.');
+
+  if (playerWon) {
+    lines.push(pName + ' finds another gear and surges toward the lead!');
+    lines.push(rival1 + ' tries to match the pace, but can\'t quite keep up!');
+    lines.push('Lap 2: ' + pName + ' is pulling away \u2014 the gap is growing!');
+    lines.push(rival3 + ' stumbles on a rough patch of track, losing precious ground!');
+    lines.push(rival2 + ' digs in for a late charge, but it may be too little too late!');
+    lines.push('Final lap: ' + pName + ' rounds the last bend with a commanding lead!');
+    lines.push('The crowd is on their feet as ' + pName + ' barrels toward the finish!');
+    lines.push('It\'s not even close anymore \u2014 ' + pName + ' has this one in the bag!');
+    lines.push('\ud83c\udf89 ' + pName + ' CROSSES THE LINE FIRST! VICTORY!! \ud83c\udfc6');
+  } else if (playerPlace === 2) {
+    lines.push(rival1 + ' edges out front, but ' + pName + ' refuses to fall back!');
+    lines.push('Lap 2: It\'s a two-pet battle at the front \u2014 ' + pName + ' and ' + rival1 + ' trade the lead!');
+    lines.push(rival3 + ' fades off the pace, unable to keep up with the leaders.');
+    lines.push(pName + ' makes a bold move on the final turn!');
+    lines.push('So close! ' + pName + ' draws level with ' + rival1 + ' down the home stretch!');
+    lines.push('Final lap: ' + rival1 + ' just barely holds on as both racers give everything!');
+    lines.push('A photo finish \u2014 but ' + rival1 + ' crosses first by a whisker!');
+    lines.push('\ud83e\udd48 ' + pName + ' takes 2nd place! What a race that was!');
+  } else if (playerPlace === 3) {
+    lines.push(rival1 + ' and ' + rival2 + ' break away early, leaving the rest to fight for the podium.');
+    lines.push('Lap 2: ' + pName + ' is stuck in traffic, looking for a gap to exploit!');
+    lines.push(rival3 + ' clips the rail and loses momentum \u2014 chance opens up!');
+    lines.push(pName + ' seizes the opening and surges into 3rd!');
+    lines.push('A tense battle for the final podium spot down the back stretch!');
+    lines.push('Final lap: ' + pName + ' holds firm as ' + rival3 + ' tries one last desperate push!');
+    lines.push('It\'s tight, but ' + pName + ' has just enough to seal the spot!');
+    lines.push('\ud83e\udd49 ' + pName + ' secures 3rd place! A hard-fought podium finish!');
   } else {
-    lines.push('Lap 1: ' + petName + ' struggles to find pace early on.');
-    lines.push('Lap 2: The pack pulls away — ' + petName + ' is giving everything they have!');
-    lines.push('Final lap: One last push, but the gap is too large.');
-    lines.push('💪 ' + petName + ' finishes the race. Better luck next time!');
+    lines.push(rival1 + ' and ' + rival2 + ' tear off into the distance, well ahead of the pack.');
+    lines.push('Lap 2: ' + pName + ' is giving it everything, but the gap keeps growing.');
+    lines.push(pName + ' stumbles trying to make up ground, losing a step!');
+    lines.push(rival3 + ' also fades back, leaving ' + pName + ' to battle for pride alone.');
+    lines.push('Final lap: ' + pName + ' digs deep for one last effort down the home stretch!');
+    lines.push('It won\'t be enough to catch the leaders today, but ' + pName + ' never lets up!');
+    lines.push('\ud83d\udcaa ' + pName + ' crosses the line in last place. Tough one \u2014 better luck next time!');
   }
+
   return lines;
 }
 
@@ -6098,7 +6144,7 @@ async function loadUserBadges() {
 async function awardBadge(badgeKey) {
   if (!currentUser) return;
   
-  // Check if already earned
+  // Check local cache first (fast path, avoids a DB call most of the time)
   if (earnedBadges.includes(badgeKey)) {
     return;
   }
@@ -6116,6 +6162,22 @@ async function awardBadge(badgeKey) {
       return;
     }
     
+    // Verify against the DB directly right before inserting — closes the race window
+    // where two near-simultaneous awardBadge() calls both pass the in-memory check
+    // before either insert resolves, which is what was causing the 409 conflicts.
+    var { data: existing } = await supabaseClient
+      .from('user_badges')
+      .select('id')
+      .eq('user_id', currentUser.id)
+      .eq('badge_id', badge.id)
+      .maybeSingle();
+    
+    if (existing) {
+      // Already has it — sync the cache so future calls short-circuit instantly
+      if (!earnedBadges.includes(badgeKey)) earnedBadges.push(badgeKey);
+      return;
+    }
+    
     // Award badge to user
     var { error: insertError } = await supabaseClient
       .from('user_badges')
@@ -6126,7 +6188,8 @@ async function awardBadge(badgeKey) {
     
     if (insertError) {
       if (insertError.code === '23505') {
-        dbg('[Badges] User already has badge:', badgeKey);
+        // Still possible in a tight race — handle quietly, no console noise
+        if (!earnedBadges.includes(badgeKey)) earnedBadges.push(badgeKey);
         return;
       }
       console.error('[Badges] Error awarding badge:', insertError);
