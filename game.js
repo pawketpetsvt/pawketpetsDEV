@@ -9598,16 +9598,32 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
   
   var expGained = 0;
   var ppGained = 0;
-  
+
   if (rpcError) {
     console.error('❌ Battle save error:', rpcError);
-    // Fall back to client-side if server function fails
+    // Fall back to client-side calculation — but actually award it via the secure RPC
+    // this time, instead of just computing a display number with nothing behind it.
     expGained = battleResult.victory ? (enemyStats.exp_reward || 10) : 0;
     ppGained = battleResult.victory ? Math.round((enemyStats.pp_reward || 10) * 1.5) : 0;
+    if (ppGained > 0) {
+      var { data: fallbackNewTotal, error: fallbackPpErr } = await supabaseClient.rpc('award_pp_secure', {
+        p_amount: ppGained, p_reason: 'battle_win_fallback'
+      });
+      if (fallbackPpErr) {
+        console.error('Fallback PP award also failed:', fallbackPpErr);
+        ppGained = 0; // don't claim a reward that was never actually granted
+      } else {
+        updateAllPoints(fallbackNewTotal);
+      }
+    }
   } else {
     expGained = result.exp_gained || 0;
     ppGained = result.pp_gained || 0;
     dbg('✅ Battle saved securely. XP:', expGained, 'PP:', ppGained);
+    // save_battle_result already credited PP server-side — refresh the displayed
+    // balance with the player's real current total so the sidebar updates.
+    var { data: freshPlayer } = await supabaseClient.from('players').select('pawketpoints').eq('id', currentUser.id).single();
+    if (freshPlayer) updateAllPoints(freshPlayer.pawketpoints);
   }
   
   // Apply guild XP boost perk
