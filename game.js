@@ -2398,7 +2398,9 @@ function makePetCard(pet) {
     imgWrap.innerHTML = isPlaceholder ? '&#10067;' : '&#128062;';
   }
   card.appendChild(imgWrap);
-  card.appendChild(makeEl('div', {class:'pet-name'}, isPlaceholder ? '???' : pet.name));
+  var nameEl = makeEl('div', {class:'pet-name'}, isPlaceholder ? '???' : pet.name);
+  card.appendChild(nameEl);
+  if (!isPlaceholder) maybeApplyNameGlitch(nameEl, pet.name);
   if (pet.vtuber_name && !isPlaceholder) card.appendChild(makeEl('div', {class:'pet-vtuber'}, pet.vtuber_name));
   card.appendChild(makeEl('div', {class:'pet-description'}, isPlaceholder ? 'A mystery pet...' : (pet.description || '')));
 
@@ -3112,6 +3114,7 @@ function makeMyPetCard(pet) {
   // NAME ROW - nickname + edit button (CLEAN CENTERED LAYOUT)
   var nameRow = makeEl('div', {class:'pet-name-row'});
   var nicknameSpan = makeEl('span', {class:'pet-nickname'}, evolutionEmoji + ' ' + pet.nickname);
+  maybeApplyNameGlitch(nicknameSpan, evolutionEmoji + ' ' + pet.nickname);
   var editBtn = makeEl('button', {class:'pet-edit-btn', title:'Edit nickname'});
   editBtn.textContent = '✏️';
   editBtn.onclick = function() { openEditNicknameModal(pet.id, pet.nickname); };
@@ -3150,7 +3153,9 @@ function makeMyPetCard(pet) {
   body.appendChild(levelDiv);
 
   // Last interaction
-  body.appendChild(makeEl('div', {class:'pet-last-seen'}, 'Last interaction: ' + lastSeen));
+  var lastSeenEl = makeEl('div', {class:'pet-last-seen'}, 'Last interaction: ' + lastSeen);
+  body.appendChild(lastSeenEl);
+  maybeApplyNameGlitch(lastSeenEl, 'Last interaction: ' + lastSeen);
 
   // Achievements
   if (achievements.length > 0) {
@@ -7395,6 +7400,31 @@ async function unlinkTwitch(){
   showToast('Twitch unlinked.');
 }
 // ── REDEEM CODES ─────────────────────────────
+
+// ── Ambient Pet Name Glitches ───────────────────────────────────────────────
+// Rare, per-pet-card chance for a name to briefly glitch to a creepy alt-text,
+// then revert. Independent per card — never affects every pet on the page at once.
+// Fully gated behind playerSettings.spooky_enabled so players who opt out never see it.
+var SPOOKY_NAME_GLITCH_CHANCE = 0.015; // ~1.5% chance per card render
+var SPOOKY_NAME_ALTS = ['HelpMe', 'LetMeOut', 'ItSeesYou', 'NotAlone', 'BehindYou', 'StillHere', 'TooLate'];
+
+function maybeApplyNameGlitch(el, originalText) {
+  if (!playerSettings.spooky_enabled) return;
+  if (!el || Math.random() >= SPOOKY_NAME_GLITCH_CHANCE) return;
+
+  var altText = SPOOKY_NAME_ALTS[Math.floor(Math.random() * SPOOKY_NAME_ALTS.length)];
+  var durationMs = 5000 + Math.random() * 5000; // 5-10 seconds
+
+  el.classList.add('glitch-text');
+  el.textContent = altText;
+
+  safeSetTimeout(function() {
+    if (el && el.isConnected) {
+      el.classList.remove('glitch-text');
+      el.textContent = originalText;
+    }
+  }, durationMs);
+}
 
 // Clean up any leftover spooky effects on page load
 function cleanupSpookyEffects() {
