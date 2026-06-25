@@ -15063,7 +15063,8 @@ async function guild_renderMemberView(mount) {
         requestsHtml +
 
         '<div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">' +
-          '<button class="btn btn-outline" onclick="loadGuildPage();guildState.view=\'dungeons\';guild_renderDungeons();" style="flex:1;">⚔️ Dungeons</button>' +
+          '<button class="btn btn-outline" onclick="guildState.view=\'chat\';guild_renderChat();" style="flex:1;">💬 Chat</button>' +
+          '<button class="btn btn-outline" onclick="guildState.view=\'dungeons\';guild_renderDungeons();" style="flex:1;">⚔️ Dungeons</button>' +
           ((guildState.myRole==='leader'||guildState.myRole==='officer')
             ? '<button class="btn btn-outline" onclick="guild_renderTreasury()" style="flex:1;">🏦 Treasury</button>' +
               '<button class="btn btn-outline" onclick="guild_showInviteForm()" style="flex:1;">✉️ Invite</button>'
@@ -15089,13 +15090,14 @@ async function guild_setLiaison() {
   if (!guildState.myGuild) return;
 
   try {
-    await supabaseClient.from('guild_liaisons').upsert({
+    var { error } = await supabaseClient.from('guild_liaisons').upsert({
       guild_id: guildState.myGuild.guild_id, user_id: currentUser.id, pet_id: petId, is_active: true
     }, { onConflict: 'guild_id,user_id' });
+    if (error) { console.error('[Guild Liaison] upsert error:', error); throw error; }
     guildState.liaisonPetId = petId;
     showToast('🏛️ Guild pet set to ' + escapeHtml(pet.nickname||pet.pet_type||'Pet') + '!', 3000);
     loadGuildPage();
-  } catch(err) { showToast('Failed: ' + err.message, 3000); }
+  } catch(err) { showToast('Failed to set guild pet: ' + err.message, 3500); }
 }
 
 // Called from My Pets page (button added conditionally)
@@ -15104,12 +15106,13 @@ async function setGuildLiaison(petId) {
   var pet = petState[petId];
   if (!pet || (pet.level||1) < 5) { showToast('Pet must be level 5+!', 2500); return; }
   try {
-    await supabaseClient.from('guild_liaisons').upsert({
+    var { error } = await supabaseClient.from('guild_liaisons').upsert({
       guild_id: guildState.myGuild.guild_id, user_id: currentUser.id, pet_id: petId, is_active: true
     }, { onConflict: 'guild_id,user_id' });
+    if (error) { console.error('[Guild Liaison] upsert error:', error); throw error; }
     guildState.liaisonPetId = petId;
     showToast('🏛️ ' + escapeHtml(pet.nickname||pet.pet_type||'Pet') + ' is now your Guild Pet!', 3000);
-  } catch(err) { showToast('Failed: ' + err.message, 3000); }
+  } catch(err) { showToast('Failed to set guild pet: ' + err.message, 3500); }
 }
 
 // ── Leader functions ──────────────────────────────────────────────────────
@@ -15371,6 +15374,117 @@ safeSetInterval(function() {
     }
   });
 }, 60000);
+
+// ── Guild Chat ────────────────────────────────────────────────────────────
+async function guild_renderChat() {
+  var mount = document.getElementById('guild-content');
+  if (!mount || !guildState.myGuild) return;
+  mount.innerHTML = '<div class="spinner"></div>';
+
+  mount.innerHTML =
+    '<button class="btn btn-outline btn-sm" onclick="loadGuildPage()" style="margin-bottom:16px;">← Back to Guild</button>' +
+    '<h3 style="color:var(--purple);margin-bottom:14px;">💬 Guild Chat</h3>' +
+    '<div style="margin-bottom:12px;">' +
+      '<textarea id="guild-chat-input" maxlength="500" placeholder="Say something to your guild..." style="width:100%;padding:10px 12px;border-radius:10px;border:2px solid var(--border);font-size:0.88rem;resize:vertical;min-height:60px;box-sizing:border-box;"></textarea>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">' +
+        '<span id="guild-chat-char-count" style="font-size:0.72rem;color:var(--text-light);">0 / 500</span>' +
+        '<button class="btn btn-primary btn-sm" onclick="guild_postChatMessage()">Send</button>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+      '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);">Recent Messages</div>' +
+      '<button class="btn btn-outline btn-sm" onclick="guild_loadChatMessages()">🔄 Refresh</button>' +
+    '</div>' +
+    '<div id="guild-chat-messages"><div class="spinner"></div></div>';
+
+  var input = document.getElementById('guild-chat-input');
+  if (input) {
+    input.addEventListener('input', function() {
+      var count = document.getElementById('guild-chat-char-count');
+      if (count) count.textContent = input.value.length + ' / 500';
+    });
+  }
+
+  guild_loadChatMessages();
+}
+
+async function guild_postChatMessage() {
+  if (!currentUser || !guildState.myGuild) return;
+  if (!canPerformAction('guild_chat_post', 2000)) { showToast('Please wait before posting again!', 2500); return; }
+
+  var input = document.getElementById('guild-chat-input');
+  var message = (input ? input.value : '').trim();
+  if (!message) { showToast('Please enter a message', 2000); return; }
+  if (message.length > 500) { showToast('Message is too long (max 500 characters)', 2500); return; }
+  if (containsProfanity(message)) { showToast('Please keep guild chat family-friendly 💖', 3000); return; }
+
+  try {
+    var { error } = await supabaseClient.from('guild_chat_messages').insert({
+      guild_id: guildState.myGuild.guild_id,
+      author_id: currentUser.id,
+      message: message
+    });
+    if (error) throw error;
+
+    if (input) { input.value = ''; }
+    var count = document.getElementById('guild-chat-char-count');
+    if (count) count.textContent = '0 / 500';
+    guild_loadChatMessages();
+  } catch(err) {
+    showToast('Could not send message: ' + err.message, 3000);
+  }
+}
+
+async function guild_loadChatMessages() {
+  var container = document.getElementById('guild-chat-messages');
+  if (!container || !guildState.myGuild) return;
+  container.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    var { data: messages, error } = await supabaseClient
+      .from('guild_chat_messages')
+      .select('id, author_id, message, created_at')
+      .eq('guild_id', guildState.myGuild.guild_id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+
+    if (!messages || messages.length === 0) {
+      container.innerHTML = '<div style="color:var(--text-light);text-align:center;padding:20px;font-style:italic;">No messages yet — say hello to your guild! 👋</div>';
+      return;
+    }
+
+    // Resolve author usernames separately (avoids guessing FK constraint names)
+    var authorIds = messages.map(function(m) { return m.author_id; }).filter(Boolean);
+    var authorMap = {};
+    if (authorIds.length > 0) {
+      var { data: authors } = await supabaseClient.from('players').select('id, username').in('id', authorIds);
+      (authors || []).forEach(function(p) { authorMap[p.id] = p.username; });
+    }
+
+    var html = messages.map(function(m) {
+      var authorName = authorMap[m.author_id] || 'Unknown';
+      var isMe = m.author_id === currentUser.id;
+      var timeAgo = getTimeAgo(new Date(m.created_at));
+      return '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid rgba(153,102,255,0.08);">' +
+        '<div style="width:30px;height:30px;border-radius:50%;background:' + (isMe?'var(--purple)':'var(--purple-light)') + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.82rem;flex-shrink:0;">' +
+          authorName.charAt(0).toUpperCase() +
+        '</div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">' +
+            '<span style="font-weight:700;font-size:0.82rem;color:' + (isMe?'var(--purple)':'var(--purple-dark)') + ';">' + escapeHtml(authorName) + (isMe ? ' (You)' : '') + '</span>' +
+            '<span style="font-size:0.68rem;color:var(--text-light);">' + timeAgo + '</span>' +
+          '</div>' +
+          '<div style="font-size:0.85rem;color:var(--purple-dark);word-break:break-word;">' + escapeHtml(m.message) + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    container.innerHTML = html;
+  } catch(err) {
+    container.innerHTML = '<div style="color:var(--text-light);text-align:center;padding:20px;">Could not load messages: ' + escapeHtml(err.message) + '</div>';
+  }
+}
 
 async function guild_donate() {
   var amountStr = (document.getElementById('guild-donate-amount')||{}).value;
