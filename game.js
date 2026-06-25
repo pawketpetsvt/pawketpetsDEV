@@ -14797,7 +14797,7 @@ async function guild_create() {
 
     var { data: guild, error: gErr } = await supabaseClient.from('guilds').insert({
       name: name, tag: tag, emblem_emoji: emblem, description: bio,
-      owner_id: currentUser.id, guild_level: 1, guild_xp: 0, guild_treasury: 0, member_count: 1, is_open: true
+      owner_id: currentUser.id, guild_level: 1, guild_xp: 0, guild_treasury: 0, member_count: 1
     }).select().single();
 
     if (gErr) {
@@ -15152,14 +15152,22 @@ async function loadActiveGuildPerks() {
   }
 
   try {
-    // Process any votes that have just passed/expired
-    var { data: results } = await supabaseClient.rpc('process_passed_treasury_votes').catch(function() { return { data: null }; });
-    (results || []).forEach(function(r) {
-      if (r.status === 'passed' && r.effect_type && r.effect_value) {
-        applyGuildPerk(r.effect_type, r.effect_value, r.duration_hours || 24);
-        showToast('🏦 Guild perk activated: ' + r.effect_type.replace('_',' ') + '!', 4000);
+    // Find active votes whose timer has expired — process them based on final vote tally
+    var { data: expiredVotes } = await supabaseClient
+      .from('guild_treasury_votes')
+      .select('*')
+      .eq('guild_id', guildState.myGuild ? guildState.myGuild.guild_id : '')
+      .eq('status', 'active')
+      .lt('ends_at', new Date().toISOString());
+
+    for (var i = 0; i < (expiredVotes || []).length; i++) {
+      var v = expiredVotes[i];
+      if ((v.votes_for || 0) > (v.votes_against || 0) && (v.votes_for || 0) >= 1) {
+        await guild_processPassedVote(v);
+      } else {
+        await supabaseClient.from('guild_treasury_votes').update({ status: 'failed' }).eq('id', v.id);
       }
-    });
+    }
   } catch(e) { dbg('loadActiveGuildPerks error:', e); }
 }
 
@@ -15391,18 +15399,18 @@ async function guild_createProposal() {
   var cost = costMap[effect] || 1000;
 
   try {
-    var { data: res, error } = await supabaseClient.rpc('create_treasury_vote', {
-      p_guild_id:      guildState.myGuild.guild_id,
-      p_created_by:    currentUser.id,
-      p_proposal:      title,
-      p_description:   desc,
-      p_cost:          cost,
-      p_effect_type:   effect,
-      p_effect_value:  effectValueMap[effect],
-      p_duration_hours:duration
+    var { error } = await supabaseClient.from('guild_treasury_votes').insert({
+      guild_id:        guildState.myGuild.guild_id,
+      proposal:        title,
+      description:     desc,
+      cost:            cost,
+      effect_type:     effect,
+      effect_value:    effectValueMap[effect],
+      duration_hours:  duration,
+      created_by:      currentUser.id,
+      ends_at:         new Date(Date.now() + duration * 3600000).toISOString()
     });
     if (error) throw error;
-    if (res && res.success === false) throw new Error(res.error || 'Failed');
 
     addPassXP(10, 'guild_proposal').catch(function(){});
     closeModal();
@@ -15414,19 +15422,56 @@ async function guild_createProposal() {
 async function guild_castVote(voteId, inFavor) {
   if (!canPerformAction('guild_vote', 2000)) return;
   try {
-    var { data: res, error } = await supabaseClient.rpc('cast_treasury_vote', {
-      p_vote_id: voteId,
-      p_user_id: currentUser.id,
-      p_vote:    inFavor
-    });
-    if (error) throw error;
-    if (res && res.success === false) throw new Error(res.error || 'Failed');
+    // Fetch current vote counts
+    var { data: vote, error: fetchErr } = await supabaseClient
+      .from('guild_treasury_votes').select('*').eq('id', voteId).single();
+    if (fetchErr) throw fetchErr;
+    if (!vote || vote.status !== 'active') { showToast('This proposal is no longer active.', 2500); return; }
+
+    var field = inFavor ? 'votes_for' : 'votes_against';
+    var { error: updateErr } = await supabaseClient
+      .from('guild_treasury_votes')
+      .update({ [field]: (vote[field] || 0) + 1 })
+      .eq('id', voteId);
+    if (updateErr) throw updateErr;
 
     updateBingoProgress('vote_in_guild', 1);
     addPassXP(5, 'guild_vote').catch(function(){});
     showToast(inFavor ? '👍 Voted Yes!' : '👎 Voted No!', 2500);
+
+    // Check if this vote just passed (simple majority, 3+ votes for, more for than against)
+    var newVotesFor = vote.votes_for + (inFavor ? 1 : 0);
+    if (newVotesFor >= 3 && newVotesFor > (vote.votes_against + (!inFavor ? 1 : 0))) {
+      await guild_processPassedVote(vote);
+    }
+
     guild_renderTreasury();
   } catch(err) { showToast('Vote failed: ' + err.message, 3000); }
+}
+
+// Apply a passed proposal's effect and deduct its cost from treasury
+async function guild_processPassedVote(vote) {
+  try {
+    var { data: rpcResult, error: rpcErr } = await supabaseClient.rpc('remove_from_guild_treasury', {
+      p_guild_id:    vote.guild_id,
+      p_amount:      vote.cost,
+      p_action:      'proposal_passed',
+      p_description: vote.proposal + ' — proposal passed'
+    });
+    if (rpcErr) {
+      // Fallback: manual deduct if RPC unavailable
+      var { data: g } = await supabaseClient.from('guilds').select('guild_treasury').eq('id', vote.guild_id).single();
+      var newTreasury = Math.max(0, ((g && g.guild_treasury) || 0) - vote.cost);
+      await supabaseClient.from('guilds').update({ guild_treasury: newTreasury }).eq('id', vote.guild_id);
+    }
+
+    await supabaseClient.from('guild_treasury_votes').update({ status: 'passed' }).eq('id', vote.id);
+
+    if (vote.effect_type && vote.effect_value) {
+      applyGuildPerk(vote.effect_type, vote.effect_value, vote.duration_hours || 24);
+      showToast('🏦 Guild perk activated: ' + vote.effect_type.replace('_',' ') + '!', 4000);
+    }
+  } catch(e) { dbg('Failed to process passed vote:', e); }
 }
 
 async function guild_leave() {
