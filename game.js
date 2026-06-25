@@ -14655,6 +14655,8 @@ async function guild_renderBrowser(mount) {
   mount.innerHTML = '<div class="spinner"></div>';
 
   try {
+    var myInvites = await guild_loadMyInvitations();
+
     var { count: totalCount } = await supabaseClient
       .from('guilds').select('*', { count: 'exact', head: true });
     guildState.totalGuilds = totalCount || 0;
@@ -14667,7 +14669,26 @@ async function guild_renderBrowser(mount) {
       .range(offset, offset + guildState.guildsPerPage - 1);
     if (error) throw error;
 
-    var html =
+    var html = '';
+
+    if (myInvites.length > 0) {
+      html +=
+        '<div style="background:rgba(153,102,255,0.08);border:2px solid var(--purple);border-radius:14px;padding:14px 16px;margin-bottom:18px;">' +
+          '<div style="font-weight:700;font-size:0.88rem;color:var(--purple-dark);margin-bottom:10px;">✉️ Guild Invitations (' + myInvites.length + ')</div>' +
+          myInvites.map(function(inv) {
+            var g = inv.guilds || {};
+            var inviter = inv.inviterUsername || 'Someone';
+            return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;">' +
+              '<span style="font-size:1.5rem;">' + (g.emblem_emoji||'🏛️') + '</span>' +
+              '<span style="flex:1;font-size:0.85rem;">' + escapeHtml(g.name||'Unknown') + ' <span style="color:var(--text-light);">invited by ' + escapeHtml(inviter) + '</span></span>' +
+              '<button class="btn btn-primary btn-sm" onclick="guild_acceptInvite(\'' + inv.id + '\',\'' + inv.guild_id + '\')">Accept</button>' +
+              '<button class="btn btn-outline btn-sm" onclick="guild_declineInvite(\'' + inv.id + '\')">Decline</button>' +
+            '</div>';
+          }).join('') +
+        '</div>';
+    }
+
+    html +=
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px;">' +
         '<h3 style="margin:0;color:var(--purple-dark);">🏛️ Browse Guilds</h3>' +
         '<button class="btn btn-primary" onclick="guild_renderCreateForm()">✨ Create Guild</button>' +
@@ -15004,7 +15025,8 @@ async function guild_renderMemberView(mount) {
         '<div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">' +
           '<button class="btn btn-outline" onclick="loadGuildPage();guildState.view=\'dungeons\';guild_renderDungeons();" style="flex:1;">⚔️ Dungeons</button>' +
           ((guildState.myRole==='leader'||guildState.myRole==='officer')
-            ? '<button class="btn btn-outline" onclick="guild_renderTreasury()" style="flex:1;">🏦 Treasury</button>'
+            ? '<button class="btn btn-outline" onclick="guild_renderTreasury()" style="flex:1;">🏦 Treasury</button>' +
+              '<button class="btn btn-outline" onclick="guild_showInviteForm()" style="flex:1;">✉️ Invite</button>'
             : '') +
           '<button class="btn btn-outline" onclick="guild_leave()" style="flex:1;color:#ff6b6b;border-color:#ff6b6b;">🚪 Leave Guild</button>' +
         '</div>' +
@@ -15066,16 +15088,35 @@ async function guild_kickMember(guildId, userId) {
   try {
     await supabaseClient.from('guild_members').delete().eq('guild_id', guildId).eq('user_id', userId);
     await supabaseClient.from('guild_liaisons').update({ is_active: false }).eq('guild_id', guildId).eq('user_id', userId);
+    await guild_syncMemberCount(guildId);
     showToast('Member removed.', 2500);
     loadGuildPage();
   } catch(err) { showToast('Failed: ' + err.message, 3000); }
 }
 
+// Recompute and persist the true member count using the get_guild_member_count RPC
+async function guild_syncMemberCount(guildId) {
+  try {
+    var { data: count, error } = await supabaseClient.rpc('get_guild_member_count', { p_guild_id: guildId });
+    if (error) throw error;
+    await supabaseClient.from('guilds').update({ member_count: count || 0 }).eq('id', guildId);
+  } catch(e) {
+    // Fallback: count rows directly
+    try {
+      var { count: cnt } = await supabaseClient.from('guild_members').select('*', { count: 'exact', head: true }).eq('guild_id', guildId);
+      await supabaseClient.from('guilds').update({ member_count: cnt || 0 }).eq('id', guildId);
+    } catch(e2) { dbg('guild_syncMemberCount failed:', e2); }
+  }
+}
+
 async function guild_acceptRequest(requestId, guildId, userId) {
   try {
+    var { data: guild } = await supabaseClient.from('guilds').select('member_count').eq('id', guildId).single();
+    if (guild && (guild.member_count||0) >= 50) { showToast('Guild is full!', 3000); return; }
+
     await supabaseClient.from('guild_join_requests').update({ status: 'accepted' }).eq('id', requestId);
     await supabaseClient.from('guild_members').insert({ guild_id: guildId, user_id: userId, role: 'member' });
-    await supabaseClient.from('guilds').update({ member_count: (guildState.myGuild.member_count||1) + 1 }).eq('id', guildId);
+    await guild_syncMemberCount(guildId);
     showToast('Member accepted!', 2500);
     loadGuildPage();
   } catch(err) { showToast('Failed: ' + err.message, 3000); }
@@ -15085,6 +15126,114 @@ async function guild_declineRequest(requestId) {
   try {
     await supabaseClient.from('guild_join_requests').update({ status: 'declined' }).eq('id', requestId);
     showToast('Request declined.', 2000);
+    loadGuildPage();
+  } catch(err) { showToast('Failed: ' + err.message, 3000); }
+}
+
+// ── Guild Invitations ────────────────────────────────────────────────────
+function guild_showInviteForm() {
+  if (!guildState.myGuild) return;
+  var modal = makeModal();
+  modal.innerHTML =
+    '<div style="max-width:340px;">' +
+      '<h3 style="color:var(--purple-dark);margin-bottom:14px;">✉️ Invite a Player</h3>' +
+      '<label style="font-size:0.82rem;font-weight:700;display:block;margin-bottom:4px;">Username</label>' +
+      '<input id="guild-invite-username" type="text" placeholder="Enter exact username" style="width:100%;padding:8px 12px;border-radius:8px;border:2px solid var(--border);font-size:0.9rem;box-sizing:border-box;margin-bottom:14px;">' +
+      '<div style="display:flex;gap:10px;">' +
+        '<button class="btn btn-outline" onclick="closeModal()" style="flex:1;">Cancel</button>' +
+        '<button class="btn btn-primary" onclick="guild_sendInvite()" style="flex:1;">Send Invite</button>' +
+      '</div>' +
+    '</div>';
+  openModal(modal);
+}
+
+async function guild_sendInvite() {
+  var username = (document.getElementById('guild-invite-username') || {}).value.trim();
+  if (!username) { showToast('Enter a username', 2000); return; }
+  if (!guildState.myGuild) return;
+
+  try {
+    var { data: player, error: pErr } = await supabaseClient
+      .from('players').select('id, username').ilike('username', username).maybeSingle();
+    if (pErr) throw pErr;
+    if (!player) { showToast('No player found with that username.', 3000); return; }
+    if (player.id === currentUser.id) { showToast("You can't invite yourself!", 2500); return; }
+
+    // Check they're not already in a guild
+    var { data: existingMember } = await supabaseClient
+      .from('guild_members').select('guild_id').eq('user_id', player.id).maybeSingle();
+    if (existingMember) { showToast(player.username + ' is already in a guild.', 3000); return; }
+
+    var { error } = await supabaseClient.from('guild_invitations').insert({
+      guild_id: guildState.myGuild.guild_id,
+      invited_user_id: player.id,
+      invited_by: currentUser.id,
+      status: 'pending'
+    });
+    if (error) {
+      if (error.code === '23505') showToast(player.username + ' already has a pending invite.', 3000);
+      else throw error;
+      return;
+    }
+
+    closeModal();
+    showToast('✉️ Invite sent to ' + player.username + '!', 3000);
+  } catch(err) { showToast('Failed to send invite: ' + err.message, 3000); }
+}
+
+// Check for pending invitations — called from guild browse page
+async function guild_loadMyInvitations() {
+  if (!currentUser) return [];
+  try {
+    var { data, error } = await supabaseClient
+      .from('guild_invitations')
+      .select('id, guild_id, invited_by, created_at, guilds(name, tag, emblem_emoji)')
+      .eq('invited_user_id', currentUser.id)
+      .eq('status', 'pending')
+      .gt('expires_at', new Date().toISOString());
+    if (error) { dbg('guild_loadMyInvitations error:', error); return []; }
+    if (!data || data.length === 0) return [];
+
+    // Look up inviter usernames separately (avoids guessing FK constraint name)
+    var inviterIds = data.map(function(inv) { return inv.invited_by; }).filter(Boolean);
+    var inviterMap = {};
+    if (inviterIds.length > 0) {
+      var { data: inviters } = await supabaseClient.from('players').select('id, username').in('id', inviterIds);
+      (inviters || []).forEach(function(p) { inviterMap[p.id] = p.username; });
+    }
+    data.forEach(function(inv) { inv.inviterUsername = inviterMap[inv.invited_by] || 'Someone'; });
+    return data;
+  } catch(e) { return []; }
+}
+
+async function guild_acceptInvite(inviteId, guildId) {
+  try {
+    var { data: guild } = await supabaseClient.from('guilds').select('member_count').eq('id', guildId).single();
+    if (guild && (guild.member_count||0) >= 50) { showToast('That guild is now full!', 3000); return; }
+
+    var { error } = await supabaseClient.from('guild_members').insert({ guild_id: guildId, user_id: currentUser.id, role: 'member' });
+    if (error) throw error;
+
+    await guild_syncMemberCount(guildId);
+    await supabaseClient.from('guild_invitations').update({ status: 'accepted' }).eq('id', inviteId);
+
+    var bestPet = Object.values(petState).filter(function(p) { return (p.level||1) >= 5; }).sort(function(a,b) { return (b.level||1)-(a.level||1); })[0];
+    if (bestPet) {
+      await supabaseClient.from('guild_liaisons').upsert(
+        { guild_id: guildId, user_id: currentUser.id, pet_id: bestPet.id, is_active: true },
+        { onConflict: 'guild_id,user_id' }
+      ).catch(function(){});
+    }
+
+    showToast('🏛️ Joined the guild!', 3000);
+    await loadGuildPage();
+  } catch(err) { showToast('Failed to accept: ' + err.message, 3000); }
+}
+
+async function guild_declineInvite(inviteId) {
+  try {
+    await supabaseClient.from('guild_invitations').update({ status: 'declined' }).eq('id', inviteId);
+    showToast('Invite declined.', 2000);
     loadGuildPage();
   } catch(err) { showToast('Failed: ' + err.message, 3000); }
 }
@@ -15510,10 +15659,12 @@ async function guild_leave() {
 
 async function guild_leaveConfirmed() {
   if (!guildState.myGuild) return;
+  var leftGuildId = guildState.myGuild.guild_id;
   try {
-    clearGuildPerks(guildState.myGuild.guild_id);
-    await supabaseClient.from('guild_members').delete().eq('guild_id', guildState.myGuild.guild_id).eq('user_id', currentUser.id);
-    await supabaseClient.from('guild_liaisons').update({ is_active: false }).eq('guild_id', guildState.myGuild.guild_id).eq('user_id', currentUser.id);
+    clearGuildPerks(leftGuildId);
+    await supabaseClient.from('guild_members').delete().eq('guild_id', leftGuildId).eq('user_id', currentUser.id);
+    await supabaseClient.from('guild_liaisons').update({ is_active: false }).eq('guild_id', leftGuildId).eq('user_id', currentUser.id);
+    await guild_syncMemberCount(leftGuildId);
     guildState.myGuild = null;
     guildState.myRole  = null;
     showToast('You left the guild.', 3000);
