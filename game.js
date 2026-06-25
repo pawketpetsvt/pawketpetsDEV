@@ -1342,7 +1342,44 @@ function updateAllPoints(pts) {
   // Update sidebar points
   var sidebarPoints = document.getElementById('sidebar-points');
   if (sidebarPoints) sidebarPoints.textContent = pts.toLocaleString() + ' PP';
+
+  maybeGlitchPointsDisplay(pts);
 }
+
+// ── Ambient "666 PP" Money Glitch ────────────────────────────────────────────
+// Rare chance, on any points update, to briefly flash every PP display to 666
+// with a spooky wobble before reverting to the real value.
+var SPOOKY_PP_GLITCH_CHANCE = 0.015; // ~1.5% chance per points update
+
+function maybeGlitchPointsDisplay(realPts) {
+  if (!playerSettings.spooky_enabled) return;
+  if (_ppGlitchActive) return; // don't stack while one is already playing out
+  if (Math.random() >= SPOOKY_PP_GLITCH_CHANCE) return;
+
+  var glitchIds = ['adopt-points','mypets-points','shop-points','games-points','redeem-points','nav-points','sidebar-points'];
+  var elements = [];
+  glitchIds.forEach(function(id) {
+    var node = el(id);
+    if (node) elements.push(node);
+  });
+  if (elements.length === 0) return;
+
+  _ppGlitchActive = true;
+  elements.forEach(function(node) {
+    node.classList.add('glitch-text', 'spooky-wobble');
+    node.textContent = node.id === 'nav-points' ? '\uD83E\uDE99 666 PP' : '666 PP';
+  });
+
+  safeSetTimeout(function() {
+    elements.forEach(function(node) {
+      node.classList.remove('glitch-text', 'spooky-wobble');
+    });
+    _ppGlitchActive = false;
+    // Restore real values via the normal path rather than guessing each format
+    updateAllPoints(realPts);
+  }, 3500 + Math.random() * 2500); // 3.5-6 seconds
+}
+var _ppGlitchActive = false;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // STREAM OVERLAY API ENDPOINTS
@@ -7426,6 +7463,36 @@ function maybeApplyNameGlitch(el, originalText) {
   }, durationMs);
 }
 
+// ── Ambient Spinner Caption Glitches ────────────────────────────────────────
+// Periodically scans the page for visible loading spinners and rarely attaches
+// a brief unsettling caption beneath one, then removes it. Purely additive —
+// doesn't require touching any of the 45 existing spinner call sites.
+var SPOOKY_SPINNER_GLITCH_CHANCE = 0.02; // ~2% chance per scan, per spinner found
+var SPOOKY_SPINNER_CAPTIONS = ['loading you...', 'almost there...', 'it sees you waiting', 'please wait forever', 'fetching something else'];
+
+safeSetInterval(function() {
+  if (!playerSettings.spooky_enabled) return;
+  var spinners = document.querySelectorAll('.spinner');
+  if (spinners.length === 0) return;
+
+  spinners.forEach(function(spinner) {
+    if (spinner.dataset.spookyActive) return; // don't stack multiple captions on one spinner
+    if (Math.random() >= SPOOKY_SPINNER_GLITCH_CHANCE) return;
+
+    spinner.dataset.spookyActive = '1';
+    var caption = document.createElement('div');
+    caption.className = 'glitch-text';
+    caption.textContent = SPOOKY_SPINNER_CAPTIONS[Math.floor(Math.random() * SPOOKY_SPINNER_CAPTIONS.length)];
+    caption.style.cssText = 'font-size:0.72rem;text-align:center;margin-top:6px;';
+    if (spinner.parentNode) spinner.parentNode.insertBefore(caption, spinner.nextSibling);
+
+    safeSetTimeout(function() {
+      if (caption.parentNode) caption.parentNode.removeChild(caption);
+      delete spinner.dataset.spookyActive;
+    }, 2500 + Math.random() * 2500); // 2.5-5 seconds, spinners are usually short-lived anyway
+  });
+}, 4000); // check every 4 seconds
+
 // Clean up any leftover spooky effects on page load
 function cleanupSpookyEffects() {
   var overlay = document.getElementById('spooky-overlay');
@@ -12881,6 +12948,22 @@ var newsTicker = {
     "Breaking: Gnarly achieves perfect Pac-Man run. Arcade ghosts file complaint.",
     "Market update: Blushimia-brand enthusiasm stocks soaring. Buy while wagging is good."
   ],
+
+  // Rare alternate pool — only shown if spooky_enabled, very low chance per rotation.
+  // Subtle in-world dread, never explicit gore/violence.
+  spookyMessages: [
+    "help us",
+    "save us",
+    "you don't belong here",
+    "Piper's going to find you...",
+    "it's already inside",
+    "stop looking at the screen",
+    "we never left the woods",
+    "it knows your name",
+    "don't trust the flute",
+    "there is no exit tab"
+  ],
+  SPOOKY_TICKER_CHANCE: 0.025, // ~2.5% chance per rotation
   
   currentIndex: 0,
   rotationInterval: null,
@@ -12952,16 +13035,25 @@ var newsTicker = {
       // Get random unused message
       this.currentIndex = this.getRandomUnusedIndex();
       var message = this.messages[this.currentIndex];
+      var isSpookyLine = false;
+
+      // Rare chance to substitute a creepy line instead — gated by spooky_enabled
+      if (playerSettings.spooky_enabled && Math.random() < this.SPOOKY_TICKER_CHANCE) {
+        message = this.spookyMessages[Math.floor(Math.random() * this.spookyMessages.length)];
+        isSpookyLine = true;
+      }
       
       // Get event announcement if active
       var eventAnnouncement = getEventAnnouncement();
       
       // Build final message
       var finalMessage = '';
-      if (eventAnnouncement) {
+      if (eventAnnouncement && !isSpookyLine) {
         finalMessage = '<span class="event-announcement">' + eventAnnouncement + '</span> | ';
       }
-      finalMessage += '📰 ' + message + ' ✨';
+      finalMessage += isSpookyLine
+        ? '<span class="glitch-text">' + message + '</span>'
+        : '📰 ' + message + ' ✨';
       
       // Update message with HTML
       tickerElement.innerHTML = finalMessage;
