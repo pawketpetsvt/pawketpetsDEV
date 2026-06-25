@@ -12035,7 +12035,7 @@ async function loadFriendsList() {
     // Fetch friend data
     var { data: friends, error: friendError } = await supabaseClient
       .from('players')
-      .select('id, username, pawketpoints, created_at')
+      .select('id, username, pawketpoints, created_at, last_login')
       .in('id', friendIds);
     
     if (friendError) throw friendError;
@@ -12208,6 +12208,23 @@ async function loadBlockedUsers() {
 }
 
 // Render friend card (used for friends, requests, and blocked users)
+// ── Friend "last active" helpers ────────────────────────────────────────────
+function friendIsOnlineNow(lastLogin) {
+  if (!lastLogin) return false;
+  var diffMs = Date.now() - new Date(lastLogin).getTime();
+  return diffMs < 5 * 60000; // active within last 5 minutes = "online"
+}
+
+function formatLastActive(lastLogin) {
+  if (!lastLogin) return '⚪ Never logged in';
+  var diffMs = Date.now() - new Date(lastLogin).getTime();
+  if (diffMs < 5 * 60000)        return '🟢 Online now';
+  if (diffMs < 3600000)          return '⚪ Active ' + Math.floor(diffMs / 60000) + 'm ago';
+  if (diffMs < 86400000)         return '⚪ Active ' + Math.floor(diffMs / 3600000) + 'h ago';
+  if (diffMs < 604800000)        return '⚪ Active ' + Math.floor(diffMs / 86400000) + 'd ago';
+  return '⚪ Active ' + Math.floor(diffMs / 604800000) + 'w ago';
+}
+
 function renderFriendCard(user, type) {
   var cardClass = type === 'request' ? 'friend-request-card' : type === 'blocked' ? 'blocked-user-card' : '';
   
@@ -12223,6 +12240,11 @@ function renderFriendCard(user, type) {
     html += '      <span class="friend-stat">⭐ Level ' + (user.totalLevel || 0) + '</span>';
     html += '      <span class="friend-stat">🎖️ ' + (user.badgeCount || 0) + ' Badges</span>';
     html += '    </div>';
+    if (type === 'friend') {
+      html += '    <div class="friend-stats" style="margin-top:4px;">';
+      html += '      <span class="friend-stat" style="color:' + (friendIsOnlineNow(user.last_login) ? '#5dde7a' : 'var(--text-light)') + ';">' + formatLastActive(user.last_login) + '</span>';
+      html += '    </div>';
+    }
   }
   
   html += '  </div>';
@@ -14255,15 +14277,22 @@ async function furniture_loadShop() {
   try {
     // Always re-fetch catalog (don't rely on cache that may have been set during failed auth)
     furnitureCache = null;
-    var { data, error } = await supabaseClient.from('furniture_items').select('*').order('cost', { ascending: true });
-    if (error) { console.error('furniture_items fetch error:', error); throw error; }
-    furnitureCache = data || [];
+    var res = await supabaseClient.from('furniture_items').select('*').order('cost', { ascending: true });
+    console.log('[Furniture] Query result:', res); // Temporary diagnostic — shows in F12 console
+    if (res.error) { console.error('[Furniture] fetch error:', res.error); throw res.error; }
+    furnitureCache = res.data || [];
 
     // Load what user already owns (so we can show "Owned" badge)
     await furniture_loadUserInventory();
 
     if (furnitureCache.length === 0) {
-      grid.innerHTML = '<div class="empty-state"><p>No furniture available yet!</p></div>';
+      console.warn('[Furniture] Query succeeded with 0 rows. This means either: ' +
+        '(1) furniture_items table is genuinely empty, or ' +
+        '(2) a Row Level Security policy is blocking SELECT for authenticated users. ' +
+        'Check Supabase → Authentication → Policies → furniture_items.');
+      grid.innerHTML = '<div class="empty-state"><p>No furniture available yet!</p>' +
+        '<p style="font-size:0.72rem;color:var(--text-light);margin-top:8px;">If you believe items exist, check F12 console for [Furniture] diagnostic logs, or verify RLS policies allow SELECT on furniture_items.</p>' +
+        '<button class="btn btn-outline btn-sm" onclick="furniture_loadShop()" style="margin-top:8px;">🔄 Retry</button></div>';
       return;
     }
 
@@ -14331,7 +14360,17 @@ async function _furniture_buyCore(furnitureId, cost) {
     var { error: furnError } = await supabaseClient
       .from('user_furniture')
       .insert({ user_id: currentUser.id, furniture_id: furnitureId, quantity: 1 });
-    if (furnError) throw furnError;
+
+    if (furnError) {
+      // Refund PP since the furniture grant failed
+      await supabaseClient.from('players').update({ pawketpoints: currentPoints }).eq('id', currentUser.id).catch(function(){});
+      if (furnError.code === '23505') {
+        showToast('You already own this furniture!', 3000);
+      } else {
+        throw furnError;
+      }
+      return;
+    }
 
     updateAllPoints(newPoints);
     userFurnCache = null; // invalidate cache
@@ -14398,16 +14437,16 @@ function furniture_renderRoomModal(petId) {
   var petName = pet.nickname || pet.pet_type || 'Your pet';
   var equipped = room.equipped_furniture || [];
 
-  // Resolve full furniture objects for equipped items
-  var equippedItems = equipped.map(function(fkey) {
-    return (furnitureCache || []).find(function(f) { return f.furniture_key === fkey; });
+  // Resolve full furniture objects for equipped items (by catalog id)
+  var equippedItems = equipped.map(function(fid) {
+    return (furnitureCache || []).find(function(f) { return f.id === fid; });
   }).filter(Boolean);
 
-  // Owned furniture not yet equipped
-  var unequipped = (userFurnCache || []).filter(function(uf) {
-    var f = uf.furniture_items;
-    return f && equipped.indexOf(f.furniture_key) === -1;
-  });
+  // Owned furniture not yet equipped — resolve furniture_id against the catalog
+  var unequipped = (userFurnCache || []).map(function(uf) {
+    var f = (furnitureCache || []).find(function(item) { return item.id === uf.furniture_id; });
+    return f ? Object.assign({}, f, { _quantity: uf.quantity }) : null;
+  }).filter(function(f) { return f && equipped.indexOf(f.id) === -1; });
 
   var totalBonus = equippedItems.reduce(function(s, f) { return s + (f.happiness_bonus || 0); }, 0);
 
@@ -14422,15 +14461,14 @@ function furniture_renderRoomModal(petId) {
           '<span style="font-size:1.2rem;">' + f.emoji + '</span>' +
           '<span style="flex:1;font-size:0.82rem;color:var(--purple-dark);">' + escapeHtml(f.name) + '</span>' +
           '<span style="font-size:0.75rem;color:#5dde7a;font-weight:600;">+' + f.happiness_bonus + '/day</span>' +
-          '<button class="btn btn-sm btn-outline" onclick="furniture_unequip(\'' + petId + '\',\'' + f.furniture_key + '\')" style="font-size:0.72rem;padding:3px 8px;margin-left:6px;">Unequip</button>' +
+          '<button class="btn btn-sm btn-outline" onclick="furniture_unequip(\'' + petId + '\',\'' + f.id + '\')" style="font-size:0.72rem;padding:3px 8px;margin-left:6px;">Unequip</button>' +
         '</div>';
       }).join('');
 
   // Unequipped (owned but not in room)
   var unequippedHtml = unequipped.length === 0
     ? '<div style="color:var(--text-light);font-style:italic;font-size:0.82rem;">No furniture in storage.</div>'
-    : unequipped.map(function(uf) {
-        var f = uf.furniture_items;
+    : unequipped.map(function(f) {
         var full = equipped.length >= ROOM_MAX_ITEMS;
         return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(153,102,255,0.08);">' +
           '<span style="font-size:1.2rem;">' + f.emoji + '</span>' +
@@ -14438,7 +14476,7 @@ function furniture_renderRoomModal(petId) {
           '<span style="font-size:0.75rem;color:#5dde7a;font-weight:600;">+' + f.happiness_bonus + '/day</span>' +
           (full
             ? '<span style="font-size:0.72rem;color:#ff6b6b;margin-left:6px;">Room full</span>'
-            : '<button class="btn btn-sm btn-primary" onclick="furniture_equip(\'' + petId + '\',\'' + f.furniture_key + '\')" style="font-size:0.72rem;padding:3px 8px;margin-left:6px;">Equip</button>'
+            : '<button class="btn btn-sm btn-primary" onclick="furniture_equip(\'' + petId + '\',\'' + f.id + '\')" style="font-size:0.72rem;padding:3px 8px;margin-left:6px;">Equip</button>'
           ) +
         '</div>';
       }).join('');
@@ -14544,8 +14582,8 @@ async function furniture_applyDailyBonus() {
       if (!room.equipped_furniture || room.equipped_furniture.length === 0) continue;
 
       // Sum bonus
-      var bonus = room.equipped_furniture.reduce(function(sum, fkey) {
-        var f = furnitureCache.find(function(fc) { return fc.furniture_key === fkey; });
+      var bonus = room.equipped_furniture.reduce(function(sum, fid) {
+        var f = furnitureCache.find(function(fc) { return fc.id === fid; });
         return sum + (f ? (f.happiness_bonus || 0) : 0);
       }, 0);
 
