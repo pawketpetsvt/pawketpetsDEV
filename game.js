@@ -11015,11 +11015,12 @@ async function handleBattleEncounter() {
 }
 
 async function handleItemEncounter() {
-  // Get random common item
+  // Get random common item (lower-priced = common tier equivalent)
   var itemsRes = await supabaseClient
     .from('items')
     .select('*')
-    .eq('tier', 1)
+    .lte('price', 80)
+    .or('is_boss_drop.is.null,is_boss_drop.eq.false')
     .limit(20);
   
   if (itemsRes.error || !itemsRes.data || itemsRes.data.length === 0) {
@@ -11067,13 +11068,15 @@ async function handleItemEncounter() {
 }
 
 async function handleTreasureEncounter() {
-  // Get random rare item (tier 2 or 3)
-  var tier = Math.random() < 0.7 ? 2 : 3; // 70% tier 2, 30% tier 3
+  // Get random rare item — use price as a proxy for rarity tier
+  // (mid/high priced items = rarer finds, same concept as tier 2/3)
+  var isHighRare = Math.random() < 0.3; // 30% chance of higher-value item
   
   var itemsRes = await supabaseClient
     .from('items')
     .select('*')
-    .eq('tier', tier)
+    .gte('price', isHighRare ? 100 : 50)
+    .or('is_boss_drop.is.null,is_boss_drop.eq.false')
     .limit(15);
   
   if (itemsRes.error || !itemsRes.data || itemsRes.data.length === 0) {
@@ -24145,11 +24148,15 @@ function loadDailyBingo() {
     if (parsed.date === today) {
       dailyBingo = parsed;
       
-      // Mark all already-completed squares as notified (prevent spam on page load)
+      // Mark all already-completed OR already-at-target squares as notified (prevent spam on page load)
       dailyBingo.squares.forEach(function(square) {
-        if (square.completed) {
+        if (square.completed || (square.progress >= square.target)) {
           var notificationKey = dailyBingo.date + '_' + square.taskType;
           bingoNotificationsShown[notificationKey] = true;
+          // Also ensure completed flag is set if progress is already at target
+          if (square.progress >= square.target && !square.completed) {
+            square.completed = true;
+          }
         }
       });
       
