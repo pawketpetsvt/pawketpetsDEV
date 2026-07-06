@@ -9599,8 +9599,8 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
   var expGained = 0;
   var ppGained = 0;
 
-  if (rpcError) {
-    console.error('❌ Battle save error:', rpcError);
+  if (rpcError || (result && result.error)) {
+    console.error('❌ Battle save error:', rpcError || result.error);
     // Fall back to client-side calculation — but actually award it via the secure RPC
     // this time, instead of just computing a display number with nothing behind it.
     expGained = battleResult.victory ? (enemyStats.exp_reward || 10) : 0;
@@ -9710,6 +9710,7 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
         .from('items')
         .select('*')
         .lte('price', 100)
+        .or('is_boss_drop.is.null,is_boss_drop.eq.false')
         .limit(20);
       
       if (!itemsRes.error && itemsRes.data && itemsRes.data.length > 0) {
@@ -24732,12 +24733,6 @@ async function scrapbook_hasMemory(userPetId, memoryType) {
 
 // Add a memory
 async function scrapbook_addMemory(userPetId, memoryType, variables) {
-  // Validate UUID format before hitting DB (avoids bigint cast error)
-  var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!userPetId || !uuidRegex.test(userPetId)) {
-    dbg('Scrapbook: skipping — invalid UUID:', userPetId);
-    return false;
-  }
     if (!userPetId || !memoryType) {
         console.error('Scrapbook: missing petId or memoryType');
         return false;
@@ -24809,7 +24804,7 @@ async function scrapbook_addMemory(userPetId, memoryType, variables) {
             });
         
         if (res.error) {
-            dbg('Scrapbook insert error (schema mismatch — user_pet_id may need to be uuid):', res.error.code);
+            console.error('Scrapbook insert error:', res.error);
             return false;
         }
         
