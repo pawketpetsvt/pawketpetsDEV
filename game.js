@@ -24492,14 +24492,22 @@ function showBingoModal() {
 // ══════════════════════════════════════════════════════════════════════════
 
 // Hook for points earned - override updateAllPoints
+// IMPORTANT: only track genuine earnings, not the initial balance display on page load.
+// We use a flag that gets set once the player's real balance has been loaded at least once,
+// so the difference calculation doesn't treat "loading 800 PP from the DB" as "earning 800 PP".
+var _bingoPointsInitialized = false;
 var originalUpdateAllPoints = updateAllPoints;
 updateAllPoints = function(pts) {
   var oldPoints = currentPoints || 0;
   originalUpdateAllPoints(pts);
-  var earnedAmount = pts - oldPoints;
-  if (earnedAmount > 0) {
+  // Only track the difference as "earned" once we've seen at least one real
+  // loaded balance, AND only if points genuinely increased (not just a display refresh).
+  if (_bingoPointsInitialized && pts > oldPoints) {
+    var earnedAmount = pts - oldPoints;
     updateBingoProgress('earn_points', earnedAmount);
   }
+  // Mark as initialized after the first call — subsequent calls are real transactions
+  _bingoPointsInitialized = true;
 };
 
 // Hook for pet level up - call this when a pet levels up
