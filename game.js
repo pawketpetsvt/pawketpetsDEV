@@ -1657,6 +1657,9 @@ async function initApp() {
     showAuth();
   }
 
+  // Check for streamer landing page parameter
+  streamerLanding_init();
+
   // Set up auth state listener
   supabaseClient.auth.onAuthStateChange(function(event, session) {
     dbg('Auth state changed:', event);
@@ -2405,6 +2408,23 @@ async function loadAdopt() {
   if (res.error || !res.data) { grid.textContent = 'Could not load pets.'; return; }
   grid.innerHTML = '';
   res.data.forEach(function(pet) { grid.appendChild(makePetCard(pet)); });
+
+  // If player arrived via streamer landing, highlight and scroll to that pet
+  var suggestedPet = localStorage.getItem('suggestedFirstPet');
+  if (suggestedPet) {
+    setTimeout(function() {
+      var cards = grid.querySelectorAll('.pet-card');
+      cards.forEach(function(card) {
+        var nameEl = card.querySelector('.pet-name');
+        if (nameEl && nameEl.textContent.trim().toLowerCase() === suggestedPet.toLowerCase()) {
+          card.classList.add('streamer-landing-highlight');
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Remove highlight after a few seconds, clear suggestion after first adopt
+          setTimeout(function() { card.classList.remove('streamer-landing-highlight'); }, 4000);
+        }
+      });
+    }, 200);
+  }
 }
 
 function makePetCard(pet) {
@@ -2554,6 +2574,9 @@ async function confirmAdopt() {
   // PHASE 8 - Process referral on first adoption
   await processReferral();
   
+  // Clear streamer landing suggestion — they've adopted now
+  localStorage.removeItem('suggestedFirstPet');
+
   // Track adoption in analytics
   trackPetAdoption(selectedPet.name);
   
@@ -6112,6 +6135,7 @@ async function checkSidebarStreamStatus() {
     dbg('✅ Sidebar stream status checked. Live:', _currentlyLiveStreamers.length);
     sortStreamerList();
     updateLiveBanner(); // Update floating banner whenever live status changes
+    if (_streamerLandingMember) streamerLanding_checkLive(_streamerLandingMember);
   } catch (err) {
     console.error('❌ Error checking sidebar stream status:', err);
   }
@@ -7397,6 +7421,108 @@ var TEAM_MEMBERS = [
   { name: 'Jess',      login: 'teatimejess',    twitchUrl: 'https://twitch.tv/teatimejess',    petName: 'Jess',     twitchId: '88727356' },
   { name: 'Gnarly',    login: 'gnarly_neon_smilodon', twitchUrl: 'https://twitch.tv/gnarly_neon_smilodon', petName: 'Gnarly', twitchId: '531222973' }
 ];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STREAMER LANDING PAGES
+// Reads ?streamer=gnarly from URL and personalizes the login/register page
+// Also handles ?ref= referral codes
+// ═══════════════════════════════════════════════════════════════════════════
+
+var _streamerLandingMember = null; // set if page loaded with ?streamer=
+
+function streamerLanding_init() {
+  var params = new URLSearchParams(window.location.search);
+  var streamerParam = (params.get('streamer') || '').toLowerCase().trim();
+  if (!streamerParam) return;
+
+  // Match against TEAM_MEMBERS login or petName
+  var member = TEAM_MEMBERS.find(function(m) {
+    return m.login.toLowerCase() === streamerParam ||
+           m.name.toLowerCase() === streamerParam ||
+           m.petName.toLowerCase() === streamerParam;
+  });
+  if (!member) return;
+
+  _streamerLandingMember = member;
+  dbg('[Landing] Streamer landing page for:', member.name);
+
+  // Auto-populate ref code if streamer has one stored in DB
+  // (we'll store it in localStorage so registration picks it up)
+  streamerLanding_buildHero(member);
+
+  // If a referral code is attached to the URL, store it
+  var refCode = params.get('ref');
+  if (refCode) {
+    localStorage.setItem('pendingRefCode', refCode);
+  }
+}
+
+function streamerLanding_buildHero(member) {
+  // Replace the landing hero on both login and register sections
+  var petImageFile = member.petName.toLowerCase() + '.png';
+
+  var heroHTML =
+    '<div class="landing-hero streamer-landing-hero">' +
+      '<div class="streamer-landing-pet-wrap">' +
+        '<img src="images/pets/' + petImageFile + '" ' +
+             'alt="' + escapeHtml(member.petName) + '" ' +
+             'class="streamer-landing-pet-img" ' +
+             'onerror="this.src='images/logo.png'" />' +
+      '</div>' +
+      '<div class="streamer-landing-info">' +
+        '<div class="streamer-landing-invited">' +
+          '<span class="streamer-landing-dot"></span>' +
+          escapeHtml(member.name) + ' invited you to PawketPets<span style="color:var(--pink);">VT</span>!' +
+        '</div>' +
+        '<h1 class="landing-title" style="font-size:2rem;margin:8px 0 6px;">' +
+          'Adopt <span style="color:var(--pink);">' + escapeHtml(member.petName) + '</span>!' +
+        '</h1>' +
+        '<p class="landing-tagline" style="font-size:0.9rem;margin-bottom:14px;">' +
+          'Create a free account and adopt ' + escapeHtml(member.name) + ''s pet. ' +
+          'Your first pet is always free!' +
+        '</p>' +
+        '<div class="streamer-landing-links">' +
+          '<a href="' + escapeHtml(member.twitchUrl) + '" target="_blank" rel="noopener" ' +
+             'class="streamer-landing-twitch-btn">' +
+            '🎮 Watch ' + escapeHtml(member.name) + ' on Twitch' +
+          '</a>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  // Replace heroes on both sections
+  ['section-login', 'section-register'].forEach(function(sectionId) {
+    var section = document.getElementById(sectionId);
+    if (!section) return;
+    var existingHero = section.querySelector('.landing-hero');
+    if (existingHero) {
+      existingHero.outerHTML = heroHTML;
+    }
+  });
+
+  // Pre-select register tab since this is a new visitor
+  showAuthSection('register');
+}
+
+async function streamerLanding_checkLive(member) {
+  // Check if this streamer is currently live and add indicator
+  if (!member) return;
+  var liveStreamer = _currentlyLiveStreamers.find(function(s) {
+    return s.login.toLowerCase() === member.login.toLowerCase();
+  });
+
+  var dot = document.querySelector('.streamer-landing-dot');
+  var inviteEl = document.querySelector('.streamer-landing-invited');
+  if (!dot || !inviteEl) return;
+
+  if (liveStreamer) {
+    dot.style.background = '#ff4444';
+    dot.style.animation = 'live-dot-pulse 1.4s ease-in-out infinite';
+    dot.style.boxShadow = '0 0 6px #ff4444';
+    inviteEl.innerHTML = '<span class="streamer-landing-dot" style="background:#ff4444;animation:live-dot-pulse 1.4s ease-in-out infinite;box-shadow:0 0 6px #ff4444;"></span>' +
+      escapeHtml(member.name) + ' is <strong style="color:#ff4444;">LIVE RIGHT NOW</strong> — check them out!';
+  }
+}
 
 async function loadTeamShowcase() {
   var showcase = document.getElementById('team-showcase');
@@ -19309,6 +19435,10 @@ async function initReferralSystem(userId) {
     
     // Clean URL (remove ref parameter)
     window.history.replaceState({}, document.title, window.location.pathname);
+    // If user arrived via streamer landing, remember for adoption pre-selection
+    if (_streamerLandingMember) {
+      localStorage.setItem('suggestedFirstPet', _streamerLandingMember.petName);
+    }
   }
   
   // Load or generate referral code for current user
