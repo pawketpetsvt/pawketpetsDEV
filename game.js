@@ -9469,8 +9469,13 @@ async function startBattleWithEnemy(petId, enemy) {
   };
   
   // BOSS ENTRANCE SEQUENCE!
+  // Piper gets the full glitch/horror treatment. Zone bosses get a lighter entrance.
   if (enemy.is_boss) {
-    triggerBossEntrance();
+    if (enemy.species === 'piper') {
+      triggerBossEntrance(); // Full Piper horror sequence
+    } else {
+      triggerZoneBossEntrance(); // Lighter dramatic entrance for zone bosses
+    }
   }
   
   // Continue with battle logic...
@@ -9655,47 +9660,51 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
   
   // BOSS DROP - Guaranteed item if you beat a boss!
   if (battleResult.victory && enemyStats.is_boss) {
-    dbg('🎁 Boss defeated! Rolling for exclusive drop...');
+    dbg('🎁 Boss defeated! Rolling for exclusive equipment drop...');
     
     // Log boss defeat activity
     await logActivity('boss_defeated', {
       boss_name: enemyStats.name
     });
     
-    // Get boss drops for this specific boss zone
+    // Boss drops are EQUIPMENT (not items) - query the equipment table
+    // Filtered by boss_source matching this boss's zone
     var bossDropRes = await supabaseClient
-      .from('items')
+      .from('equipment')
       .select('*')
       .eq('is_boss_drop', true)
       .ilike('boss_source', '%' + enemyStats.forest_zone + '%');
     
     if (!bossDropRes.error && bossDropRes.data && bossDropRes.data.length > 0) {
       // Random drop from this boss's loot table
-      itemDropped = bossDropRes.data[Math.floor(Math.random() * bossDropRes.data.length)];
+      var bossEquipDrop = bossDropRes.data[Math.floor(Math.random() * bossDropRes.data.length)];
       
-      dbg('🎉 Boss dropped:', itemDropped.name);
+      dbg('🎉 Boss dropped equipment:', bossEquipDrop.name);
       
-      // Check if player already has this item
-      var existingItem = await supabaseClient
-        .from('user_inventory')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .eq('item_id', itemDropped.id)
-        .single();
+      // Grant to player_equipment (same as buying, but free)
+      // Each row = one physical copy, independently equippable
+      var bossEquipInsert = await supabaseClient
+        .from('player_equipment')
+        .insert([{
+          user_id: currentUser.id,
+          equipment_id: bossEquipDrop.id,
+          quantity: 1,
+          is_equipped: false,
+          pet_id: null
+        }]);
       
-      if (existingItem.data) {
-        await supabaseClient
-          .from('user_inventory')
-          .update({ quantity: existingItem.data.quantity + 1 })
-          .eq('id', existingItem.data.id);
+      if (!bossEquipInsert.error) {
+        // Use bossEquipDrop as itemDropped so the UI shows what was received
+        itemDropped = {
+          id: bossEquipDrop.id,
+          name: bossEquipDrop.name,
+          description: bossEquipDrop.description,
+          item_type: 'equipment',
+          is_boss_drop: true
+        };
+        dbg('✅ Boss equipment granted to player_equipment');
       } else {
-        await supabaseClient
-          .from('user_inventory')
-          .insert([{
-            user_id: currentUser.id,
-            item_id: itemDropped.id,
-            quantity: 1
-          }]);
+        console.error('Failed to grant boss equipment:', bossEquipInsert.error);
       }
     }
   }
@@ -11244,12 +11253,28 @@ async function findBattle() {
  */
 async function getRandomEnemy(zone, playerLevel) {
   // ═══════════════════════════════════════════════════════════════════════
-  // BOSS ENCOUNTER CHECK - 3% chance to encounter Shadow of Piper
+  // BOSS ENCOUNTER CHECK
+  // Two tiers:
+  //   Piper  — 3% chance, SPOOKY MODE only, any zone
+  //   Zone bosses — 5% chance, all players, zone-specific
   // ═══════════════════════════════════════════════════════════════════════
   var bossRoll = Math.random();
-  if (bossRoll < GAME_CONSTANTS.BOSS_ENCOUNTER_RATE && playerSettings.spooky_enabled) { // 3% chance + spooky enabled
+
+  // Piper check: spooky mode required
+  if (bossRoll < GAME_CONSTANTS.BOSS_ENCOUNTER_RATE && playerSettings.spooky_enabled) {
     dbg('🔥 BOSS ENCOUNTER! Shadow of Piper appears!');
-    return await getBossEnemy(zone, playerLevel);
+    var piperEnemy = await getPiperEnemy(zone, playerLevel);
+    if (piperEnemy) return piperEnemy;
+    // If Piper not found in DB, fall through to normal/zone boss rolls
+  }
+
+  // Zone boss check: 5% for all players (independent roll)
+  var zoneBossRoll = Math.random();
+  if (zoneBossRoll < 0.05) {
+    dbg('⚔️ ZONE BOSS ENCOUNTER!');
+    var zoneBoss = await getZoneBossEnemy(zone, playerLevel);
+    if (zoneBoss) return zoneBoss;
+    // If no zone boss found, fall through to normal enemy
   }
   
   // Determine level range based on zone
@@ -11507,56 +11532,104 @@ async function getRandomEnemy(zone, playerLevel) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// BOSS ENCOUNTER SYSTEM - Shadow of Piper
+// BOSS ENCOUNTER SYSTEM
 // ═══════════════════════════════════════════════════════════════════════
+// Two types of bosses:
+//   Piper   — spooky mode only, identified by species='piper', any zone
+//   Zone bosses — all players, one per zone, identified by species!='piper'
 
-async function getBossEnemy(zone, playerLevel) {
-  // Convert zone shorthand to full name for database lookup
-  var zoneNameMap = {
-    'outskirts': 'City Outskirts',
-    'glade': 'Forest Glade',
-    'deepwoods': 'Deep Woods'
+var BOSS_ZONE_MAP = {
+  'outskirts': 'City Outskirts',
+  'glade':     'Forest Glade',
+  'deepwoods': 'Deep Woods',
+  'ruins':     'Outside The Ruins'
+};
+
+function scaleBoss(boss, playerLevel, levelScaleHP, levelScaleAtk) {
+  var bossLevel = playerLevel + 2;
+  var levelBonus = bossLevel - 1;
+  return {
+    id:             boss.id,
+    species:        boss.species,
+    name:           boss.name,
+    level:          bossLevel,
+    base_hp:        boss.base_hp + (levelBonus * (levelScaleHP || 15)),
+    base_attack:    boss.base_attack + (levelBonus * (levelScaleAtk || 1)),
+    base_defense:   boss.base_defense + Math.floor(levelBonus * 0.5),
+    base_speed:     boss.base_speed + Math.floor(levelBonus * 0.3),
+    image_file:     boss.image_file,
+    forest_zone:    boss.forest_zone,
+    difficulty_tier: boss.difficulty_tier,
+    is_boss:        true,
+    exp_reward:     boss.exp_reward,
+    pp_reward:      boss.pp_reward
   };
-  
-  var fullZoneName = zoneNameMap[zone] || zone;
-  
-  // Fetch the boss from database
+}
+
+// Piper — spooky mode only, appears in any zone
+async function getPiperEnemy(zone, playerLevel) {
+  var fullZoneName = BOSS_ZONE_MAP[zone] || zone;
+  var res = await supabaseClient
+    .from('enemy_pets')
+    .select('*')
+    .eq('is_boss', true)
+    .eq('species', 'piper')
+    .limit(1)
+    .maybeSingle();
+
+  if (res.error || !res.data) {
+    console.error('[Boss] Piper not found in DB');
+    return null;
+  }
+  // Override Piper's stored zone with the current zone so drops match
+  var piper = Object.assign({}, res.data, { forest_zone: fullZoneName });
+  return scaleBoss(piper, playerLevel, 20, 1); // Piper scales faster — very scary
+}
+
+// Zone boss — one per zone, all players
+async function getZoneBossEnemy(zone, playerLevel) {
+  var fullZoneName = BOSS_ZONE_MAP[zone] || zone;
+  if (!fullZoneName) return null;
+
   var res = await supabaseClient
     .from('enemy_pets')
     .select('*')
     .eq('is_boss', true)
     .eq('forest_zone', fullZoneName)
-    .single();
-  
+    .neq('species', 'piper')
+    .limit(1)
+    .maybeSingle();
+
   if (res.error || !res.data) {
-    console.error('Boss not found, falling back to normal enemy');
+    dbg('[Boss] No zone boss found for zone:', fullZoneName);
     return null;
   }
-  
-  var boss = res.data;
-  
-  // Scale boss level to player (+2 levels to make it scary)
-  var bossLevel = playerLevel + 2;
-  
-  // Boss already has massive HP, just add level scaling
-  var levelBonus = bossLevel - 1;
-  
-  return {
-    id: boss.id,
-    species: boss.species,
-    name: boss.name,
-    level: bossLevel,
-    base_hp: boss.base_hp + (levelBonus * 15),  // Bosses scale faster!
-    base_attack: boss.base_attack + levelBonus,
-    base_defense: boss.base_defense + Math.floor(levelBonus * 0.5),
-    base_speed: boss.base_speed + Math.floor(levelBonus * 0.5),
-    image_file: boss.image_file,
-    forest_zone: boss.forest_zone,
-    difficulty_tier: boss.difficulty_tier,
-    is_boss: true,
-    exp_reward: boss.exp_reward,
-    pp_reward: boss.pp_reward
-  };
+  return scaleBoss(res.data, playerLevel, 10, 1); // Zone bosses scale a bit slower than Piper
+}
+
+// Zone boss entrance — dramatic but no horror effects
+function triggerZoneBossEntrance() {
+  dbg('⚔️ Triggering zone boss entrance...');
+
+  var battleScreen = el('battle-tab');
+  if (battleScreen) {
+    battleScreen.classList.add('zone-boss-entrance', 'boss-battle-bg');
+  }
+
+  var battleArea = el('battle-area');
+  if (battleArea && !document.getElementById('boss-indicator')) {
+    var indicator = document.createElement('div');
+    indicator.id = 'boss-indicator';
+    indicator.className = 'boss-battle-indicator zone-boss-indicator';
+    indicator.innerHTML = '⚠️ BOSS ENCOUNTER ⚠️';
+    battleArea.insertBefore(indicator, battleArea.firstChild);
+  }
+
+  // Screen flash gold to signal a rare encounter
+  var flash = document.createElement('div');
+  flash.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,200,0,0.18);z-index:9999;pointer-events:none;animation:boss-flash 0.8s ease-out forwards;';
+  document.body.appendChild(flash);
+  setTimeout(function() { flash.remove(); }, 900);
 }
 
 function triggerBossEntrance() {
@@ -11985,10 +12058,10 @@ function resumeNormalMusic() {
 }
 
 function clearBossEffects() {
-  // Remove boss effects after battle
+  // Remove boss effects after battle (works for both Piper and zone bosses)
   var battleScreen = el('battle-tab');
   if (battleScreen) {
-    battleScreen.classList.remove('boss-entrance', 'boss-battle-bg');
+    battleScreen.classList.remove('boss-entrance', 'boss-battle-bg', 'zone-boss-entrance');
   }
   
   // Remove UI fragmentation effect
@@ -23323,7 +23396,7 @@ async function loadEquipmentShop() {
     var res = await supabaseClient
       .from('equipment')
       .select('*')
-      .or('rotation_week.eq.' + currentWeek + ',is_boss_drop.eq.true')
+      .eq('rotation_week', currentWeek)
       .order('tier', { ascending: true })
       .order('weight_class', { ascending: true });
     
