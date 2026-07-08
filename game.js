@@ -946,17 +946,15 @@ function esw_getEventBonusText(effects) {
 }
 
 function esw_getWeatherBonusText(weatherId) {
+  // These match the actual values in weatherSystem.getWeatherBonus()
   var map = {
-    clear:   '☀️ Normal conditions',
-    sunny:   '☀️ Pets are extra happy today!',
-    rainy:   '🌊 Water types: +25% XP',
-    foggy:   '🌫️ Rare encounters: +10%',
-    windy:   '💨 All pets move +15% faster',
-    snowy:   '❄️ Ice types: +25% XP',
-    stormy:  '⚡ Electric types: +25% XP\n⚔️ Battles deal +10% damage',
-    starry:  '✨ Mystical bonuses active',
-    rainbow: '🌈 All types: +10% XP (lucky day!)',
-    cursed:  '🟣 Strange energies… beware'
+    clear:  '☀️ Normal conditions — no bonuses or penalties',
+    sunny:  '☀️ +10% XP from all sources\n⚡ +15% Energy regen\n😊 Happiness decays 15% slower',
+    rainy:  '🌧️ +5% PP from all sources\n😟 Happiness decays 10% faster',
+    foggy:  '🌫️ +15% rare item drop chance',
+    windy:  '💨 +10% Energy regen',
+    starry: '✨ +20% XP from all sources\n💜 +15% PP from all sources\n⭐ +25% rare item drop chance',
+    cursed: '🟣 -10% XP and PP from all sources\n⚡ -15% Energy regen\n😱 Happiness decays 20% faster'
   };
   return map[weatherId] || '✨ Normal conditions';
 }
@@ -1065,17 +1063,12 @@ async function calendar_load(modal) {
 
     if (todayFeature && todayFeature.weather) {
       var weatherId = typeof todayFeature.weather === 'object' ? todayFeature.weather.id : todayFeature.weather;
-      var WEATHER_TYPES = [
-        { id: 'clear',  name: 'Clear Skies', icon: '☀️',  description: 'Normal conditions today.' },
-        { id: 'foggy',  name: 'Foggy',        icon: '🌫️', description: 'Mysterious conditions — exploration bonuses!' },
-        { id: 'rainy',  name: 'Rainy',        icon: '🌧️', description: 'Water-type pets thrive today.' },
-        { id: 'starry', name: 'Starry Night', icon: '✨',  description: 'Magical bonuses tonight.' },
-        { id: 'stormy', name: 'Stormy',       icon: '⛈️', description: 'Rough conditions — be careful!' },
-        { id: 'snowy',  name: 'Snowy',        icon: '❄️',  description: 'Ice-type pets feel at home.' }
-      ];
-      var found = WEATHER_TYPES.find(function(w) { return w.id === weatherId; });
-      if (found) days[0].weather = found;
-      else if (weatherId) days[0].weather = { id: weatherId, name: weatherId, icon: '🌤️', description: 'Today\'s weather.' };
+      // Use live weatherSystem types so today's card always matches actual weather definitions
+    var found = (typeof weatherSystem !== 'undefined' && weatherSystem.weatherTypes)
+      ? weatherSystem.weatherTypes.find(function(w) { return w.id === weatherId; })
+      : null;
+    if (found) days[0].weather = found;
+    else if (weatherId) days[0].weather = { id: weatherId, name: weatherId, icon: '🌤️', description: 'Today\'s weather.' };
     }
   } catch(e) { /* silent — daily_features may not exist yet */ }
 
@@ -1105,26 +1098,51 @@ async function calendar_load(modal) {
 
   // For any future day still without weather, generate deterministic forecast
   // Uses date string as seed so ALL players see the same forecast
-  var weatherKeys = typeof weatherSystem !== 'undefined' && weatherSystem.weatherTypes
-    ? Object.keys(weatherSystem.weatherTypes)
-    : ['clear','rainy','foggy','windy','starry'];
-  var weatherIconMap = { clear:'☀️', rainy:'🌧️', foggy:'🌫️', windy:'💨', starry:'✨', cursed:'🟣' };
-  var weatherNameMap = { clear:'Clear Skies', rainy:'Rainy', foggy:'Foggy', windy:'Windy', starry:'Starry Night', cursed:'Cursed Aura' };
+  // Build forecast pool from the actual weatherSystem types (excluding cursed - too rare to forecast)
+  var forecastPool = (typeof weatherSystem !== 'undefined' && Array.isArray(weatherSystem.weatherTypes))
+    ? weatherSystem.weatherTypes.filter(function(w) { return w.id !== 'cursed'; })
+    : [
+        { id:'clear',  name:'Clear Skies',   icon:'☀️',  description:'Normal conditions today.' },
+        { id:'sunny',  name:'Sunny',          icon:'🌤️', description:'Warm and bright!' },
+        { id:'rainy',  name:'Rainy',          icon:'🌧️', description:'Great day to stay cozy inside.' },
+        { id:'foggy',  name:'Foggy',          icon:'🌫️', description:'Mysterious conditions — rare encounter bonus!' },
+        { id:'windy',  name:'Windy',          icon:'💨',  description:'Breezy day — pets move faster!' },
+        { id:'starry', name:'Starry Night',   icon:'✨',  description:'Make a wish tonight!' }
+      ];
 
+  // Deterministic hash — same seed = same forecast for all players on that date
   function calendarHash(str) {
     var h = 0;
     for (var i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0; }
     return Math.abs(h);
   }
 
+  // Weight-aware deterministic selection — respects rarity
+  function deterministicWeatherPick(dateStr, pool) {
+    var seed = calendarHash(dateStr);
+    // Use seed to pick a weather weighted by its weight property
+    var totalWeight = pool.reduce(function(s, w) { return s + (w.weight || 10); }, 0);
+    var pick = seed % totalWeight;
+    var cumulative = 0;
+    for (var wi = 0; wi < pool.length; wi++) {
+      cumulative += (pool[wi].weight || 10);
+      if (pick < cumulative) return pool[wi];
+    }
+    return pool[0];
+  }
+
   for (var di = 1; di < days.length; di++) {
     if (!days[di].weather) {
-      var wKey = weatherKeys[calendarHash(days[di].dateStr) % weatherKeys.length];
+      // Night hours (18-6) can show starry; daytime pool excludes it
+      var hour = new Date().getHours();
+      var isNight = hour >= 18 || hour < 6;
+      var dayPool = isNight ? forecastPool : forecastPool.filter(function(w) { return w.id !== 'starry'; });
+      var picked = deterministicWeatherPick(days[di].dateStr, dayPool);
       days[di].weather = {
-        id:   wKey,
-        name: weatherNameMap[wKey] || wKey,
-        icon: weatherIconMap[wKey] || '🌤️',
-        description: 'Forecasted weather for this day.'
+        id:          picked.id,
+        name:        picked.name,
+        icon:        picked.icon,
+        description: picked.description || 'Forecasted weather.'
       };
     }
   }
@@ -3627,6 +3645,8 @@ function calculateEnergyRegen(currentEnergy, maxEnergy, lastPlayedTimestamp) {
   
   // Apply event bonus if active
   var eventMultiplier = worldEvents.getActiveBonus('energyRegen');
+  var weatherMultiplier = (typeof weatherSystem !== 'undefined') ? weatherSystem.getWeatherBonus('energyRegen') : 1.0;
+  eventMultiplier = eventMultiplier * weatherMultiplier;
   regenRate = regenRate * eventMultiplier;
   
   var regenAmount = Math.floor((maxEnergy * (regenRate / 100)) * hoursPassed);
@@ -10035,6 +10055,21 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
     if (freshPlayer) updateAllPoints(freshPlayer.pawketpoints);
   }
   
+  // Apply weather PP bonus to battle results (victory only)
+  if (battleResult.victory && ppGained > 0 && typeof weatherSystem !== 'undefined') {
+    var weatherPPMult = weatherSystem.getWeatherBonus('ppBonus');
+    if (weatherPPMult !== 1.0) {
+      var weatherPPBonus = Math.floor(ppGained * (weatherPPMult - 1));
+      if (weatherPPBonus > 0) {
+        await supabaseClient.rpc('award_pp_secure', {
+          p_amount: weatherPPBonus, p_reason: 'weather_pp_bonus'
+        }).catch(function(e) { dbg('[Weather] PP bonus error:', e); });
+        ppGained += weatherPPBonus;
+        dbg('[Weather] PP bonus:', weatherPPBonus, 'weather:', weatherSystem.currentWeather && weatherSystem.currentWeather.id);
+      }
+    }
+  }
+
   // Apply guild XP boost perk
   var xpPerkMult = getActivePerkMultiplier('xp_boost');
   if (xpPerkMult > 1 && expGained > 0) {
@@ -10044,6 +10079,14 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
   // CRITICAL: Ensure HP is properly updated after battle
   if (battleResult.victory || battleResult.playerFinalHP > 0) {
     // Award Pass XP for battles (capped daily via 'battle' source)
+    // Apply weather XP bonus to battle results
+    if (typeof weatherSystem !== 'undefined' && expGained > 0) {
+      var weatherXPMult = weatherSystem.getWeatherBonus('xpBonus');
+      if (weatherXPMult !== 1.0) {
+        var weatherXPBonus = Math.floor(expGained * (weatherXPMult - 1));
+        if (weatherXPBonus > 0) expGained += weatherXPBonus;
+      }
+    }
     addPassXP(battleResult.victory ? 15 : 5, 'battle').catch(function(){});
     var hpUpdate = await supabaseClient
       .from('user_pets')
@@ -10113,6 +10156,9 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
   if (battleResult.victory && !enemyStats.is_boss) {
     var dropChance = 0.1;
     dropChance = dropChance * worldEvents.getActiveBonus('rareFindChance');
+    if (typeof weatherSystem !== 'undefined') {
+      dropChance = dropChance * weatherSystem.getWeatherBonus('dropChance');
+    }
     
     if (Math.random() < dropChance) {
       var itemsRes = await supabaseClient
@@ -23153,6 +23199,41 @@ var weatherSystem = {
   },
 
   getCurrentWeather: function() { return this.currentWeather; },
+
+  // Get a numeric bonus multiplier for a given bonus type based on current weather
+  // Mirrors worldEvents.getActiveBonus() so callers can use both interchangeably
+  getWeatherBonus: function(bonusType) {
+    var id = this.currentWeather ? this.currentWeather.id : 'clear';
+    var bonusMap = {
+      // xpBonus: extra XP multiplier from battles and expeditions
+      xpBonus: {
+        clear: 1.0, sunny: 1.10, rainy: 1.0, foggy: 1.0,
+        windy: 1.0, starry: 1.20, cursed: 0.90
+      },
+      // ppBonus: extra PP from all sources
+      ppBonus: {
+        clear: 1.0, sunny: 1.0, rainy: 1.05, foggy: 1.0,
+        windy: 1.0, starry: 1.15, cursed: 0.95
+      },
+      // dropChance: rare item find multiplier
+      dropChance: {
+        clear: 1.0, sunny: 1.0, rainy: 1.0, foggy: 1.15,
+        windy: 1.0, starry: 1.25, cursed: 1.0
+      },
+      // energyRegen: energy regen rate multiplier
+      energyRegen: {
+        clear: 1.0, sunny: 1.15, rainy: 1.0, foggy: 1.0,
+        windy: 1.10, starry: 1.0, cursed: 0.85
+      },
+      // happinessDecay: how fast happiness drops (lower = slower decay = better)
+      happinessDecay: {
+        clear: 1.0, sunny: 0.85, rainy: 1.10, foggy: 1.0,
+        windy: 1.0, starry: 0.90, cursed: 1.20
+      }
+    };
+    var map = bonusMap[bonusType];
+    return (map && map[id] !== undefined) ? map[id] : 1.0;
+  },
 
   setWeather: function(weatherId) {
     var weather = this.weatherTypes.find(function(w) { return w.id === weatherId; });
