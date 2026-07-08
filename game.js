@@ -3048,6 +3048,8 @@ async function useItem(petId) {
   if (!updates.current_hp) {
     showFlash(petId, item.name + ': ' + getEffectText(item), '#b06aff');
     showToast('Used ' + item.name + '!');
+  // Store in companion memory
+  if (typeof CompanionBuddy !== 'undefined') CompanionBuddy.lastFoodUsed = item.name;
   }
   
   // Refresh the dropdown
@@ -3478,6 +3480,8 @@ async function loadEquippedItems(petId) {
         if (w.defense_bonus) bonuses.push('+' + w.defense_bonus + ' DEF');
         if (w.speed_bonus) bonuses.push('+' + w.speed_bonus + ' SPD');
         if (w.hp_bonus) bonuses.push('+' + w.hp_bonus + ' HP');
+        if (w.luck_bonus) bonuses.push('+' + w.luck_bonus + ' LCK');
+        if (w.spirit_bonus) bonuses.push('+' + w.spirit_bonus + ' SPI');
         
         html += '<div style="flex:1;min-width:120px;padding:6px;background:rgba(255,255,255,0.5);border-radius:8px;">';
         html += '<div style="font-weight:bold;color:#ff6b6b;">⚔️ ' + w.name + '</div>';
@@ -3496,6 +3500,8 @@ async function loadEquippedItems(petId) {
         if (a.defense_bonus) bonuses.push('+' + a.defense_bonus + ' DEF');
         if (a.speed_bonus) bonuses.push('+' + a.speed_bonus + ' SPD');
         if (a.hp_bonus) bonuses.push('+' + a.hp_bonus + ' HP');
+        if (a.luck_bonus) bonuses.push('+' + a.luck_bonus + ' LCK');
+        if (a.spirit_bonus) bonuses.push('+' + a.spirit_bonus + ' SPI');
         
         html += '<div style="flex:1;min-width:120px;padding:6px;background:rgba(255,255,255,0.5);border-radius:8px;">';
         html += '<div style="font-weight:bold;color:#5dde7a;">🛡️ ' + a.name + '</div>';
@@ -5753,6 +5759,8 @@ async function loadShop() {
       if(item.effect === 'healing' && item.effect_value > 0)tags.appendChild(makeEl('span',{class:'effect-tag'},'+'+item.effect_value+' HP'));
       if(item.attack_bonus>0)tags.appendChild(makeEl('span',{class:'effect-tag'},'+'+item.attack_bonus+' ATK'));
       if(item.defense_bonus>0)tags.appendChild(makeEl('span',{class:'effect-tag'},'+'+item.defense_bonus+' DEF'));
+      if(item.luck_bonus>0)tags.appendChild(makeEl('span',{class:'effect-tag luck-tag'},'+'+item.luck_bonus+' LCK'));
+      if(item.spirit_bonus>0)tags.appendChild(makeEl('span',{class:'effect-tag spirit-tag'},'+'+item.spirit_bonus+' SPI'));
       if(item.hp_bonus>0)tags.appendChild(makeEl('span',{class:'effect-tag'},'+'+item.hp_bonus+' HP'));
       if(item.speed_bonus>0)tags.appendChild(makeEl('span',{class:'effect-tag'},'+'+item.speed_bonus+' SPD'));
       if(tags.children.length)card.appendChild(tags);
@@ -6387,6 +6395,135 @@ async function awardBadge(badgeKey) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// UNLOCK CELEBRATION SYSTEM
+// Central handler for all reward unlocks — badge, title, cosmetic
+// Shows a rich notification with context-aware nav button + nav flash
+// ═══════════════════════════════════════════════════════════════════════════
+
+var _navFlashTimers = {}; // track active flashes so we don't stack them
+
+function flashNavButton(tab, duration) {
+  // Add pulsing attention dot to the sidebar nav button
+  var btn = document.getElementById('sidebar-btn-' + tab);
+  if (!btn) return;
+
+  // Add notification dot if not already there
+  if (!btn.querySelector('.nav-attention-dot')) {
+    var dot = document.createElement('span');
+    dot.className = 'nav-attention-dot';
+    btn.appendChild(dot);
+  }
+
+  // Clear any existing timer for this tab
+  if (_navFlashTimers[tab]) clearTimeout(_navFlashTimers[tab]);
+
+  // Remove dot after duration
+  _navFlashTimers[tab] = setTimeout(function() {
+    var d = btn.querySelector('.nav-attention-dot');
+    if (d) d.remove();
+    delete _navFlashTimers[tab];
+  }, duration || 10000);
+}
+
+function clearNavFlash(tab) {
+  var btn = document.getElementById('sidebar-btn-' + tab);
+  if (!btn) return;
+  var dot = btn.querySelector('.nav-attention-dot');
+  if (dot) dot.remove();
+  if (_navFlashTimers[tab]) {
+    clearTimeout(_navFlashTimers[tab]);
+    delete _navFlashTimers[tab];
+  }
+}
+
+function showUnlockCelebration(unlockType, data, extra) {
+  // unlockType: 'cosmetic' | 'title' | 'badge' (badge uses showBadgeNotification directly)
+  // For cosmetics: data = type ('background'|'frame'|'badge'), extra = cosmeticId
+  // For titles: data = title object, extra = reason string
+
+  var title, subtitle, icon, navTab, navLabel, color;
+
+  if (unlockType === 'cosmetic') {
+    var cosmeticType = data;
+    var cosmeticId = extra;
+
+    // Look up the cosmetic in COSMETICS_CATALOG for display info
+    var cosmeticItem = null;
+    if (typeof COSMETICS_CATALOG !== 'undefined') {
+      var allItems = (COSMETICS_CATALOG.backgrounds || [])
+        .concat(COSMETICS_CATALOG.frames || [])
+        .concat(COSMETICS_CATALOG.badges || [])
+        .concat(COSMETICS_CATALOG.themes || []);
+      cosmeticItem = allItems.find(function(c) { return c.id === cosmeticId; });
+    }
+
+    var typeLabels = {
+      background: { label: 'Profile Background', icon: '🖼️', color: '#9966ff' },
+      frame:      { label: 'Profile Frame',      icon: '✨', color: '#ff6eb4' },
+      badge:      { label: 'Profile Badge',       icon: '🏅', color: '#f0a500' },
+      theme:      { label: 'UI Theme',            icon: '🎨', color: '#44aaff' }
+    };
+    var typeInfo = typeLabels[cosmeticType] || { label: 'Cosmetic', icon: '🎨', color: '#9966ff' };
+
+    title = typeInfo.label + ' Unlocked!';
+    subtitle = cosmeticItem ? cosmeticItem.name : cosmeticId;
+    icon = typeInfo.icon;
+    color = typeInfo.color;
+    navTab = 'profile';
+    navLabel = 'Customize Profile →';
+
+  } else if (unlockType === 'title') {
+    var titleObj = data;
+    var rarityColors = { common:'#8e8e8e', uncommon:'#5cb85c', rare:'#5bc0de', epic:'#9c27b0', legendary:'#ff9800' };
+    color = titleObj.color || rarityColors[(titleObj.rarity||'').toLowerCase()] || '#9966ff';
+    title = 'Title Unlocked!';
+    subtitle = (titleObj.icon || '👑') + ' ' + titleObj.display_name;
+    icon = '👑';
+    navTab = 'profile';
+    navLabel = 'Set as Active →';
+  } else {
+    return; // badges handled by showBadgeNotification
+  }
+
+  // Play celebration sound
+  if (typeof playChiptune === 'function') playChiptune('badge');
+
+  // Build the notification panel
+  var panel = document.createElement('div');
+  panel.className = 'unlock-celebration-panel';
+  panel.innerHTML =
+    '<button class="unlock-dismiss-btn" onclick="this.closest('.unlock-celebration-panel').remove()" title="Dismiss">✕</button>' +
+    '<div class="unlock-cel-icon">' + icon + '</div>' +
+    '<div class="unlock-cel-body">' +
+      '<div class="unlock-cel-title">' + escapeHtml(title) + '</div>' +
+      '<div class="unlock-cel-subtitle" style="color:' + color + ';">' + escapeHtml(subtitle) + '</div>' +
+      '<button class="unlock-cel-nav-btn" onclick="showTab('' + navTab + '');this.closest('.unlock-celebration-panel').remove();clearNavFlash('' + navTab + '');">' +
+        navLabel +
+      '</button>' +
+    '</div>';
+
+  document.body.appendChild(panel);
+
+  // Animate in
+  setTimeout(function() { panel.classList.add('show'); }, 10);
+
+  // Auto-dismiss after 10 seconds
+  setTimeout(function() {
+    panel.classList.remove('show');
+    setTimeout(function() { if (panel.parentNode) panel.remove(); }, 400);
+  }, 10000);
+
+  // Flash the nav button
+  flashNavButton(navTab, 12000);
+
+  // Mini confetti burst
+  if (typeof startConfetti === 'function') {
+    startConfetti();
+    setTimeout(function() { if (typeof stopConfetti === 'function') stopConfetti(); }, 2000);
+  }
+}
+
 function showBadgeNotification(badge) {
   // Store for potential sharing
   lastUnlockedBadge = badge;
@@ -6423,6 +6560,9 @@ function showBadgeNotification(badge) {
     notification.classList.remove('show');
     setTimeout(function() { if (notification.parentNode) notification.remove(); }, 300);
   }, 12000);
+
+  // Flash the profile nav button so player knows where to find their badge
+  flashNavButton('profile', 8000);
 }
 
 // ── MINIGAMES ────────────────────────────
@@ -9376,6 +9516,8 @@ async function calculatePetStats(petId) {
       stats.attack += equip.attack_bonus || 0;
       stats.defense += equip.defense_bonus || 0;
       stats.speed += equip.speed_bonus || 0;
+      stats.luck = (stats.luck || 0) + (equip.luck_bonus || 0);
+      stats.spirit = (stats.spirit || 0) + (equip.spirit_bonus || 0);
     });
   }
   
@@ -9462,7 +9604,7 @@ function simulateBattle(playerStats, enemyStats) {
         });
       } else {
         // Normal attack
-        var playerDamageResult = calculateDamage(playerStats.stats.attack, enemyStats.defense, false);
+        var playerDamageResult = calculateDamage(playerStats.stats.attack, enemyStats.defense, false, playerStats.stats.luck || 0);
         enemyHP -= playerDamageResult.damage;
         
         log.push({
@@ -9471,7 +9613,8 @@ function simulateBattle(playerStats, enemyStats) {
           damage: playerDamageResult.damage,
           variance: playerDamageResult.variance,
           isSkill: false,
-          text: playerStats.name + ' attacks for ' + playerDamageResult.damage + ' damage! ' + playerDamageResult.flavor,
+          isCrit: playerDamageResult.isCrit || false,
+          text: (playerDamageResult.isCrit ? '⚡ CRITICAL HIT! ' : '') + playerStats.name + ' attacks for ' + playerDamageResult.damage + ' damage! ' + playerDamageResult.flavor,
           playerHP: playerHP,
           enemyHP: Math.max(0, enemyHP)
         });
@@ -9519,10 +9662,18 @@ function simulateBattle(playerStats, enemyStats) {
 /**
  * Calculate damage with variance
  */
-function calculateDamage(attack, defense, isBossAttack) {
+function calculateDamage(attack, defense, isBossAttack, luck) {
   var baseDamage = attack - defense;
   var variance = Math.floor(Math.random() * 3) - 1; // -1, 0, or +1
+
+  // LUCK: increases crit chance. Base 5%, +0.5% per Luck point, max 25%
+  var luckPoints = luck || 0;
+  var critChance = Math.min(0.25, 0.05 + (luckPoints * 0.005));
+  var isCrit = Math.random() < critChance;
+  if (isCrit) variance = Math.max(variance, 1); // crits always hit for at least +1 variance
+
   var damage = Math.max(1, baseDamage + variance);
+  if (isCrit) damage = Math.floor(damage * 1.5); // crit = 1.5x
   
   // Flavor text based on variance
   var flavor = '';
@@ -9589,7 +9740,7 @@ function calculateDamage(attack, defense, isBossAttack) {
     }
   }
   
-  return { damage: damage, flavor: flavor, variance: variance };
+  return { damage: damage, flavor: flavor, variance: variance, isCrit: isCrit };
 }
 
 /**
@@ -10550,6 +10701,12 @@ function showBattleRewardsModal() {
     
     // 🐾 COMPANION REACTION - Battle victory!
     if (typeof CompanionBuddy !== 'undefined' && CompanionBuddy.currentCompanionId) {
+      // Store in companion memory for future contextual messages
+      CompanionBuddy.lastBattleResult = {
+        victory: true,
+        enemyName: battleRewards && battleRewards.enemyName ? battleRewards.enemyName : null,
+        finalHP: battleRewards ? battleRewards.playerFinalHP : null
+      };
       var victoryMessages = [
         "That was incredible! ⚔️✨",
         "You're so strong! 💪",
@@ -11473,9 +11630,28 @@ async function getRandomEnemy(zone, playerLevel) {
   // BOSS ENCOUNTER CHECK - 3% chance to encounter Shadow of Piper
   // ═══════════════════════════════════════════════════════════════════════
   var bossRoll = Math.random();
-  if (bossRoll < GAME_CONSTANTS.BOSS_ENCOUNTER_RATE && playerSettings.spooky_enabled) { // 3% chance + spooky enabled
-    dbg('🔥 BOSS ENCOUNTER! Shadow of Piper appears!');
-    return await getBossEnemy(zone, playerLevel);
+
+  // Piper check: spooky mode required. Spirit reduces encounter rate.
+  if (playerSettings.spooky_enabled) {
+    // Spirit gear reduces Piper encounter rate: each 10 Spirit = -0.3%, floor 0.5%
+    var spiritTotal = 0;
+    try {
+      var spiritEquip = await supabaseClient.from('player_equipment')
+        .select('equipment(spirit_bonus)')
+        .eq('user_id', currentUser.id)
+        .eq('is_equipped', true);
+      if (spiritEquip.data) {
+        spiritEquip.data.forEach(function(e) {
+          spiritTotal += (e.equipment && e.equipment.spirit_bonus) || 0;
+        });
+      }
+    } catch(e) { dbg('[Spirit] load error:', e); }
+
+    var piperRate = Math.max(0.005, GAME_CONSTANTS.BOSS_ENCOUNTER_RATE - (Math.floor(spiritTotal / 10) * 0.003));
+    if (bossRoll < piperRate) {
+      dbg('🔥 BOSS ENCOUNTER! Shadow of Piper! Spirit:', spiritTotal, 'Rate:', piperRate.toFixed(3));
+      return await getBossEnemy(zone, playerLevel);
+    }
   }
   
   // Determine level range based on zone
@@ -13811,18 +13987,98 @@ var CompanionBuddy = {
     }, 5000);
   },
   
+  // Last known context for memory system
+  lastBattleResult: null,  // { victory, enemyName, petNickname, finalHP }
+  lastFoodUsed: null,      // item name
+  loginStreak: 0,
+
   getRandomMessage: function(context) {
+    // 35% chance to use a contextual memory message, 65% random pool
+    if (Math.random() < 0.35) {
+      var memMsg = this.getMemoryMessage(context);
+      if (memMsg) return memMsg;
+    }
+    // Pet-specific messages — 20% chance if pet has personality messages
+    if (Math.random() < 0.20) {
+      var petMsg = this.getPetPersonalityMessage();
+      if (petMsg) return petMsg;
+    }
     var pool = this.messages[context] || this.messages.idle;
-    var randomMsg = pool[Math.floor(Math.random() * pool.length)];
-    return randomMsg;
+    return pool[Math.floor(Math.random() * pool.length)];
   },
-  
+
+  getMemoryMessage: function(context) {
+    var msgs = [];
+    var weather = (typeof currentWeather !== 'undefined' && currentWeather) ? currentWeather : null;
+    var streak = this.loginStreak || 0;
+
+    // Weather-aware messages
+    if (weather) {
+      var weatherMsgs = {
+        sunny:  ['What a beautiful day! ☀️ Perfect for exploring!', 'Sun's out! Energy feels great today! ☀️'],
+        rainy:  ['Cozy inside while it rains... 🌧️', 'Rainy days are perfect for minigames! 🌧️'],
+        stormy: ['Stay safe out there! ⛈️ It's rough today...', 'The storms make battle feel extra intense! ⚡'],
+        foggy:  ['Something feels... off today. 🌫️', 'I can't see very far in this fog... 🌫️ Stay close.'],
+        snowy:  ['It's so cold! 🌨️ Let's stay warm!', 'Snow day! ❄️ Perfect for napping!'],
+        windy:  ['Windy days make me want to run! 💨', 'Hold on tight! 💨 It's gusty out there!']
+      };
+      var wKey = weather.type || weather.id || '';
+      if (weatherMsgs[wKey]) msgs = msgs.concat(weatherMsgs[wKey]);
+    }
+
+    // Recent battle memory
+    if (this.lastBattleResult && context !== 'shop') {
+      if (this.lastBattleResult.victory) {
+        msgs.push('That battle earlier was amazing! 💪 You really showed ' + (this.lastBattleResult.enemyName || 'them') + ' who's boss!');
+        if (this.lastBattleResult.finalHP && this.lastBattleResult.finalHP < 10) {
+          msgs.push('That last fight was SO close... 😰 Let's heal up before the next one!');
+        }
+      } else {
+        msgs.push('Don't worry about that last battle... 💕 We'll get them next time!');
+      }
+    }
+
+    // Food memory
+    if (this.lastFoodUsed && context === 'shop') {
+      msgs.push('Last time you used a ' + this.lastFoodUsed + '! Should we grab another? 😋');
+    }
+
+    // Streak messages
+    if (streak >= 7) {
+      msgs.push(streak + ' days in a row! 🔥 You're so dedicated!');
+    }
+    if (streak >= 30) {
+      msgs.push('A whole month together! 💖 I'm so glad you keep coming back!');
+    }
+
+    // Login time awareness
+    var hour = new Date().getHours();
+    if (hour < 6)  msgs.push('You're up so late! 🌙 Or... really early? Either way, I'm here!');
+    if (hour >= 6  && hour < 10) msgs.push('Good morning! ☀️ Ready to start the day?');
+    if (hour >= 22) msgs.push('Getting late... 🌙 One more adventure before bed?');
+
+    if (msgs.length === 0) return null;
+    return msgs[Math.floor(Math.random() * msgs.length)];
+  },
+
+  getPetPersonalityMessage: function() {
+    if (!this.currentCompanionId) return null;
+    // Find pet nickname/type from petState
+    var pet = petState && petState[this.currentCompanionId];
+    if (!pet) return null;
+    var petName = (pet.pets && pet.pets.name) || pet.pet_type || '';
+    var key = petName.toLowerCase();
+    var pool = this.petMessages[key];
+    if (!pool || pool.length === 0) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+  },
+
   getCurrentContext: function() {
     // Detect which tab is active
-    var activeSection = document.querySelector('.page-section:not([style*="display: none"])');
+    var activeSection = document.querySelector('.page-section.active');
     if (!activeSection) return 'idle';
     
-    var id = activeSection.id;
+    var id = activeSection.id || '';
     if (id.includes('shop')) return 'shop';
     if (id.includes('minigame')) return 'minigames';
     if (id.includes('battle')) return 'battle';
@@ -13832,9 +14088,16 @@ var CompanionBuddy = {
     
     return 'idle';
   },
-  
+
   startMessageRotation: function() {
     var self = this;
+
+    // Load login streak for memory messages
+    if (currentUser) {
+      supabaseClient.from('players').select('login_streak').eq('id', currentUser.id).single()
+        .then(function(res) { if (res.data) self.loginStreak = res.data.login_streak || 0; })
+        .catch(function(){});
+    }
     
     // Show first message after 3 seconds
     safeSetTimeout(function() {
@@ -13843,12 +14106,12 @@ var CompanionBuddy = {
       self.showMessage(message);
     }, 3000);
     
-    // Then show messages every 60-90 seconds
+    // Then show messages every 60-90 seconds with slight variance
     this.messageInterval = safeSetInterval(function() {
       var context = self.getCurrentContext();
       var message = self.getRandomMessage(context);
       self.showMessage(message);
-    }, 75000); // 75 seconds average
+    }, 75000);
   },
   
   stopMessageRotation: function() {
@@ -21792,22 +22055,7 @@ function getPlayerTitleDisplay(userId) {
 
 // Show title unlock notification
 function showPlayerTitleUnlockNotification(title, reason) {
-  var rarityColors = {
-    'Common': '#8e8e8e',
-    'Uncommon': '#5cb85c',
-    'Rare': '#5bc0de',
-    'Epic': '#9c27b0',
-    'Legendary': '#ff9800'
-  };
-  
-  var color = title.color || rarityColors[title.rarity] || '#8e8e8e';
-  
-  var message = '🎉 <strong>Player Title Unlocked!</strong><br>' +
-    '<span style="color: ' + color + '; font-size: 1.2rem;">' +
-    title.icon + ' ' + title.display_name + '</span><br>' +
-    '<small>' + (reason || title.unlock_condition) + '</small>';
-  
-  showToast(message, 6000, color);
+  showUnlockCelebration('title', title, reason);
 }
 
 // Check and award player titles based on achievements
@@ -24087,6 +24335,7 @@ async function addPassXP(amount, source) {
   
   if (levelsGained > 0) {
     showToast('🎫 Pass Level Up! Now Level ' + passProgress.level + '!', 'success', true);
+    flashNavButton('mypets', 10000); // Pass rewards are in mypets/pass section
     playSound('levelup');
   }
 }
@@ -24544,6 +24793,7 @@ async function checkBingoLines() {
         await addPassXP(50, 'bingo_line');
         
         showToast('🎯 Bingo Line Complete! +100 PP, +50 XP', 'success', true);
+        flashNavButton('minigames', 8000);
         playSound('victory');
       }
     }
@@ -25755,10 +26005,8 @@ async function phase1_unlockCosmetic(type, cosmeticId) {
     // Update local state
     await phase1_loadUnlockedCosmetics();
     
-    // Show notification
-    if (typeof showToast === 'function') {
-      showToast('🎨 New cosmetic unlocked!', 'success', true);
-    }
+    // Show rich unlock notification with nav button
+    showUnlockCelebration('cosmetic', type, cosmeticId);
     
     dbg('✅ Phase 1: Unlocked cosmetic:', type, cosmeticId);
     return true;
