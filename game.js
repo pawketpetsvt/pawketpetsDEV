@@ -5524,25 +5524,21 @@ function itemEmoji(type) {
 
 // ── Category-based food icon images ─────────────────────────────────────
 var FOOD_CATEGORY_IMAGES = {
-  spicy:    'images/icons/food/spicy.png',
-  sweet:    'images/icons/food/sweet.png',
-  savory:   'images/icons/food/savory.png',
-  fish:     'images/icons/food/fish.png',
-  fruit:    'images/icons/food/fruit.png',
-  basic:    'images/icons/food/basic.png',
-  streamer: 'images/icons/food/streamer.png',
-  snack:    'images/icons/food/snack.png'
+  spicy:  'images/icons/food/spicy.png',
+  sweet:  'images/icons/food/sweet.png',
+  savory: 'images/icons/food/savory.png',
+  fish:   'images/icons/food/fish.png',
+  fruit:  'images/icons/food/fruit.png',
+  basic:  'images/icons/food/basic.png'
 };
 
 var FOOD_CATEGORY_FALLBACK = {
-  spicy:    '🌶️',
-  sweet:    '🍰',
-  savory:   '🍖',
-  fish:     '🐟',
-  fruit:    '🍎',
-  basic:    '🍞',
-  streamer: '🎮',
-  snack:    '🍿'
+  spicy:  '🌶️',
+  sweet:  '🍰',
+  savory: '🍖',
+  fish:   '🐟',
+  fruit:  '🍎',
+  basic:  '🍞'
 };
 
 // Returns icon HTML for any shop/inventory item.
@@ -5571,26 +5567,23 @@ function getItemIconHtml(item) {
 // ══════════════════════════════════════════════════════════════════════════
 
 var foodCategoryData = {
-  spicy:    { name: 'Spicy',    icon: '🌶️', color: '#ff4444' },
-  sweet:    { name: 'Sweet',    icon: '🍰', color: '#ff66cc' },
-  savory:   { name: 'Savory',   icon: '🍖', color: '#8B4513' },
-  fish:     { name: 'Fish',     icon: '🐟', color: '#4488ff' },
-  fruit:    { name: 'Fruit',    icon: '🍎', color: '#ff6666' },
-  basic:    { name: 'Basic',    icon: '🍞', color: '#d4a76a' },
-  streamer: { name: 'Streamer', icon: '🎮', color: '#9966ff' },
-  snack:    { name: 'Snack',    icon: '🍿', color: '#f0a500' }
+  spicy: { name: 'Spicy', icon: '🌶️', color: '#ff4444' },
+  sweet: { name: 'Sweet', icon: '🍰', color: '#ff66cc' },
+  savory: { name: 'Savory', icon: '🍖', color: '#8B4513' },
+  fish: { name: 'Fish', icon: '🐟', color: '#4488ff' },
+  fruit: { name: 'Fruit', icon: '🍎', color: '#ff6666' },
+  basic: { name: 'Basic', icon: '🍞', color: '#d4a76a' }
 };
 
-// 4-week food rotation — one full month of variety
+// 3-week rotation (like equipment)
 function getFoodRotation() {
   var weeksSinceEpoch = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
-  var weekInCycle = weeksSinceEpoch % 4;
+  var weekInCycle = weeksSinceEpoch % 3;
   
   var rotations = [
-    ['spicy', 'savory'],      // Week A: Hearty foods
-    ['sweet', 'fruit'],       // Week B: Treats
-    ['fish', 'basic'],        // Week C: Essentials
-    ['streamer', 'snack']     // Week D: Streamer specials & snacks
+    ['spicy', 'savory'],    // Week A: Hearty foods
+    ['sweet', 'fruit'],     // Week B: Treats
+    ['fish', 'basic']       // Week C: Essentials
   ];
   
   return rotations[weekInCycle];
@@ -5609,11 +5602,11 @@ function getFoodCategoryLabel(category) {
   return data.icon + ' ' + data.name;
 }
 
-// Get current rotation week (A, B, C, or D)
+// Get current rotation week (A, B, or C)
 function getCurrentRotationWeek() {
   var weeksSinceEpoch = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
-  var weekInCycle = weeksSinceEpoch % 4;
-  return ['A', 'B', 'C', 'D'][weekInCycle];
+  var weekInCycle = weeksSinceEpoch % 3;
+  return ['A', 'B', 'C'][weekInCycle];
 }
 
 
@@ -5951,6 +5944,86 @@ function sortStreamerList() {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// WHO'S LIVE BANNER — floating notification when team members are streaming
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateLiveBanner() {
+  var existing = document.getElementById('live-banner');
+
+  // Nobody live — remove banner if it exists
+  if (_currentlyLiveStreamers.length === 0) {
+    if (existing) existing.remove();
+    return;
+  }
+
+  // Build or update the banner
+  if (!existing) {
+    existing = document.createElement('div');
+    existing.id = 'live-banner';
+    existing.className = 'live-banner-collapsed';
+    document.body.appendChild(existing);
+  }
+
+  var count = _currentlyLiveStreamers.length;
+
+  if (count === 1) {
+    // Single streamer — show name and link directly
+    var s = _currentlyLiveStreamers[0];
+    existing.innerHTML =
+      '<div class="live-banner-inner" onclick="liveBannerToggle()">' +
+        '<span class="live-banner-dot"></span>' +
+        '<span class="live-banner-text">🎮 <strong>' + escapeHtml(s.name) + '</strong> is LIVE!</span>' +
+        '<a class="live-banner-btn" href="' + escapeHtml(s.twitchUrl) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Watch →</a>' +
+      '</div>';
+    existing.className = 'live-banner-collapsed live-banner-single';
+  } else {
+    // Multiple streamers — show count badge, expand on click
+    var expanded = existing.classList.contains('live-banner-open');
+    var listHtml = _currentlyLiveStreamers.map(function(s) {
+      return '<a class="live-banner-list-item" href="' + escapeHtml(s.twitchUrl) + '" target="_blank" rel="noopener">' +
+        '<span class="live-banner-dot live-banner-dot-sm"></span>' +
+        '<span class="live-banner-list-name">' + escapeHtml(s.name) + '</span>' +
+        (s.viewers ? '<span class="live-banner-viewers">' + s.viewers.toLocaleString() + ' viewers</span>' : '') +
+        '<span class="live-banner-list-btn">Watch →</span>' +
+      '</a>';
+    }).join('');
+
+    existing.innerHTML =
+      '<div class="live-banner-inner" onclick="liveBannerToggle()">' +
+        '<span class="live-banner-dot"></span>' +
+        '<span class="live-banner-text">🎮 <strong>' + count + ' streamers</strong> are LIVE!</span>' +
+        '<span class="live-banner-badge">' + count + '</span>' +
+        '<span class="live-banner-chevron">' + (expanded ? '▲' : '▼') + '</span>' +
+      '</div>' +
+      '<div class="live-banner-list" style="display:' + (expanded ? 'block' : 'none') + ';">' +
+        listHtml +
+      '</div>';
+    existing.className = 'live-banner-collapsed' + (expanded ? ' live-banner-open' : '');
+  }
+}
+
+function liveBannerToggle() {
+  var banner = document.getElementById('live-banner');
+  if (!banner) return;
+  if (_currentlyLiveStreamers.length <= 1) return; // single streamer has no expand
+
+  var list = banner.querySelector('.live-banner-list');
+  var chevron = banner.querySelector('.live-banner-chevron');
+  if (!list) return;
+
+  var isOpen = banner.classList.contains('live-banner-open');
+  if (isOpen) {
+    banner.classList.remove('live-banner-open');
+    list.style.display = 'none';
+    if (chevron) chevron.textContent = '▼';
+  } else {
+    banner.classList.add('live-banner-open');
+    list.style.display = 'block';
+    if (chevron) chevron.textContent = '▲';
+  }
+}
+
 async function checkSidebarStreamStatus() {
   // ... rest of the existing function ...
   // Check if Embertail and Pyxshuul are live using public Twitch API
@@ -5997,6 +6070,8 @@ async function checkSidebarStreamStatus() {
     });
     
     // Update live streamers
+    _currentlyLiveStreamers = []; // reset before repopulating
+
     if (data.data && data.data.length > 0) {
       data.data.forEach(function(stream) {
         var login = stream.user_login.toLowerCase();
@@ -6018,11 +6093,25 @@ async function checkSidebarStreamStatus() {
         if (statusEl) statusEl.textContent = stream.game_name || 'LIVE';
         if (badgeEl) badgeEl.style.display = 'inline-block';
         if (watchBtn) watchBtn.style.display = 'inline-block';
+
+        // Add to shared live state for the banner and other systems
+        var member = TEAM_MEMBERS.find(function(m) { return m.login.toLowerCase() === login; });
+        if (member) {
+          _currentlyLiveStreamers.push({
+            name:      member.name,
+            login:     member.login,
+            twitchUrl: member.twitchUrl,
+            petName:   member.petName,
+            viewers:   stream.viewer_count,
+            title:     stream.title || ''
+          });
+        }
       });
     }
     
-    dbg('✅ Sidebar stream status checked');
+    dbg('✅ Sidebar stream status checked. Live:', _currentlyLiveStreamers.length);
     sortStreamerList();
+    updateLiveBanner(); // Update floating banner whenever live status changes
   } catch (err) {
     console.error('❌ Error checking sidebar stream status:', err);
   }
@@ -7294,6 +7383,10 @@ async function initTwitchTab() {
 }
 
 // Team members config — add new members here as they join
+// Shared live streamer state — populated by checkSidebarStreamStatus every 2 minutes
+// Read by the live banner and any other system that needs to know who is live
+var _currentlyLiveStreamers = []; // array of { name, login, twitchUrl, petName, viewers, title }
+
 var TEAM_MEMBERS = [
   { name: 'Embertail', login: 'embertail', twitchUrl: 'https://twitch.tv/Embertail', petName: 'Ember',    twitchId: '91821604' },
   { name: 'Pyxshuul',  login: 'pyxshuul',  twitchUrl: 'https://twitch.tv/Pyxshuul',  petName: 'Pyxie',   twitchId: '1459912293' },
@@ -9633,45 +9726,6 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
     if (freshPlayer) updateAllPoints(freshPlayer.pawketpoints);
   }
   
-  // Apply furniture battle_pp_bonus_pct and xp_bonus_pct bonuses
-  // These are room passive bonuses that give a small extra PP/XP after each battle win
-  if (battleResult.victory && ppGained > 0 && petId) {
-    try {
-      var petRoom = petRoomCache[petId];
-      if (petRoom && petRoom.furniture_list && petRoom.furniture_list.length > 0) {
-        if (!furnitureCache) {
-          var { data: fc } = await supabaseClient.from('furniture_items').select('*');
-          furnitureCache = fc || [];
-        }
-        var totalPPPct = 0;
-        var totalXPPct = 0;
-        petRoom.furniture_list.forEach(function(fid) {
-          var f = furnitureCache.find(function(fi) { return fi.id === fid; });
-          if (!f) return;
-          totalPPPct += f.battle_pp_bonus_pct || 0;
-          totalXPPct += f.xp_bonus_pct       || 0;
-        });
-        if (totalPPPct > 0) {
-          var furniturePPBonus = Math.floor(ppGained * (totalPPPct / 100));
-          if (furniturePPBonus > 0) {
-            await supabaseClient.rpc('award_pp_secure', {
-              p_amount: furniturePPBonus, p_reason: 'furniture_battle_bonus'
-            }).catch(function(e) { dbg('[Furniture] PP bonus error:', e); });
-            ppGained += furniturePPBonus;
-            dbg('[Furniture] Battle PP bonus:', furniturePPBonus, '(+' + totalPPPct + '%)');
-          }
-        }
-        if (totalXPPct > 0) {
-          var furnitureXPBonus = Math.floor(expGained * (totalXPPct / 100));
-          if (furnitureXPBonus > 0) {
-            expGained += furnitureXPBonus;
-            dbg('[Furniture] XP bonus:', furnitureXPBonus, '(+' + totalXPPct + '%)');
-          }
-        }
-      }
-    } catch(e) { dbg('[Furniture] Bonus calc error:', e); }
-  }
-
   // Apply guild XP boost perk
   var xpPerkMult = getActivePerkMultiplier('xp_boost');
   if (xpPerkMult > 1 && expGained > 0) {
@@ -14558,10 +14612,7 @@ async function furniture_loadShop() {
           '<div style="font-size:2.2rem;margin-bottom:6px;">' + escapeHtml(item.emoji) + '</div>' +
           '<div style="font-weight:700;font-size:0.85rem;color:var(--purple-dark);margin-bottom:2px;">' + escapeHtml(item.name) + '</div>' +
           '<div style="font-size:0.74rem;color:var(--text-light);margin-bottom:4px;">' + escapeHtml(item.description || '') + '</div>' +
-          (item.happiness_bonus    > 0 ? '<div style="font-size:0.78rem;color:#5dde7a;font-weight:600;margin-bottom:2px;">+' + item.happiness_bonus + ' happiness/day</div>' : '') +
-          (item.energy_regen_bonus  > 0 ? '<div style="font-size:0.78rem;color:#44aaff;font-weight:600;margin-bottom:2px;">+' + item.energy_regen_bonus + '% energy/day</div>' : '') +
-          (item.battle_pp_bonus_pct > 0 ? '<div style="font-size:0.78rem;color:#f0a500;font-weight:600;margin-bottom:2px;">+' + item.battle_pp_bonus_pct + '% battle PP</div>' : '') +
-          (item.xp_bonus_pct        > 0 ? '<div style="font-size:0.78rem;color:#b06aff;font-weight:600;margin-bottom:2px;">+' + item.xp_bonus_pct + '% XP</div>' : '') +
+          '<div style="font-size:0.78rem;color:#5dde7a;font-weight:600;margin-bottom:2px;">+' + item.happiness_bonus + ' happiness/day</div>' +
           '<div style="font-size:0.7rem;color:#ffaa00;margin-bottom:8px;">🏠 All pet rooms</div>' +
           (owned
             ? '<div style="font-size:0.75rem;color:#5dde7a;font-weight:700;">✅ Owned</div>'
@@ -14697,11 +14748,7 @@ function furniture_renderRoomModal(petId) {
     return f ? Object.assign({}, f, { _quantity: uf.quantity }) : null;
   }).filter(function(f) { return f && equipped.indexOf(f.id) === -1; });
 
-  var totalHappiness   = equippedItems.reduce(function(s,f){ return s+(f.happiness_bonus||0); }, 0);
-  var totalEnergyRegen = equippedItems.reduce(function(s,f){ return s+(f.energy_regen_bonus||0); }, 0);
-  var totalBattlePP    = equippedItems.reduce(function(s,f){ return s+(f.battle_pp_bonus_pct||0); }, 0);
-  var totalXP          = equippedItems.reduce(function(s,f){ return s+(f.xp_bonus_pct||0); }, 0);
-  var totalBonus       = totalHappiness; // keep for backward-compat references
+  var totalBonus = equippedItems.reduce(function(s, f) { return s + (f.happiness_bonus || 0); }, 0);
 
   // Auto-generate room description
   var desc = generateRoomDescription(petName, equippedItems);
@@ -14713,12 +14760,7 @@ function furniture_renderRoomModal(petId) {
         return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(153,102,255,0.08);">' +
           '<span style="font-size:1.2rem;">' + f.emoji + '</span>' +
           '<span style="flex:1;font-size:0.82rem;color:var(--purple-dark);">' + escapeHtml(f.name) + '</span>' +
-          '<span style="font-size:0.75rem;font-weight:600;color:#5dde7a;">' +
-            (f.happiness_bonus    > 0 ? '+' + f.happiness_bonus    + ' hap/day '  : '') +
-            (f.energy_regen_bonus > 0 ? '+' + f.energy_regen_bonus + '% nrg/day ' : '') +
-            (f.battle_pp_bonus_pct> 0 ? '+' + f.battle_pp_bonus_pct + '% PP '     : '') +
-            (f.xp_bonus_pct       > 0 ? '+' + f.xp_bonus_pct       + '% XP '      : '') +
-          '</span>' +
+          '<span style="font-size:0.75rem;color:#5dde7a;font-weight:600;">+' + f.happiness_bonus + '/day</span>' +
           '<button class="btn btn-sm btn-outline" onclick="furniture_unequip(\'' + petId + '\',\'' + f.id + '\')" style="font-size:0.72rem;padding:3px 8px;margin-left:6px;">Unequip</button>' +
         '</div>';
       }).join('');
@@ -14731,12 +14773,7 @@ function furniture_renderRoomModal(petId) {
         return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(153,102,255,0.08);">' +
           '<span style="font-size:1.2rem;">' + f.emoji + '</span>' +
           '<span style="flex:1;font-size:0.82rem;color:var(--text-light);">' + escapeHtml(f.name) + '</span>' +
-          '<span style="font-size:0.75rem;font-weight:600;color:#5dde7a;">' +
-            (f.happiness_bonus    > 0 ? '+' + f.happiness_bonus    + ' hap/day '  : '') +
-            (f.energy_regen_bonus > 0 ? '+' + f.energy_regen_bonus + '% nrg/day ' : '') +
-            (f.battle_pp_bonus_pct> 0 ? '+' + f.battle_pp_bonus_pct + '% PP '     : '') +
-            (f.xp_bonus_pct       > 0 ? '+' + f.xp_bonus_pct       + '% XP '      : '') +
-          '</span>' +
+          '<span style="font-size:0.75rem;color:#5dde7a;font-weight:600;">+' + f.happiness_bonus + '/day</span>' +
           (full
             ? '<span style="font-size:0.72rem;color:#ff6b6b;margin-left:6px;">Room full</span>'
             : '<button class="btn btn-sm btn-primary" onclick="furniture_equip(\'' + petId + '\',\'' + f.id + '\')" style="font-size:0.72rem;padding:3px 8px;margin-left:6px;">Equip</button>'
@@ -14755,14 +14792,10 @@ function furniture_renderRoomModal(petId) {
       '📝 ' + escapeHtml(desc) +
     '</div>' +
 
-    // Daily bonus banner — show all active bonus types
-    '<div style="background:rgba(93,222,122,0.08);border-radius:10px;padding:10px 14px;margin-bottom:14px;">' +
-      '<div style="font-size:0.82rem;font-weight:700;color:var(--purple-dark);margin-bottom:6px;">✨ Daily Room Bonuses</div>' +
-      (totalHappiness   > 0 ? '<div style="font-size:0.82rem;color:#5dde7a;font-weight:600;">+' + totalHappiness   + ' happiness/day</div>' : '') +
-      (totalEnergyRegen > 0 ? '<div style="font-size:0.82rem;color:#44aaff;font-weight:600;">+' + totalEnergyRegen + '% energy restored/day</div>' : '') +
-      (totalBattlePP    > 0 ? '<div style="font-size:0.82rem;color:#f0a500;font-weight:600;">+' + totalBattlePP    + '% PP from battles</div>' : '') +
-      (totalXP          > 0 ? '<div style="font-size:0.82rem;color:#b06aff;font-weight:600;">+' + totalXP          + '% XP from all sources</div>' : '') +
-      ((totalHappiness + totalEnergyRegen + totalBattlePP + totalXP === 0) ? '<div style="font-size:0.82rem;color:var(--text-light);font-style:italic;">Equip furniture to get bonuses!</div>' : '') +
+    // Daily bonus banner
+    '<div style="display:flex;align-items:center;justify-content:space-between;background:rgba(93,222,122,0.1);border-radius:10px;padding:8px 14px;margin-bottom:14px;">' +
+      '<span style="font-size:0.82rem;font-weight:600;color:var(--purple-dark);">✨ Daily Happiness Bonus</span>' +
+      '<span style="font-size:1.1rem;font-weight:800;color:#5dde7a;">+' + totalBonus + ' happiness</span>' +
     '</div>' +
 
     // Equipped section
@@ -14858,43 +14891,24 @@ async function furniture_applyDailyBonus() {
       if (room.last_bonus_date === today) continue; // already applied today
       if (!room.furniture_list || room.furniture_list.length === 0) continue;
 
-      // Sum all bonus types from equipped furniture
-      var happinessBonus = 0;
-      var energyRegenBonus = 0; // extra % per hour added to base 5%
-
-      room.furniture_list.forEach(function(fid) {
+      // Sum bonus
+      var bonus = room.furniture_list.reduce(function(sum, fid) {
         var f = furnitureCache.find(function(fc) { return fc.id === fid; });
-        if (!f) return;
-        happinessBonus   += f.happiness_bonus      || 0;
-        energyRegenBonus += f.energy_regen_bonus   || 0;
-        // battle_pp_bonus_pct and xp_bonus_pct are applied at point-of-use, not daily
-      });
+        return sum + (f ? (f.happiness_bonus || 0) : 0);
+      }, 0);
+
+      if (bonus <= 0) continue;
 
       var pet = petState[room.pet_id];
       if (!pet) continue;
 
-      // Happiness bonus via secure RPC
-      if (happinessBonus > 0) {
-        var { data: confirmedHappiness, error: happinessErr } = await supabaseClient.rpc('adjust_pet_stat_secure', {
-          p_pet_id: room.pet_id, p_stat: 'happiness', p_delta: happinessBonus, p_reason: 'furniture_daily_bonus'
-        });
-        if (!happinessErr && petState[room.pet_id]) {
-          petState[room.pet_id].happiness = confirmedHappiness;
-        }
-      }
+      // Update pet happiness via secure RPC
+      var { data: confirmedHappiness, error: happinessErr } = await supabaseClient.rpc('adjust_pet_stat_secure', {
+        p_pet_id: room.pet_id, p_stat: 'happiness', p_delta: bonus, p_reason: 'furniture_daily_bonus'
+      });
+      if (happinessErr) { dbg('Furniture happiness bonus failed:', happinessErr); continue; }
 
-      // Energy regen bonus — award as a one-time energy bump at daily reset
-      // (represents having a comfortable room that restores more energy overnight)
-      if (energyRegenBonus > 0) {
-        var energyBump = Math.floor((pet.max_energy || 100) * (energyRegenBonus / 100));
-        if (energyBump > 0) {
-          await supabaseClient.rpc('adjust_pet_stat_secure', {
-            p_pet_id: room.pet_id, p_stat: 'energy', p_delta: energyBump, p_reason: 'furniture_energy_bonus'
-          }).catch(function(e) { dbg('[Furniture] Energy bonus error:', e); });
-        }
-      }
-
-      if (happinessBonus <= 0 && energyRegenBonus <= 0) continue;
+      if (petState[room.pet_id]) petState[room.pet_id].happiness = confirmedHappiness;
 
       // Mark bonus applied
       await supabaseClient.from('pet_rooms')
