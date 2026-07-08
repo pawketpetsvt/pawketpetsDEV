@@ -3276,6 +3276,20 @@ function makeMyPetCard(pet) {
     spdStat.innerHTML = '<div style="font-size:0.7rem;color:var(--text-light);text-transform:uppercase;">SPD</div><div style="font-weight:bold;color:var(--purple);font-size:1.1rem;">' + (pet.base_speed || 4) + '</div>';
     battleStats.appendChild(spdStat);
     
+    // Luck and Spirit — only show if pet has any via equipment
+    // We render placeholder boxes that updatePetStatsDisplay fills in
+    var lckStat = makeEl('div', {class:'battle-stat-mini', id:'lck-stat-'+pet.id});
+    lckStat.setAttribute('data-tooltip', '🍀 LUCK\nIncreases critical hit chance in battle.\n(Base 5% + 0.5% per Luck point, max 25%)\n\nAlso improves rare item drop chances.\n\n💡 Increase by:\n• Equipping Luck gear\n• Certain boss drops');
+    lckStat.style.cursor = 'help';
+    lckStat.innerHTML = '<div style="font-size:0.7rem;color:var(--text-light);text-transform:uppercase;">LCK</div><div style="font-weight:bold;color:#f0a500;font-size:1.1rem;">0</div>';
+    battleStats.appendChild(lckStat);
+
+    var spiStat = makeEl('div', {class:'battle-stat-mini', id:'spi-stat-'+pet.id});
+    spiStat.setAttribute('data-tooltip', '✨ SPIRIT\nReduces the chance of encountering spooky events.\n(Every 10 Spirit = -0.3% Piper encounter rate)\n\nAlso builds resistance to enemy debuffs and\nstatus effects in future updates.\n\n💡 Increase by:\n• Equipping Spirit gear\n• Certain boss drops');
+    spiStat.style.cursor = 'help';
+    spiStat.innerHTML = '<div style="font-size:0.7rem;color:var(--text-light);text-transform:uppercase;">SPI</div><div style="font-weight:bold;color:#c47fff;font-size:1.1rem;">0</div>';
+    battleStats.appendChild(spiStat);
+
     body.appendChild(battleStats);
     
     // Update stats with equipment bonuses (async)
@@ -3540,18 +3554,24 @@ async function updatePetStatsDisplay(petId, baseAtk, baseDef, baseSpd) {
       var totalAtk = baseAtk;
       var totalDef = baseDef;
       var totalSpd = baseSpd;
+      var totalLck = 0;
+      var totalSpi = 0;
       
       equipRes.data.forEach(function(item) {
         var equip = item.equipment;
-        totalAtk += equip.attack_bonus || 0;
+        totalAtk += equip.attack_bonus  || 0;
         totalDef += equip.defense_bonus || 0;
-        totalSpd += equip.speed_bonus || 0;
+        totalSpd += equip.speed_bonus   || 0;
+        totalLck += equip.luck_bonus    || 0;
+        totalSpi += equip.spirit_bonus  || 0;
       });
       
       // Update the display
       var atkEl = el('atk-stat-' + petId);
       var defEl = el('def-stat-' + petId);
       var spdEl = el('spd-stat-' + petId);
+      var lckEl = el('lck-stat-' + petId);
+      var spiEl = el('spi-stat-' + petId);
       
       if (atkEl) {
         var atkBonus = totalAtk - baseAtk;
@@ -3572,6 +3592,18 @@ async function updatePetStatsDisplay(petId, baseAtk, baseDef, baseSpd) {
         spdEl.innerHTML = '<div style="font-size:0.7rem;color:var(--text-light);text-transform:uppercase;">SPD</div>' +
           '<div style="font-weight:bold;color:var(--purple);font-size:1.1rem;">' + totalSpd + 
           (spdBonus > 0 ? ' <span style="color:#5dde7a;font-size:0.8rem;">(+' + spdBonus + ')</span>' : '') + '</div>';
+      }
+
+      if (lckEl) {
+        lckEl.innerHTML = '<div style="font-size:0.7rem;color:var(--text-light);text-transform:uppercase;">LCK</div>' +
+          '<div style="font-weight:bold;color:#f0a500;font-size:1.1rem;">' + totalLck +
+          (totalLck > 0 ? ' <span style="color:#5dde7a;font-size:0.8rem;">(+' + totalLck + ')</span>' : '') + '</div>';
+      }
+
+      if (spiEl) {
+        spiEl.innerHTML = '<div style="font-size:0.7rem;color:var(--text-light);text-transform:uppercase;">SPI</div>' +
+          '<div style="font-weight:bold;color:#c47fff;font-size:1.1rem;">' + totalSpi +
+          (totalSpi > 0 ? ' <span style="color:#5dde7a;font-size:0.8rem;">(+' + totalSpi + ')</span>' : '') + '</div>';
       }
     } catch (error) {
       console.error('Error updating pet stats display:', error);
@@ -11280,15 +11312,23 @@ async function loadBattlePets() {
       var maxHP = pet.max_hp || pet.base_hp || 30;
 
       var hpStat = makeEl('div', { class: 'battle-pet-stat' });
+      hpStat.setAttribute('data-tooltip', '❤️ HP — Carries over between battles. At 0 your pet faints.');
+      hpStat.style.cursor = 'help';
       hpStat.innerHTML = '<div class="battle-pet-stat-label">HP</div><div class="battle-pet-stat-value">' + currentHP + '/' + maxHP + '</div>';
       stats.appendChild(hpStat);
       var atkStat = makeEl('div', { class: 'battle-pet-stat' });
+      atkStat.setAttribute('data-tooltip', '⚔️ ATK — Damage dealt per hit. Boosted by weapons and level-ups.');
+      atkStat.style.cursor = 'help';
       atkStat.innerHTML = '<div class="battle-pet-stat-label">ATK</div><div class="battle-pet-stat-value">' + (pet.base_attack || 5) + '</div>';
       stats.appendChild(atkStat);
       var defStat = makeEl('div', { class: 'battle-pet-stat' });
+      defStat.setAttribute('data-tooltip', '🛡️ DEF — Reduces incoming damage. Boosted by armor and level-ups.');
+      defStat.style.cursor = 'help';
       defStat.innerHTML = '<div class="battle-pet-stat-label">DEF</div><div class="battle-pet-stat-value">' + (pet.base_defense || 3) + '</div>';
       stats.appendChild(defStat);
       var spdStat = makeEl('div', { class: 'battle-pet-stat' });
+      spdStat.setAttribute('data-tooltip', '💨 SPD — Who attacks first. Also affects racing performance.');
+      spdStat.style.cursor = 'help';
       spdStat.innerHTML = '<div class="battle-pet-stat-label">SPD</div><div class="battle-pet-stat-value">' + (pet.base_speed || 4) + '</div>';
       stats.appendChild(spdStat);
       card.appendChild(stats);
