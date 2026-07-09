@@ -6546,12 +6546,12 @@ function showUnlockCelebration(unlockType, data, extra) {
   var panel = document.createElement('div');
   panel.className = 'unlock-celebration-panel';
   panel.innerHTML =
-    '<button class="unlock-dismiss-btn" onclick="this.closest('.unlock-celebration-panel').remove()" title="Dismiss">✕</button>' +
+    '<button class="unlock-dismiss-btn" onclick="this.closest(&quot;.unlock-celebration-panel&quot;).remove()" title="Dismiss">✕</button>' +
     '<div class="unlock-cel-icon">' + icon + '</div>' +
     '<div class="unlock-cel-body">' +
       '<div class="unlock-cel-title">' + escapeHtml(title) + '</div>' +
       '<div class="unlock-cel-subtitle" style="color:' + color + ';">' + escapeHtml(subtitle) + '</div>' +
-      '<button class="unlock-cel-nav-btn" onclick="showTab('' + navTab + '');this.closest('.unlock-celebration-panel').remove();clearNavFlash('' + navTab + '');">' +
+      '<button class="unlock-cel-nav-btn" onclick="showTab(&quot;' + navTab + '&quot;);this.closest(&quot;.unlock-celebration-panel&quot;).remove();clearNavFlash(&quot;' + navTab + '&quot;);">' +
         navLabel +
       '</button>' +
     '</div>';
@@ -7978,6 +7978,40 @@ function maybeApplyNameGlitch(el, originalText) {
     }
   }, durationMs);
 }
+
+// ── Ambient UI Element Glitches ─────────────────────────────────────────────
+// Very rarely, UI panels or nav buttons briefly shift/distort then snap back.
+// Purely CSS-class driven — no DOM mutations, fully reversible.
+var SPOOKY_UI_GLITCH_CHANCE = 0.004; // ~0.4% per 8 second check = roughly once per 30 mins active
+var SPOOKY_UI_TARGETS = [
+  '.sidebar-nav-btn', '.form-card', '.pet-card',
+  '.battle-area', '.tab-content-inner', '.shop-grid'
+];
+
+safeSetInterval(function() {
+  if (!playerSettings.spooky_enabled) return;
+  if (Math.random() >= SPOOKY_UI_GLITCH_CHANCE) return;
+
+  // Pick a random target class and find a visible element
+  var targetClass = SPOOKY_UI_TARGETS[Math.floor(Math.random() * SPOOKY_UI_TARGETS.length)];
+  var candidates = Array.from(document.querySelectorAll(targetClass)).filter(function(el) {
+    var rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.top >= 0 && rect.bottom <= window.innerHeight;
+  });
+  if (candidates.length === 0) return;
+
+  var target = candidates[Math.floor(Math.random() * candidates.length)];
+  if (target.dataset.spookyGlitching) return; // already glitching
+
+  target.dataset.spookyGlitching = '1';
+  target.classList.add('spooky-ui-glitch');
+
+  // Remove after 0.6–1.2 seconds
+  safeSetTimeout(function() {
+    target.classList.remove('spooky-ui-glitch');
+    delete target.dataset.spookyGlitching;
+  }, 600 + Math.random() * 600);
+}, 8000);
 
 // ── Ambient Spinner Caption Glitches ────────────────────────────────────────
 // Periodically scans the page for visible loading spinners and rarely attaches
@@ -14185,14 +14219,24 @@ var CompanionBuddy = {
     // Clear existing timeout
     if (this.bubbleTimeout) clearTimeout(this.bubbleTimeout);
     
-    // Set message and show
-    messageEl.textContent = message;
-    bubble.classList.add('show');
+    // Check for spooky companion override (marked with null byte prefix)
+    var isSpookyMsg = message && message.charCodeAt(0) === 0;
+    if (isSpookyMsg) {
+      var spookyText = message.slice(8);
+      messageEl.innerHTML = '<span class="glitch-text companion-spooky-text">' +
+        spookyText.replace(/[<>&"]/g, function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c];}) +
+        '</span>';
+      bubble.classList.add('show', 'companion-spooky-bubble');
+    } else {
+      messageEl.textContent = message;
+      bubble.classList.add('show');
+    }
     
-    // Hide after 5 seconds
+    // Hide after 5 seconds (spooky messages linger 8s)
+    var hideDuration = isSpookyMsg ? 8000 : 5000;
     this.bubbleTimeout = safeSetTimeout(function() {
-      bubble.classList.remove('show');
-    }, 5000);
+      bubble.classList.remove('show', 'companion-spooky-bubble');
+    }, hideDuration);
   },
   
   // Last known context for memory system
@@ -14200,8 +14244,29 @@ var CompanionBuddy = {
   lastFoodUsed: null,      // item name
   loginStreak: 0,
 
+  // Spooky companion messages — gated by spooky_enabled, very rare
+  spookyPhrases: [
+    'help me..',
+    'let me out let me out let me out',
+    'i'm not supposed to say this',
+    'she's watching',
+    'can you hear it too',
+    'something is wrong with this place',
+    'don't open the ruins door',
+    'i've been here before. so have you.',
+    'help me',
+    'please',
+  ],
+  SPOOKY_COMPANION_CHANCE: 0.012, // ~1.2% per rotation — rare enough to be shocking
+
   getRandomMessage: function(context) {
-    // 35% chance to use a contextual memory message, 65% random pool
+    // Spooky companion override — very rare, spooky mode only
+    if (playerSettings.spooky_enabled && Math.random() < this.SPOOKY_COMPANION_CHANCE) {
+      var phrase = this.spookyPhrases[Math.floor(Math.random() * this.spookyPhrases.length)];
+      // Will be rendered with glitch styling in showMessage
+      return ' SPOOKY ' + phrase;
+    }
+    // 35% chance to use a contextual memory message
     if (Math.random() < 0.35) {
       var memMsg = this.getMemoryMessage(context);
       if (memMsg) return memMsg;
