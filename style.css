@@ -5768,6 +5768,61 @@ body.boss-ui-glitch header {
   box-shadow: 0 4px 12px rgba(255, 165, 2, 0.2);
 }
 
+/* ===== TODAY IN PAWKETPETS CARD ===== */
+.today-card {
+  background: linear-gradient(135deg, #f3ecff, #ffffff);
+  border: 3px solid #9966ff;
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  margin: 20px 0;
+  box-shadow: 0 4px 12px rgba(153, 102, 255, 0.2);
+}
+
+.today-card-header {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.15rem;
+  color: #7a3fd6;
+  margin-bottom: 10px;
+}
+
+.today-card-weather,
+.today-card-stats,
+.today-card-live {
+  font-size: 0.92rem;
+  color: var(--text);
+  padding: 6px 0;
+}
+
+.today-card-icon {
+  font-size: 1.1rem;
+}
+
+.today-card-goal {
+  font-size: 0.92rem;
+  color: var(--text);
+  padding: 8px 0 4px;
+}
+
+.today-card-goal-bar {
+  background: rgba(153, 102, 255, 0.15);
+  border-radius: 20px;
+  height: 10px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.today-card-goal-fill {
+  background: linear-gradient(90deg, #9966ff, #ff66cc);
+  height: 100%;
+  border-radius: 20px;
+  transition: width 0.4s ease;
+}
+
+.today-card-live {
+  color: #e0245e;
+  font-weight: 600;
+}
+
 .daily-tip-header {
   font-family: 'Fredoka One', cursive;
   font-size: 1.2rem;

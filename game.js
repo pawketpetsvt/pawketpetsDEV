@@ -878,7 +878,7 @@ function updateEventStatusWidget() {
   var textEl = document.getElementById('event-status-text');
   var dotEl  = document.getElementById('event-status-dot');
 
-  // Priority: active world event > today's weather from todayFeatures > weatherSystem
+  // Priority: active world event > weatherSystem (the single source of truth)
   var hasEvent = false;
 
   if (typeof worldEvents !== 'undefined' && worldEvents.currentEvent) {
@@ -894,24 +894,13 @@ function updateEventStatusWidget() {
     widget.dataset.endDate = (worldEvents.eventEndDate || '').toString();
     hasEvent = true;
   } else {
-    // Fall back to todayFeatures weather (already loaded) or weatherSystem
+    // Weather from weatherSystem, the single source of truth
     var weatherId   = null;
     var weatherName = 'Clear';
     var weatherIcon = '☀️';
     var weatherDesc = 'Normal conditions today.';
 
-    if (typeof todayFeatures !== 'undefined' && todayFeatures.current) {
-      var twId = todayFeatures.current.weather;
-      // todayFeatures.current.weather may be an id string or object
-      if (typeof twId === 'object' && twId !== null) { twId = twId.id; }
-      var tw = todayFeatures.weatherTypes.find(function(w) { return w.id === twId; });
-      if (tw) {
-        weatherId   = tw.id;
-        weatherName = tw.name;
-        weatherIcon = tw.emoji || tw.icon || '☀️';
-        weatherDesc = tw.effect || tw.description || '';
-      }
-    } else if (typeof weatherSystem !== 'undefined' && weatherSystem.currentWeather) {
+    if (typeof weatherSystem !== 'undefined' && weatherSystem.currentWeather) {
       var ws = weatherSystem.currentWeather;
       weatherId   = ws.id;
       weatherName = ws.name;
@@ -18818,6 +18807,14 @@ async function gp_renderHistoricalLeaderboard() {
 
 async function checkDailyLogin() {
   if (!currentUser) return;
+
+  // Known bug fix: loginCalendar.currentStreak was never assigned from the
+  // player's actual login_streak, so the calendar widget/welcome modal always
+  // showed "Day 0". Set it from cached currentUser immediately so it's correct
+  // even on the early-return path below (already claimed today).
+  if (typeof loginCalendar !== 'undefined') {
+    loginCalendar.currentStreak = currentUser.login_streak || 0;
+  }
   
   var today = new Date().toISOString().split('T')[0];
   var lastLogin = localStorage.getItem('lastLoginDate_' + currentUser.id);
@@ -18856,6 +18853,9 @@ async function checkDailyLogin() {
     // streak cap removed — long-term milestones need 100+ days
     
     dailyLoginStreak = streak;
+    if (typeof loginCalendar !== 'undefined') {
+      loginCalendar.currentStreak = streak; // keep in sync with the freshly-incremented streak
+    }
     
     // Calculate rewards
     var ppReward = 50 + (streak * 5); // 50 base + 5 per day
@@ -26375,7 +26375,7 @@ var phase1_state = {
 async function newFeatures_init() {
   dbg('🚀 Initializing new features...');
   try {
-    if (typeof today_init === 'function') await today_init();
+    if (typeof todayCard_init === 'function') await todayCard_init();
     if (typeof calendar_init === 'function') await calendar_init();
     if (typeof dailyWelcome_check === 'function') dailyWelcome_check();
     dbg('✅ New features initialized!');
@@ -27775,288 +27775,87 @@ function showRareDropCelebration(rare) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 3. TODAY IN PAWKETPETS SYSTEM
+// 3. TODAY IN PAWKETPETS — home tab summary card
+// Single source of truth for each data point (no independent weather
+// generation here — that was the old todayFeatures system, removed because
+// it wrote its own weather vocabulary to daily_features.weather and
+// conflicted with weatherSystem):
+//   - weather        -> weatherSystem.currentWeather
+//   - daily stats     -> newsTicker.loadDailyStats() (daily_stats table)
+//   - featured goal   -> community_loadGoals() (community_goals table)
+//   - live streamers  -> _currentlyLiveStreamers
 // ═══════════════════════════════════════════════════════════════════════════
 
-var todayFeatures = {
-  current: null,
-  
-  weatherTypes: [
-    { id: 'sunny',    emoji: '☀️',  name: 'Sunny',    effect: 'Pets are extra happy! +10% happiness from all actions' },
-    { id: 'rainy',    emoji: '🌧️',  name: 'Rainy',    effect: 'Water types earn +25% XP' },
-    { id: 'cloudy',   emoji: '☁️',  name: 'Cloudy',   effect: 'Normal conditions — a peaceful day' },
-    { id: 'foggy',    emoji: '🌫️',  name: 'Foggy',    effect: 'Rare encounters +10% chance' },
-    { id: 'snowy',    emoji: '❄️',  name: 'Snowy',    effect: 'Ice types earn +25% XP; energy drains 15% slower' },
-    { id: 'stormy',   emoji: '⛈️',  name: 'Stormy',   effect: 'Electric types +25% XP; battles deal +10% damage' },
-    { id: 'windy',    emoji: '💨',  name: 'Windy',    effect: 'Speed +15% for all pets today' },
-    { id: 'rainbow',  emoji: '🌈',  name: 'Rainbow',  effect: 'All types earn +10% XP! A lucky day!' }
-  ],
-  
-  bonusTypes: [
-    { id: 'double_xp',    name: '2x Battle XP',              multiplier: 2.0,  icon: '⚔️' },
-    { id: 'double_pp',    name: '2x PawketPoints',           multiplier: 2.0,  icon: '💜' },
-    { id: 'fast_energy',  name: '50% Faster Energy Regen',   multiplier: 1.5,  icon: '⚡' },
-    { id: 'bonus_drops',  name: '+25% Item Drops',           multiplier: 1.25, icon: '📦' },
-    { id: 'rare_boost',   name: 'Rare Encounters +50%',      multiplier: 1.5,  icon: '✨' },
-    { id: 'cheap_shop',   name: '20% Off Shop Prices',       multiplier: 0.8,  icon: '🛒' },
-    { id: 'happy_boost',  name: '+30% Happiness Gains',      multiplier: 1.3,  icon: '😊' },
-    { id: 'mystery_bonus',name: 'Mystery Bonus (changes hourly!)', multiplier: 1.0, icon: '🎲' }
-  ],
-
-  // Event modifiers — shown as highlighted banner alert
-  eventModifiers: [
-    { id: 'rare_encounters', label: 'RARE ENCOUNTERS',    icon: '⭐', desc: '+50% rare spawns today!',          color: '#FFD700' },
-    { id: 'double_xp',       label: 'DOUBLE XP',          icon: '⚔️', desc: '2x XP from all battles!',           color: '#ff6eb4' },
-    { id: 'cheap_shop',      label: 'MARKET SALE',        icon: '🛒', desc: '20% off everything in the shop!',   color: '#5dde7a' },
-    { id: 'fast_energy',     label: 'ENERGIZED',          icon: '⚡', desc: 'Energy recovers 2x faster today!',  color: '#5bc0de' },
-    { id: 'bonus_drops',     label: 'BONUS DROPS',        icon: '📦', desc: '+50% item drop rate!',              color: '#ff9f43' },
-    { id: 'none',            label: '',                   icon: '',   desc: '',                                  color: '' }
-  ],
-
-  // Flavor text by weather
-  flavorTexts: {
-    sunny:   ['A perfect day to take your pet for an adventure!', 'The sun is shining and your pets feel amazing!', 'Clear skies bring good fortune — get out there!'],
-    rainy:   ['The rain brings a cozy stay-inside vibe.', 'Perfect weather for potion brewing and fossil hunting.', 'Puddles everywhere. Your water pets are thriving.'],
-    cloudy:  ['A quiet, peaceful day. Nothing unusual.', 'Clouds roll in, but the vibes are immaculate.', 'Calm and chill. A good day to just exist.'],
-    foggy:   ['Something stirs in the fog... rare things lurk.', 'Visibility is low. Mysterious encounters await.', 'The fog hides secrets. Explore carefully.'],
-    snowy:   ['Everything is fluffy and cold and perfect.', 'Snow day! Your pets are absolutely losing it.', 'The world is quiet and beautiful today.'],
-    stormy:  ['THUNDER. Your electric pets are HYPED.', 'Stay inside or don\'t — your call. Bold choice.', 'The storm brings power and chaos equally.'],
-    windy:   ['Your pets are running approximately 15% faster today.', 'The wind carries faint sounds of chaos. Exciting.', 'Hold onto your hats. And your pets.'],
-    rainbow: ['A rainbow appeared! Today is undeniably your lucky day.', 'The rainbow is real and the luck is real. Probably.', 'Maximum good vibes. All pets sensing great energy.']
-  },
-
-  petTypes: ['fire', 'water', 'grass', 'electric', 'ice', 'normal'],
-  
-  headlines: [
-    '🔬 Scientists discover new pet variant!',
-    '🎭 Local pet wins talent show!',
-    '🌟 Mysterious lights seen in sky...',
-    '📰 PawketPets reaches 1,000 players!',
-    '🎉 Community goal smashed!',
-    '🔮 Fortune teller predicts lucky day!',
-    '🎪 Traveling merchant spotted!',
-    '🏆 New leaderboard champion!',
-    '💫 Strange energy detected...',
-    '🎨 New cosmetics coming soon!',
-    '🦋 Rare butterfly swarm spotted near ruins!',
-    '🍄 Mushroom population up 400%. Experts baffled.',
-    '🐾 Local pets form union. Demands: more treats.',
-    '🌙 Moon unusually large tonight. Pets unaffected.',
-    '📜 Ancient scroll discovered. Contains recipes?'
-  ],
-
-  // Mystery bonus changes every hour
-  getMysteryBonus: function() {
-    var hour = new Date().getHours();
-    var bonuses = [
-      { name: '3x XP this hour!',          icon: '🌟' },
-      { name: 'Free shop item available!',  icon: '🎁' },
-      { name: '+50% PP from battles!',      icon: '💜' },
-      { name: 'Double happiness gains!',    icon: '💕' },
-      { name: 'Energy costs -50%!',         icon: '⚡' },
-      { name: 'Rare encounter guaranteed!', icon: '✨' }
-    ];
-    return bonuses[hour % bonuses.length];
-  }
-};
-
-async function today_init() {
-  await today_loadOrGenerate();
-  today_displayBanner();
-  today_applyEffects();
-  // Refresh widget now that weather is loaded
-  updateEventStatusWidget();
-}
-
-async function today_loadOrGenerate() {
-  var todayDate = new Date().toISOString().split('T')[0];
-  
+async function todayCard_init() {
   try {
-    var { data: existing } = await supabaseClient
-      .from('daily_features')
-      .select('*')
-      .eq('date', todayDate)
-      .single();
-    
-    if (existing) {
-      todayFeatures.current = existing;
-    } else {
-      // Generate new daily features
-      var features = today_generate();
-      
-      var { data: created } = await supabaseClient
-        .from('daily_features')
-        .insert({
-          date: todayDate,
-          weather: features.weather.id,
-          bonus_type: features.bonus.id,
-          bonus_multiplier: features.bonus.multiplier,
-          featured_type: features.featuredType,
-          event_chance: features.eventChance,
-          news_headline: features.headline
-        })
-        .select()
-        .single();
-      
-      todayFeatures.current = created;
-    }
+    await todayCard_render();
   } catch (err) {
-    console.error('Error loading today features:', err);
-    todayFeatures.current = today_generate();
+    console.error('[TodayCard] init error:', err);
   }
 }
 
-function today_generate() {
-  var weather = todayFeatures.weatherTypes[Math.floor(Math.random() * todayFeatures.weatherTypes.length)];
-  var bonus = todayFeatures.bonusTypes[Math.floor(Math.random() * todayFeatures.bonusTypes.length)];
-  var featuredType = todayFeatures.petTypes[Math.floor(Math.random() * todayFeatures.petTypes.length)];
-  var eventChance = ['low', 'normal', 'high'][Math.floor(Math.random() * 3)];
-  var headline = todayFeatures.headlines[Math.floor(Math.random() * todayFeatures.headlines.length)];
+async function todayCard_render() {
+  var mount = document.getElementById('today-card-mount');
+  if (!mount) return; // home tab markup not present (e.g. logged out)
 
-  // Pick an event modifier (30% chance of a real one, 70% none)
-  var modifierPool = todayFeatures.eventModifiers.slice(0, -1); // exclude 'none'
-  var eventModifier = Math.random() < 0.3
-    ? modifierPool[Math.floor(Math.random() * modifierPool.length)]
-    : todayFeatures.eventModifiers[todayFeatures.eventModifiers.length - 1]; // 'none'
+  // Weather — read from the single source of truth, don't generate our own
+  if (typeof weatherSystem !== 'undefined' && !weatherSystem.currentWeather) {
+    try { await weatherSystem.init(); } catch (e) {}
+  }
+  var weather = (typeof weatherSystem !== 'undefined' && weatherSystem.currentWeather) ? weatherSystem.currentWeather : null;
 
-  // Flavor text based on weather
-  var flavorOptions = todayFeatures.flavorTexts[weather.id] || ['Today is a fine day.'];
-  var flavorText = flavorOptions[Math.floor(Math.random() * flavorOptions.length)];
+  // Daily stats (cached inside newsTicker, non-blocking if it fails)
+  var stats = {};
+  try { stats = await newsTicker.loadDailyStats(); } catch (e) { stats = {}; }
 
-  return {
-    weather: weather,
-    bonus: bonus,
-    featuredType: featuredType,
-    eventChance: eventChance,
-    headline: headline,
-    eventModifier: eventModifier,
-    flavorText: flavorText
-  };
-}
+  // One featured community goal — closest to completion surfaces first
+  var goal = null;
+  try {
+    var goals = await community_loadGoals();
+    if (goals && goals.length) {
+      goal = goals.slice().sort(function(a, b) {
+        var ra = (a.current_progress || 0) / Math.max(1, a.goal_target || 1);
+        var rb = (b.current_progress || 0) / Math.max(1, b.goal_target || 1);
+        return rb - ra;
+      })[0];
+    }
+  } catch (e) { goal = null; }
 
-function today_displayBanner() {
-  var homeContent = document.getElementById('home-content');
-  if (!homeContent) return;
-  
-  var features = todayFeatures.current;
-  if (!features) return;
-  
-  var weather = todayFeatures.weatherTypes.find(function(w) { return w.id === (features.weather && features.weather.id ? features.weather.id : features.weather); });
-  var bonus = todayFeatures.bonusTypes.find(function(b) { return b.id === (features.bonus && features.bonus.id ? features.bonus.id : features.bonus_type); });
-  var eventModifier = features.eventModifier || null;
-  var flavorText = features.flavorText || '';
-  var mysteryBonus = todayFeatures.getMysteryBonus();
+  // Live streamers
+  var liveCount = (typeof _currentlyLiveStreamers !== 'undefined') ? _currentlyLiveStreamers.length : 0;
 
-  // Event modifier alert (only shown if there is one)
-  var modifierHtml = '';
-  if (eventModifier && eventModifier.id !== 'none' && eventModifier.label) {
-    modifierHtml = `
-      <div class="today-modifier-alert" style="background:${eventModifier.color}22;border:2px solid ${eventModifier.color};border-radius:10px;padding:10px 16px;margin-bottom:10px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:1.4rem;">${eventModifier.icon}</span>
-        <div>
-          <strong style="color:${eventModifier.color};font-size:1rem;">${eventModifier.label}!</strong>
-          <div style="font-size:0.85rem;opacity:0.85;">${eventModifier.desc}</div>
-        </div>
-      </div>`;
+  var weatherHtml = weather
+    ? '<div class="today-card-weather"><span class="today-card-icon">' + weather.icon + '</span> ' +
+      '<strong>' + weather.name + '</strong> — ' + weather.effect + '</div>'
+    : '<div class="today-card-weather">Loading weather...</div>';
+
+  var statsHtml = '<div class="today-card-stats">' +
+    '⚔️ ' + (stats.battles_won || 0) + ' battles won &nbsp;•&nbsp; ' +
+    '👑 ' + (stats.bosses_killed || 0) + ' bosses defeated &nbsp;•&nbsp; ' +
+    '🐾 ' + (stats.pets_adopted || 0) + ' pets adopted today' +
+    '</div>';
+
+  var goalHtml = '';
+  if (goal) {
+    var pct = Math.min(100, Math.round(((goal.current_progress || 0) / Math.max(1, goal.goal_target || 1)) * 100));
+    goalHtml = '<div class="today-card-goal">' +
+      '🎯 <strong>' + goal.title + '</strong> — ' + (goal.current_progress || 0) + ' / ' + goal.goal_target + ' (' + pct + '%)' +
+      '<div class="today-card-goal-bar"><div class="today-card-goal-fill" style="width:' + pct + '%;"></div></div>' +
+      '</div>';
   }
 
-  // Mystery bonus (changes hourly — shown inline)
-  var mysteryHtml = bonus && bonus.id === 'mystery_bonus'
-    ? `<div class="today-detail-item" style="background:rgba(255,159,67,0.1);border-radius:8px;padding:8px;">
-        🎲 <strong>Mystery Hour:</strong> ${mysteryBonus.icon} ${mysteryBonus.name}
-        <div style="font-size:0.8rem;opacity:0.7;">Changes every hour!</div>
-       </div>`
+  var liveHtml = liveCount > 0
+    ? '<div class="today-card-live">🔴 ' + liveCount + ' team member' + (liveCount !== 1 ? 's' : '') + ' live right now!</div>'
     : '';
 
-  var banner = document.createElement('div');
-  banner.className = 'today-banner collapsed';
-  banner.id = 'today-banner';
-  banner.innerHTML = `
-    <div class="today-summary" onclick="todayBanner_toggle()">
-      <span class="today-icon">🌟</span>
-      <span class="today-text">
-        ${weather ? weather.emoji + ' ' + weather.name : ''} •
-        ${bonus ? bonus.icon + ' ' + bonus.name : ''} •
-        ✨ ${features.featured_type || features.featuredType} Day
-      </span>
-      <span class="today-arrow">▼</span>
-    </div>
-    <div class="today-details" style="display:none;">
-      ${modifierHtml}
-      <div class="today-flavor" style="font-style:italic;opacity:0.85;margin-bottom:10px;padding:8px 12px;background:rgba(153,102,255,0.08);border-radius:8px;">
-        "${flavorText}"
-      </div>
-      <div class="today-detail-item">
-        <strong>Weather:</strong> ${weather ? weather.emoji + ' ' + weather.name : 'Unknown'}
-        <div class="detail-effect">${weather ? weather.effect : ''}</div>
-      </div>
-      <div class="today-detail-item">
-        <strong>${bonus ? bonus.icon : '⚡'} Bonus:</strong> ${bonus ? bonus.name : 'None'}
-      </div>
-      ${mysteryHtml}
-      <div class="today-detail-item">
-        <strong>✨ Featured:</strong> ${features.featured_type || features.featuredType}-type pets earn +50% XP
-      </div>
-      <div class="today-detail-item">
-        <strong>Events:</strong> ${features.event_chance || features.eventChance} chance of random events
-      </div>
-      <div class="today-news">
-        📰 ${features.news_headline || features.headline}
-      </div>
-    </div>
-  `;
-  
-  // Remove old banner if exists, insert at top
-  var existing = document.getElementById('today-banner');
-  if (existing) existing.remove();
-  if (homeContent.firstChild) {
-    homeContent.insertBefore(banner, homeContent.firstChild);
-  } else {
-    homeContent.appendChild(banner);
-  }
-}
-
-function todayBanner_toggle() {
-  var banner = document.querySelector('.today-banner');
-  if (!banner) return;
-  
-  var details = banner.querySelector('.today-details');
-  var arrow = banner.querySelector('.today-arrow');
-  
-  if (details.style.display === 'none') {
-    details.style.display = 'block';
-    arrow.textContent = '▲';
-    banner.classList.remove('collapsed');
-  } else {
-    details.style.display = 'none';
-    arrow.textContent = '▼';
-    banner.classList.add('collapsed');
-  }
-}
-
-function today_applyEffects() {
-  // Effects applied automatically by checking todayFeatures.current
-  dbg('✅ Today features loaded:', todayFeatures.current);
-}
-
-function today_getMultiplier(type) {
-  if (!todayFeatures.current) return 1.0;
-  
-  var features = todayFeatures.current;
-  var multiplier = 1.0;
-  
-  // Featured type bonus
-  if (type === features.featured_type) {
-    multiplier *= 1.5;
-  }
-  
-  // Weather bonus
-  var weather = features.weather;
-  if (weather === 'rainy' && type === 'water') multiplier *= 1.25;
-  if (weather === 'snowy' && type === 'ice') multiplier *= 1.25;
-  if (weather === 'stormy' && type === 'electric') multiplier *= 1.25;
-  
-  return multiplier;
+  mount.innerHTML =
+    '<div class="today-card">' +
+      '<div class="today-card-header">🌟 Today in PawketPets</div>' +
+      weatherHtml +
+      statsHtml +
+      goalHtml +
+      liveHtml +
+    '</div>';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -28202,8 +28001,6 @@ async function dailyWelcome_show() {
   
   var streak = loginCalendar.currentStreak || 0;
   var dayReward = loginCalendar.calendarRewards ? loginCalendar.calendarRewards.find(function(r) { return r.day === streak; }) : null;
-  var features = todayFeatures.current;
-  
   var modal = document.createElement('div');
   modal.className = 'modal-overlay daily-welcome-modal';
   
@@ -28230,16 +28027,13 @@ async function dailyWelcome_show() {
     html += '  </div>';
   }
   
-  // Today features
-  if (features) {
-    var weather = todayFeatures.weatherTypes.find(function(w) { return w.id === features.weather; });
-    var bonus = todayFeatures.bonusTypes.find(function(b) { return b.id === features.bonus_type; });
-    
+  // Today features — reads from weatherSystem, the single source of truth
+  var todayWeather = (typeof weatherSystem !== 'undefined' && weatherSystem.currentWeather) ? weatherSystem.currentWeather : null;
+  if (todayWeather) {
     html += '  <div class="welcome-today">';
     html += '    <h3>🌟 TODAY IN PAWKETPETS</h3>';
-    html += '    <div class="today-item">Weather: ' + (weather ? weather.emoji + ' ' + weather.name : '') + '</div>';
-    html += '    <div class="today-item">Bonus: ' + (bonus ? '⚡ ' + bonus.name : '') + '</div>';
-    html += '    <div class="today-item">Featured: ✨ ' + features.featured_type + '-type pets +50% XP</div>';
+    html += '    <div class="today-item">Weather: ' + todayWeather.icon + ' ' + todayWeather.name + '</div>';
+    html += '    <div class="today-item">' + todayWeather.effect + '</div>';
     html += '  </div>';
   }
   
