@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>PawketPetsVT — OBS Overlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Chewy&display=swap" rel="stylesheet">
 <style>
   /* Transparent, click-through overlay meant for an OBS Browser Source. */
   html, body {
@@ -16,6 +17,7 @@
 
   :root {
     --purple: #9966ff;
+    --purple-light: #ccaaff;
     --purple-dark: #6633cc;
     --pink: #ff66cc;
   }
@@ -59,11 +61,31 @@
   /* ── Persistent stats card ── */
   #stats-overlay { padding: 14px 16px; }
   .stats-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-  .stats-pet-img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: rgba(255,255,255,0.1); }
-  .stats-name-row { display: flex; align-items: center; gap: 6px; }
-  .stats-brand-logo { width: 18px; height: 18px; border-radius: 4px; object-fit: contain; }
+  .stats-pet-img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: rgba(255,255,255,0.1); flex-shrink: 0; }
+  .stats-name-block { flex: 1; min-width: 0; }
   .stats-name { font-weight: bold; font-size: 1.05rem; }
   .stats-sub { font-size: 0.78rem; color: #d8c8ff; }
+  .stats-brand-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 0.85;
+    flex-shrink: 0;
+    text-align: center;
+    padding: 0 4px;
+  }
+  .stats-brand-line {
+    font-family: 'Chewy', cursive;
+    font-size: 1.3rem;
+    letter-spacing: 0.02em;
+    background: linear-gradient(135deg, var(--pink), var(--purple-light));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: var(--pink); /* fallback if background-clip:text isn't supported */
+    text-shadow: 0 2px 3px rgba(0,0,0,0.35);
+  }
   .stat-row { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 0.78rem; }
   .stat-label { width: 56px; flex-shrink: 0; }
   .stat-bar-track { flex: 1; height: 8px; background: rgba(255,255,255,0.12); border-radius: 6px; overflow: hidden; }
@@ -85,10 +107,26 @@
 
   /* ── Live alert banner ── */
   #alert-banner {
-    padding: 12px 18px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    border-color: var(--pink);
+    padding: 14px 20px;
+    border-width: 3px;
+    text-align: center;
+  }
+  .alert-icon { font-size: 1.9rem; display: block; margin-bottom: 2px; }
+  .alert-headline { font-size: 1.05rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
+  .alert-subtext { font-size: 0.85rem; margin-top: 4px; color: #f0e6ff; }
+
+  @keyframes alertPop {
+    0%   { transform: scale(0.6); }
+    55%  { transform: scale(1.1); }
+    75%  { transform: scale(0.96); }
+    100% { transform: scale(1); }
+  }
+  @keyframes alertGlow {
+    0%, 100% { filter: drop-shadow(0 0 2px currentColor); }
+    50%      { filter: drop-shadow(0 0 14px currentColor); }
+  }
+  #alert-banner.pop-in {
+    animation: alertPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1), alertGlow 1.4s ease-in-out 0.55s 2;
   }
 
   /* ── Chat-triggered pet pop-up ── */
@@ -112,12 +150,13 @@
       <div id="stats-overlay" class="obs-card">
         <div class="stats-header">
           <img id="stats-pet-img" class="stats-pet-img" src="" alt="">
-          <div>
-            <div class="stats-name-row">
-              <img src="images/pawket-logo.png" alt="PawketPetsVT" class="stats-brand-logo" onerror="this.style.display='none'">
-              <div id="stats-name" class="stats-name">—</div>
-            </div>
+          <div class="stats-name-block">
+            <div id="stats-name" class="stats-name">—</div>
             <div id="stats-sub" class="stats-sub">—</div>
+          </div>
+          <div class="stats-brand-text">
+            <span class="stats-brand-line">Pawket</span>
+            <span class="stats-brand-line">Pets</span>
           </div>
         </div>
         <div class="stat-row"><span class="stat-label">HP</span><div class="stat-bar-track"><div id="bar-hp" class="stat-bar-fill stat-fill-hp" style="width:0%"></div></div></div>
@@ -217,17 +256,31 @@
   function formatAlert(row) {
     var data = row.activity_data || {};
     switch (row.activity_type) {
-      case 'pet_adopted':        return '🐾 A new pet was just adopted: ' + (data.pet_name || 'a new pet') + '!';
-      case 'boss_defeated':      return '💀 Boss defeated: ' + (data.boss_name || 'a boss') + '!';
-      case 'level_up':           return '🎉 ' + (data.pet_name || 'A pet') + ' just hit level ' + (data.level || '?') + '!';
-      case 'badge_earned':       return '🎖️ Someone just earned the ' + (data.badge_name || 'a badge') + '!';
-      case 'achievement_unlocked': return '⭐ Achievement unlocked: ' + (data.achievement_name || 'something cool') + '!';
+      case 'pet_adopted':
+        return { icon: '🐾', headline: 'New Pet Alert!', subtext: (data.pet_name || 'A new pet') + ' just joined the family!', color: '#ff66cc' };
+      case 'boss_defeated':
+        return { icon: '💀', headline: 'Boss Defeated!', subtext: (data.boss_name || 'A boss') + ' has fallen!', color: '#ff6644' };
+      case 'level_up':
+        return { icon: '🎉', headline: 'Level Up!', subtext: (data.pet_name || 'A pet') + ' just hit level ' + (data.level || '?') + '!', color: '#ffcc33' };
+      case 'badge_earned':
+        return { icon: '🎖️', headline: 'Badge Earned!', subtext: 'Someone just earned ' + (data.badge_name || 'a badge') + '!', color: '#9966ff' };
+      case 'achievement_unlocked':
+        return { icon: '⭐', headline: 'Achievement!', subtext: (data.achievement_name || 'Something cool') + ' unlocked!', color: '#33ccff' };
       default: return null; // unrecognized types don't show a banner
     }
   }
 
-  function showAlert(text) {
-    document.getElementById('alert-banner').textContent = text;
+  function showAlert(alert) {
+    var el = document.getElementById('alert-banner');
+    el.innerHTML =
+      '<span class="alert-icon">' + alert.icon + '</span>' +
+      '<div class="alert-headline">' + alert.headline + '</div>' +
+      '<div class="alert-subtext">' + alert.subtext + '</div>';
+    el.style.borderColor = alert.color;
+    el.style.color = alert.color;
+    el.classList.remove('pop-in');
+    void el.offsetWidth; // force reflow so the animation can re-trigger on back-to-back alerts
+    el.classList.add('pop-in');
     expand('alert-wrap');
     setTimeout(function() { collapse('alert-wrap'); }, 6000);
   }
@@ -237,8 +290,8 @@
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_feed' }, function(payload) {
       var row = payload.new;
       if (!row.is_public) return;
-      var text = formatAlert(row);
-      if (text) showAlert(text);
+      var alert = formatAlert(row);
+      if (alert) showAlert(alert);
     })
     .subscribe();
 
