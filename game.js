@@ -9681,6 +9681,7 @@ async function calculatePetStats(petId) {
   };
   
   // Apply equipment bonuses
+  var equippedPassives = [];
   if (!equipRes.error && equipRes.data) {
     equipRes.data.forEach(function(item) {
       var equip = item.equipment;
@@ -9689,6 +9690,14 @@ async function calculatePetStats(petId) {
       stats.speed += equip.speed_bonus || 0;
       stats.luck = (stats.luck || 0) + (equip.luck_bonus || 0);
       stats.spirit = (stats.spirit || 0) + (equip.spirit_bonus || 0);
+
+      if (equip.passive_effect && equip.passive_chance > 0) {
+        equippedPassives.push({
+          effect: equip.passive_effect,
+          chance: equip.passive_chance,
+          itemName: equip.name
+        });
+      }
     });
   }
   
@@ -9701,9 +9710,43 @@ async function calculatePetStats(petId) {
     maxHP: maxHP,
     energy: pet.energy || 50,
     maxEnergy: pet.max_energy || 100,
-    specialSkill: pet.pets.special_skill || null
+    specialSkill: pet.pets.special_skill || null,
+    passives: equippedPassives
   };
 }
+
+/**
+ * Equipment Passive Effects Catalog
+ * type: 'attack' — procs on the player's attack turn
+ * type: 'defend' — procs on the enemy's attack turn (player defending)
+ * Shared-pool effects scale in strength with rarity (common → epic).
+ * Unique effects are hand-crafted for named legendary boss drops.
+ */
+var PASSIVE_EFFECTS = {
+  // ---- Shared pool ----
+  spark_hit:       { type: 'attack', label: 'Spark Hit',       icon: '✨', bonusDamage: 2 },
+  lifesteal_small: { type: 'attack', label: 'Lifesteal',       icon: '🩸', healPct: 0.20 },
+  double_strike:   { type: 'attack', label: 'Double Strike',   icon: '⚔️', extraHitPct: 0.60 },
+  armor_shatter:   { type: 'attack', label: 'Armor Shatter',   icon: '💥', defenseShred: 3 },
+
+  sturdy_tiny:     { type: 'defend', label: 'Sturdy',          icon: '🛡️', flatReduction: 1 },
+  thorns_small:    { type: 'defend', label: 'Thorns',          icon: '🌵', reflectPct: 0.15 },
+  second_wind:     { type: 'defend', label: 'Second Wind',     icon: '💚', healMaxPct: 0.08 },
+  iron_will:       { type: 'defend', label: 'Iron Will',       icon: '🧱', fullBlock: true },
+
+  // ---- Unique legendary effects ----
+  fated_strike:        { type: 'attack', label: "Fated Strike",         icon: '🥄', forceCrit: true },
+  haunting_melody:      { type: 'attack', label: "Haunting Melody",      icon: '🎵', stunEnemy: true },
+  chiming_dread:        { type: 'attack', label: "Chiming Dread",        icon: '🔔', healPct: 0.25, defenseShred: 2 },
+  pipers_final_verse:   { type: 'attack', label: "Piper's Final Verse",  icon: '🎼', doubleDamage: true, attackShred: 2 },
+  cataloged_weakness:   { type: 'attack', label: "Cataloged Weakness",   icon: '📖', forceCrit: true, ignoreDefense: true },
+  culinary_chaos:       { type: 'attack', label: "Culinary Chaos",       icon: '🥣', extraHitPct: 1.0 },
+
+  royal_spores:         { type: 'defend', label: "Royal Spores",        icon: '🍄', healMaxPct: 0.15 },
+  warding_chimes:        { type: 'defend', label: "Warding Chimes",      icon: '🔔', fullBlock: true },
+  trash_royalty:         { type: 'defend', label: "Trash Royalty",       icon: '👑', reflectPct: 0.30 },
+  forbidden_knowledge:   { type: 'defend', label: "Forbidden Knowledge", icon: '📜', flatReduction: 4 }
+};
 
 /**
  * Simulate an entire battle and return the log
@@ -9715,6 +9758,7 @@ function simulateBattle(playerStats, enemyStats) {
   var enemyHP = enemyStats.hp;
   var turn = 0;
   var maxTurns = GAME_CONSTANTS.BATTLE_MAX_TURNS; // prevent infinite loops
+  var enemyStunned = false; // set by stun-type passives (e.g. Haunting Melody)
   
   // Determine who goes first based on speed
   var playerFirst = playerStats.stats.speed >= enemyStats.speed;
@@ -9789,25 +9833,116 @@ function simulateBattle(playerStats, enemyStats) {
           playerHP: playerHP,
           enemyHP: Math.max(0, enemyHP)
         });
+
+        // --- Weapon passive procs ---
+        if (playerStats.passives && playerStats.passives.length) {
+          playerStats.passives.forEach(function(passive) {
+            var fx = PASSIVE_EFFECTS[passive.effect];
+            if (!fx || fx.type !== 'attack') return;
+            if (Math.random() * 100 >= passive.chance) return; // didn't proc
+
+            if (fx.bonusDamage) {
+              enemyHP -= fx.bonusDamage;
+            }
+            if (fx.doubleDamage) {
+              enemyHP -= playerDamageResult.damage;
+            }
+            if (fx.extraHitPct) {
+              var extraDmg = Math.max(1, Math.floor((playerStats.stats.attack - enemyStats.defense) * fx.extraHitPct));
+              enemyHP -= extraDmg;
+              log.push({ type: 'passive', text: fx.icon + ' ' + fx.label + '! ' + playerStats.name + ' strikes again for ' + extraDmg + ' damage!', playerHP: playerHP, enemyHP: Math.max(0, enemyHP) });
+            }
+            if (fx.forceCrit) {
+              var critBonus = Math.floor(playerDamageResult.damage * 0.5);
+              enemyHP -= critBonus;
+              log.push({ type: 'passive', text: fx.icon + ' ' + fx.label + '! A guaranteed critical strike!', playerHP: playerHP, enemyHP: Math.max(0, enemyHP) });
+            }
+            if (fx.ignoreDefense) {
+              enemyHP -= enemyStats.defense; // bonus damage equal to bypassed defense
+            }
+            if (fx.healPct) {
+              var healAmt = Math.floor(playerDamageResult.damage * fx.healPct);
+              playerHP = Math.min(playerStats.maxHP, playerHP + healAmt);
+              log.push({ type: 'passive', text: fx.icon + ' ' + fx.label + '! ' + playerStats.name + ' heals ' + healAmt + ' HP!', playerHP: playerHP, enemyHP: Math.max(0, enemyHP) });
+            }
+            if (fx.defenseShred) {
+              enemyStats.defense = Math.max(0, enemyStats.defense - fx.defenseShred);
+            }
+            if (fx.attackShred) {
+              enemyStats.attack = Math.max(0, enemyStats.attack - fx.attackShred);
+            }
+            if (fx.stunEnemy) {
+              enemyStunned = true;
+              log.push({ type: 'passive', text: fx.icon + ' ' + fx.label + '! The haunting melody stuns the enemy!', playerHP: playerHP, enemyHP: Math.max(0, enemyHP) });
+            }
+          });
+        }
       }
       
       if (enemyHP <= 0) break;
     }
     
     // Enemy's turn
-    var isBossAttack = enemyStats.is_boss || false;
-    var enemyDamageResult = calculateDamage(enemyStats.attack, playerStats.stats.defense, isBossAttack);
-    playerHP -= enemyDamageResult.damage;
-    
-    log.push({
-      type: 'enemy_attack',
-      attacker: 'enemy',
-      damage: enemyDamageResult.damage,
-      variance: enemyDamageResult.variance,
-      text: enemyStats.name + ' attacks for ' + enemyDamageResult.damage + ' damage! ' + enemyDamageResult.flavor,
-      playerHP: Math.max(0, playerHP),
-      enemyHP: Math.max(0, enemyHP)
-    });
+    if (enemyStunned) {
+      log.push({
+        type: 'passive',
+        text: '🎵 The enemy is still reeling from the haunting melody and cannot attack!',
+        playerHP: Math.max(0, playerHP),
+        enemyHP: Math.max(0, enemyHP)
+      });
+      enemyStunned = false; // only stuns one turn
+    } else {
+      var isBossAttack = enemyStats.is_boss || false;
+      var enemyDamageResult = calculateDamage(enemyStats.attack, playerStats.stats.defense, isBossAttack);
+      var finalDamage = enemyDamageResult.damage;
+      var defendPassiveLogs = [];
+
+      // --- Armor passive procs (defending) ---
+      if (playerStats.passives && playerStats.passives.length) {
+        playerStats.passives.forEach(function(passive) {
+          var fx = PASSIVE_EFFECTS[passive.effect];
+          if (!fx || fx.type !== 'defend') return;
+          if (Math.random() * 100 >= passive.chance) return; // didn't proc
+
+          if (fx.fullBlock) {
+            finalDamage = 0;
+            defendPassiveLogs.push(fx.icon + ' ' + fx.label + '! The attack was fully blocked!');
+          }
+          if (fx.flatReduction) {
+            finalDamage = Math.max(0, finalDamage - fx.flatReduction);
+            defendPassiveLogs.push(fx.icon + ' ' + fx.label + '! Damage reduced!');
+          }
+          if (fx.reflectPct) {
+            var reflectDmg = Math.floor(finalDamage * fx.reflectPct);
+            if (reflectDmg > 0) {
+              enemyHP -= reflectDmg;
+              defendPassiveLogs.push(fx.icon + ' ' + fx.label + '! Reflected ' + reflectDmg + ' damage back!');
+            }
+          }
+          if (fx.healMaxPct) {
+            var healAmt2 = Math.floor(playerStats.maxHP * fx.healMaxPct);
+            playerHP = Math.min(playerStats.maxHP, playerHP + healAmt2);
+            defendPassiveLogs.push(fx.icon + ' ' + fx.label + '! Healed ' + healAmt2 + ' HP!');
+          }
+        });
+      }
+
+      playerHP -= finalDamage;
+
+      log.push({
+        type: 'enemy_attack',
+        attacker: 'enemy',
+        damage: finalDamage,
+        variance: enemyDamageResult.variance,
+        text: enemyStats.name + ' attacks for ' + finalDamage + ' damage! ' + enemyDamageResult.flavor,
+        playerHP: Math.max(0, playerHP),
+        enemyHP: Math.max(0, enemyHP)
+      });
+
+      defendPassiveLogs.forEach(function(txt) {
+        log.push({ type: 'passive', text: txt, playerHP: Math.max(0, playerHP), enemyHP: Math.max(0, enemyHP) });
+      });
+    }
     
     if (playerHP <= 0) break;
   }
