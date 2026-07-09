@@ -4075,7 +4075,7 @@ async function expedition_claim(expeditionId) {
   addPassXP(10, 'expedition').catch(function(){});
   checkPetWishes('expedition', row.pet_id).catch(function(){});
   progressQuestArc(row.pet_id, 'expedition').catch(function(){});
-  community_increment('expeditions_week1', 1);
+  community_increment('expeditions', 1);
   trackDailyStat('expeditions_completed').catch(function(){});
   checkAchievementTierProgress('expeditions_completed', row.pet_id, streak).catch(function(){});
 
@@ -4428,7 +4428,7 @@ async function race_start() {
     updateWeeklyLeaderboard(playerBest.pet.id, playerWon, raceTimeMs).catch(function(){});
     checkAchievementTierProgress('race_wins', playerBest.pet.id, playerWon ? 1 : 0).catch(function(){});
   }
-  community_increment('races_week1', 1);
+  community_increment('races', 1);
 
   // Show results with animated log
   race_renderResults(racerunners, payout, playerBest);
@@ -5040,7 +5040,7 @@ async function feedFree(petId) {
   }
   
   // COMMUNITY GOALS: Track feeding
-  community_increment('feed_pets_week1', 1);
+  community_increment('feed_pets', 1);
   
   // Update local state
   petState[petId].hunger = feedResult.hunger;
@@ -5105,12 +5105,12 @@ async function feedWithItem(petId, itemId, itemName) {
   await addPassXP(2, 'feed');
   
   // COMMUNITY GOALS: Track feeding
-  community_increment('feed_pets_week1', 1);
+  community_increment('feed_pets', 1);
   
   // Check if using treat for bingo and community
   if (itemId === 'treat' || itemId === 'premium_treat') {
     updateBingoProgress('use_treat', 1);
-    community_increment('use_treats_week1', 1);
+    community_increment('use_treats', 1);
   }
   
   // Update local state
@@ -10449,16 +10449,16 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
   // ═══════════════════════════════════════════════════════════
   if (battleResult.victory) {
     // COMMUNITY GOALS: Track battle wins
-    community_increment('battle_wins_week1', 1);
+    community_increment('battle_wins', 1);
     
     // COMMUNITY GOALS: Track mushroom defeats
     if (enemyStats.name && enemyStats.name.toLowerCase().indexOf('mushroom') !== -1) {
-      community_increment('defeat_mushrooms_week1', 1);
+      community_increment('defeat_mushrooms', 1);
     }
 
     // COMMUNITY GOALS: Track corrupted enemy defeats (for the big spooky goal)
     if (enemyStats.specialVariant === 'corrupted') {
-      community_increment('corrupted_kills_event1', 1);
+      community_increment('corrupted_kills', 1);
     }
     
     // SCRAPBOOK: Add first battle win memory
@@ -11446,7 +11446,7 @@ async function battleExp_claim(expeditionId) {
   addPassXP(10, 'expedition').catch(function(){});
   checkPetWishes('expedition', row.pet_id).catch(function(){});
   progressQuestArc(row.pet_id, 'expedition').catch(function(){});
-  community_increment('expeditions_week1', 1);
+  community_increment('expeditions', 1);
 
   // Show rewards modal
   var itemText = items.length > 0 ? items.map(function(it) { return it.icon + ' ' + it.name; }).join(', ') : 'No items';
@@ -26019,14 +26019,19 @@ async function trackDailyStat(column, amount) {
   }
 }
 
-function community_increment(goalKey, amount, metadata) {
-    if (!goalKey) return;
+// NOTE: the string passed in here is a stable METRIC key (e.g. 'battle_wins'),
+// not the database's goal_key. goal_key is unique per row (one per rotation
+// cycle) since the DB enforces a unique constraint on it; metric_key is what
+// stays constant across cycles so the same community_increment() call site
+// keeps working no matter which cycle's goal is currently live for it.
+function community_increment(metricKey, amount, metadata) {
+    if (!metricKey) return;
     amount = amount || 1;
     metadata = metadata || {};
-    community_pendingUpdates[goalKey] = (community_pendingUpdates[goalKey] || 0) + amount;
+    community_pendingUpdates[metricKey] = (community_pendingUpdates[metricKey] || 0) + amount;
     
     // Update UI immediately
-    community_updateLocalProgress(goalKey, community_pendingUpdates[goalKey]);
+    community_updateLocalProgress(metricKey, community_pendingUpdates[metricKey]);
     
     // Schedule sync (every 10 seconds or after 10 increments)
     if (!community_syncInterval) {
@@ -26049,18 +26054,18 @@ async function community_syncToDatabase() {
     }
     community_pendingUpdates = {};
     
-    for (var goalKey in updates) {
-        var increment = updates[goalKey];
+    for (var metricKey in updates) {
+        var increment = updates[metricKey];
         try {
             var res = await supabaseClient.rpc('increment_goal_progress', {
-                p_goal_key: goalKey,
+                p_metric_key: metricKey,
                 p_amount: increment
             });
             if (res.error) console.error('Sync error:', res.error);
         } catch(e) {
             console.error('RPC error:', e);
             // Put back for retry
-            community_pendingUpdates[goalKey] = (community_pendingUpdates[goalKey] || 0) + increment;
+            community_pendingUpdates[metricKey] = (community_pendingUpdates[metricKey] || 0) + increment;
         }
     }
     community_cachedGoals = null;
@@ -26068,14 +26073,14 @@ async function community_syncToDatabase() {
 }
 
 // Update local progress display
-function community_updateLocalProgress(goalKey, increment) {
+function community_updateLocalProgress(metricKey, increment) {
     if (!community_cachedGoals) return;
-    var goal = community_cachedGoals.find(function(g) { return g.goal_key === goalKey; });
+    var goal = community_cachedGoals.find(function(g) { return g.metric_key === metricKey; });
     if (!goal) return;
     var current = goal.current_progress || 0;
     var percent = Math.min(100, ((current + increment) / goal.goal_target) * 100);
-    var progressBar = document.querySelector('.com-progress-' + goalKey);
-    var progressText = document.querySelector('.com-text-' + goalKey);
+    var progressBar = document.querySelector('.com-progress-' + goal.goal_key);
+    var progressText = document.querySelector('.com-text-' + goal.goal_key);
     if (progressBar) progressBar.style.width = percent + '%';
     if (progressText) progressText.textContent = (current + increment) + '/' + goal.goal_target;
 }
@@ -26089,7 +26094,7 @@ function community_updateLocalProgress(goalKey, increment) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 var COMMUNITY_GOAL_NARRATIVES = {
-  'corrupted_kills_event1': [
+  'corrupted_kills_e1': [
     { threshold: 0,   text: "Reports are trickling in — pets returning from the forest with strange, twisted markings. Piper's tune echoes a little differently these days..." },
     { threshold: 25,  text: 'The corruption is spreading faster than anyone expected. Trainers are banding together to fight back.' },
     { threshold: 50,  text: "Halfway there. The corrupted are thinning out, but Piper's presence still lingers at the edges of the forest." },
