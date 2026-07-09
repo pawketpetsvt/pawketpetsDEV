@@ -9024,17 +9024,11 @@ body.night-mode .stat-item.global .stat-value {
   gap: 20px;
 }
 
-/* Two-Column Equipment Shop Layout */
-.equipment-shop-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 30px;
+/* Equipment shop: Weapons and Armor each render as their own full-width
+   section (stacked, not side-by-side) so cards get the full page width
+   to reflow into as many per row as fit — same pattern as .shop-grid. */
+.equipment-section {
   margin-top: 24px;
-}
-
-.equipment-column {
-  display: flex;
-  flex-direction: column;
 }
 
 .equipment-column-title {
@@ -9052,19 +9046,9 @@ body.night-mode .stat-item.global .stat-value {
 
 .equipment-grid-column {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-}
-
-/* Responsive - Stack columns on mobile */
-@media (max-width: 900px) {
-  .equipment-shop-columns {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
-  .equipment-grid-column {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+  width: 100%;
 }
 
 @media (max-width: 500px) {
@@ -11102,7 +11086,6 @@ body.night-mode .btn-outline:hover {
   color: #333 !important;
 }
 
-.pass-level-card,
 .pass-reward-card,
 .pass-reward-item {
   background: rgba(255, 255, 255, 0.95) !important;
@@ -11110,14 +11093,12 @@ body.night-mode .btn-outline:hover {
   color: #333 !important;
 }
 
-.pass-level-card.locked,
 .pass-reward-card.locked {
   background: rgba(0, 0, 0, 0.05) !important;
   opacity: 0.6 !important;
   color: #999 !important;
 }
 
-.pass-level-card.completed,
 .pass-reward-card.completed {
   background: rgba(76, 175, 80, 0.15) !important;
   border-color: #4caf50 !important;
@@ -11235,7 +11216,6 @@ body[data-theme="dark"] .modal-content {
 }
 
 /* Ensure all modal text is readable */
-.pass-modal .pass-level-card *,
 .bingo-modal .bingo-card * {
   text-shadow: none !important;
 }
@@ -13812,14 +13792,6 @@ body[data-theme="dark"] .modal-content {
   background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
 }
 
-.pass-progress-display {
-  background: rgba(102, 126, 234, 0.1);
-  padding: 25px;
-  border-radius: 12px;
-  margin-bottom: 25px;
-  border: 2px solid rgba(102, 126, 234, 0.3);
-}
-
 .pass-level {
   text-align: center;
   font-size: 24px;
@@ -14097,25 +14069,6 @@ body[data-theme="dark"] .modal-content {
   animation: bounceIn 0.4s ease-out;
 }
 
-/* Custom scrollbar for rewards list */
-#pass-rewards-list::-webkit-scrollbar {
-  width: 8px;
-}
-
-#pass-rewards-list::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
-}
-
-#pass-rewards-list::-webkit-scrollbar-thumb {
-  background: rgba(102, 126, 234, 0.5);
-  border-radius: 4px;
-}
-
-#pass-rewards-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(102, 126, 234, 0.7);
-}
-
 /* ═══════════════════════════════════════════════════════════════════════════
    REWARD CARDS
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -14158,10 +14111,6 @@ body[data-theme="dark"] .modal-content {
     height: 100vh;
     max-height: 100vh !important;
     border-radius: 0 !important;
-  }
-  
-  #pass-rewards-list {
-    max-height: calc(100vh - 300px) !important;
   }
   
   .pass-reward-card {
@@ -14265,7 +14214,6 @@ body[data-theme="dark"] .modal-content {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @media print {
-  #pass-modal-overlay,
   .modal-overlay {
     display: none !important;
   }
@@ -16087,14 +16035,8 @@ body.night-mode .btn-variant-selector {
     margin: 8px 0 !important;
   }
 
-  /* ── 13. Equipment shop columns: stack ── */
-  .equipment-shop-columns {
-    flex-direction: column !important;
-    gap: 16px !important;
-  }
-  .equipment-column {
-    width: 100% !important;
-  }
+  /* ── 13. Equipment shop: .equipment-grid-column already reflows via
+     auto-fill, no forced stacking needed here anymore ── */
 
   /* ── 14. Snapshot modal: full width ── */
   .snapshot-modal-overlay > div {
@@ -16627,58 +16569,11 @@ body.night-mode .item-icon-img {
 }
 
 
-/* ── Equipment shop: center cards, no "All" button gap ───────────────────── */
-.equipment-shop-columns {
-  display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
-  gap: 30px !important;
-  justify-items: center !important;
-  width: 100% !important;
-}
-
-.equipment-column {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  width: 100% !important;
-}
-
-.equipment-grid-column {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
-  gap: 20px !important;
-  width: 100% !important;
-  justify-items: center !important;
-}
-
-.equipment-card {
-  width: 100% !important;
-  max-width: 300px !important;
-  box-sizing: border-box !important;
-}
-
-@media (max-width: 640px) {
-  .equipment-shop-columns { grid-template-columns: 1fr !important; }
-}
-
-
-/* ── Equipment shop: final override for 2-per-row cards ─────────────────── */
-.equipment-grid-column {
-  display: grid !important;
-  grid-template-columns: repeat(2, 1fr) !important;
-  gap: 16px !important;
-}
-.equipment-shop-columns {
-  display: grid !important;
-  grid-template-columns: repeat(2, 1fr) !important;
-  gap: 24px !important;
-  width: 100% !important;
-}
-.equipment-card { width: 100% !important; box-sizing: border-box !important; }
-@media (max-width: 600px) {
-  .equipment-shop-columns,
-  .equipment-grid-column { grid-template-columns: 1fr !important; }
-}
+/* Equipment shop layout is now defined once, near .equipment-grid above —
+   the two duplicate !important patch blocks that used to be here (one
+   using auto-fill, one forcing repeat(2,1fr), both also fighting over
+   .equipment-shop-columns which no longer exists in the markup) have been
+   removed since they were the actual cause of the "1 item per row" bug. */
 
 
 /* ── Twitch Rewards Section ──────────────────────────────────────────────── */

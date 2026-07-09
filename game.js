@@ -24393,21 +24393,22 @@ async function loadEquipmentShop() {
     var showArmor   = (currentFilter === 'all' || currentFilter === 'armor');
 
     if (currentFilter === 'all') {
-      // Two columns: weapons left, armor right
-      html += '<div class="equipment-shop-columns">';
-      html += '<div class="equipment-column">';
+      // Weapons and armor each get their own full-width row of cards.
+      // (Previously these were two side-by-side half-width columns, which
+      // halved the usable width and was the root cause of only 1 card
+      // fitting per visual row no matter how the grid inside was tuned.)
+      html += '<div class="equipment-section">';
       html += '<h3 class="equipment-column-title">⚔️ Weapons</h3>';
       html += '<div class="equipment-grid-column">';
       if (weapons.length === 0) { html += '<div class="empty-equipment">No weapons available this week</div>'; }
       else { weapons.forEach(function(item) { html += renderEquipmentCard(item); }); }
       html += '</div></div>';
-      html += '<div class="equipment-column">';
+      html += '<div class="equipment-section">';
       html += '<h3 class="equipment-column-title">🛡️ Armor</h3>';
       html += '<div class="equipment-grid-column">';
       if (armor.length === 0) { html += '<div class="empty-equipment">No armor available this week</div>'; }
       else { armor.forEach(function(item) { html += renderEquipmentCard(item); }); }
       html += '</div></div>';
-      html += '</div>';
     } else {
       // Single column — full width, whichever type is selected
       var filteredItems = showWeapons ? weapons : armor;
@@ -24967,9 +24968,12 @@ function updatePassUI() {
 function showPassModal() {
   var modal = makeModal();
   modal.classList.add('pass-modal');
+  // makeModal()'s generic inline style caps width at 90% — widen specifically
+  // for the Pass modal so the reward track actually gets the extra room.
+  modal.style.maxWidth = '96vw';
   
   var content = makeEl('div', {class: 'pass-modal-content'});
-  content.style.cssText = 'padding:20px;max-width:900px;max-height:80vh;overflow-y:auto;';
+  content.style.cssText = 'padding:20px;max-width:1500px;width:95vw;max-height:88vh;overflow-y:auto;';
   
   // Header
   var header = makeEl('div');
@@ -24984,7 +24988,7 @@ function showPassModal() {
   
   // Rewards track
   var track = makeEl('div', {class: 'pass-rewards-track'});
-  track.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:15px;';
+  track.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:14px;';
   
   for (var level = 1; level <= 50; level++) {
     var reward = PASS_REWARDS[level];
@@ -28538,398 +28542,15 @@ async function screenshot_copyToClipboard(imageUrl, btn) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 7. PAWKETPASS SYSTEM
+// 7. PAWKETPASS NAVBAR BADGE
+// (This used to be a full second PawketPass system — its own state object,
+// modal, and XP-granting call — but it called a Postgres RPC, grant_pass_xp,
+// that doesn't exist (the real one is add_pass_xp), so it never actually ran.
+// The live Pass system is addPassXP() / showPassModal() / passProgress
+// earlier in this file. The only piece of this block that was actually
+// reachable was pass_updateNavbar, wired in below via a wrapper around the
+// real loadPassProgress() — kept as-is since it's live and working.)
 // ═══════════════════════════════════════════════════════════════════════════
-
-var pawketPass = {
-  currentSeason: null,
-  playerProgress: null,
-  rewards: []
-};
-
-async function pass_init() {
-  await pass_loadSeason();
-  await pass_loadProgress();
-  await pass_loadRewards();
-}
-
-async function pass_loadSeason() {
-  try {
-    var { data: season } = await supabaseClient
-      .from('pass_seasons')
-      .select('*')
-      .eq('is_active', true)
-      .order('season_number', { ascending: false })
-      .limit(1)
-      .single();
-    
-    pawketPass.currentSeason = season;
-  } catch (err) {
-    console.error('Error loading pass season:', err);
-  }
-}
-
-async function pass_loadProgress() {
-  if (!currentUser || !pawketPass.currentSeason) return;
-  
-  try {
-    var { data: progress } = await supabaseClient
-      .from('player_pass_progress')
-      .select('*')
-      .eq('player_id', currentUser.id)
-      .eq('season_id', pawketPass.currentSeason.id)
-      .single();
-    
-    if (!progress) {
-      // Create progress
-      var { data: created } = await supabaseClient
-        .from('player_pass_progress')
-        .insert({
-          player_id: currentUser.id,
-          season_id: pawketPass.currentSeason.id,
-          pass_xp: 0,
-          pass_level: 1
-        })
-        .select()
-        .single();
-      
-      pawketPass.playerProgress = created;
-    } else {
-      pawketPass.playerProgress = progress;
-    }
-  } catch (err) {
-    console.error('Error loading pass progress:', err);
-  }
-}
-
-async function pass_loadRewards() {
-  if (!pawketPass.currentSeason) return;
-  
-  try {
-    var { data: rewards } = await supabaseClient
-      .from('pass_rewards')
-      .select('*')
-      .eq('season_id', pawketPass.currentSeason.id)
-      .order('level');
-    
-    pawketPass.rewards = rewards || [];
-  } catch (err) {
-    console.error('Error loading pass rewards:', err);
-  }
-}
-
-async function pass_grantXP(amount, source) {
-  if (!currentUser) return;
-  
-  try {
-    var { data: result } = await supabaseClient
-      .rpc('grant_pass_xp', {
-        p_user_id: currentUser.id,
-        p_xp_amount: amount,
-        p_source: source
-      });
-    
-    if (result && result.success) {
-      dbg('✅ Pass XP granted:', result);
-      
-      if (result.leveled_up) {
-        pass_showLevelUpNotification(result.new_level);
-      }
-      
-      // Reload progress
-      await pass_loadProgress();
-      
-      // Update UI
-      pass_updateDisplay();
-    }
-  } catch (err) {
-    console.error('Error granting pass XP:', err);
-  }
-}
-
-
-function pass_showModal() {
-  if (!passProgress) {
-    showToast('Pass not loaded yet. Please try again.', 'error');
-    return;
-  }
-  
-  passUI.isModalOpen = true;
-  
-  var modal = document.createElement('div');
-  modal.id = 'pass-modal-overlay';
-  modal.className = 'modal-overlay';
-  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:10000;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s;';
-  
-  var content = document.createElement('div');
-  content.className = 'pass-modal-content';
-  content.style.cssText = 'background:linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);border-radius:16px;max-width:900px;width:95%;max-height:85vh;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.4);';
-  
-  // Header
-  var header = document.createElement('div');
-  header.style.cssText = 'padding:24px;border-bottom:2px solid rgba(102,126,234,0.3);display:flex;justify-content:space-between;align-items:center;';
-  header.innerHTML = 
-    '<div>' +
-    '<h2 style="margin:0;font-size:28px;color:#667eea;">🎫 PawketPass</h2>' +
-    '<p style="margin:4px 0 0 0;color:#94a3b8;font-size:14px;">Season 1: Origins</p>' +
-    '</div>' +
-    '<button onclick="pass_closeModal()" style="background:none;border:none;color:#94a3b8;font-size:32px;cursor:pointer;padding:0;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:all 0.2s;" onmouseover="this.style.background=\'rgba(255,255,255,0.1)\';this.style.color=\'white\';" onmouseout="this.style.background=\'none\';this.style.color=\'#94a3b8\';">×</button>';
-  
-  // Progress section
-  var progressSection = document.createElement('div');
-  progressSection.style.cssText = 'padding:24px;background:rgba(102,126,234,0.1);border-bottom:2px solid rgba(102,126,234,0.2);';
-  
-  var xpPercent = (passProgress.xp / 100) * 100;
-  var nextLevel = passProgress.level + 1;
-  
-  progressSection.innerHTML = 
-    '<div style="text-align:center;margin-bottom:16px;">' +
-    '<div style="font-size:24px;font-weight:bold;color:#667eea;margin-bottom:8px;">Level ' + passProgress.level + ' / 50</div>' +
-    '<div style="font-size:14px;color:#cbd5e1;">Next level: ' + passProgress.xp + ' / 100 XP</div>' +
-    '</div>' +
-    '<div style="width:100%;height:32px;background:rgba(0,0,0,0.4);border-radius:16px;overflow:hidden;position:relative;">' +
-    '<div style="width:' + xpPercent + '%;height:100%;background:linear-gradient(90deg,#667eea,#764ba2);transition:width 0.5s ease;box-shadow:0 0 20px rgba(102,126,234,0.6);"></div>' +
-    '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-weight:bold;font-size:14px;text-shadow:0 2px 4px rgba(0,0,0,0.8);">' + passProgress.xp + ' / 100</div>' +
-    '</div>';
-
-  // Populate unclaimedLevels now that passProgress is loaded
-  passUI.unclaimedLevels = [];
-  var claimedList = passProgress.claimedRewards || passProgress.claimed_rewards || [];
-  for (var lvl = 1; lvl <= (passProgress.level || 1); lvl++) {
-    if (claimedList.indexOf(lvl) === -1) passUI.unclaimedLevels.push(lvl);
-  }
-
-  progressSection.innerHTML += (passUI.unclaimedLevels.length > 0 ? 
-      '<div style="text-align:center;margin-top:16px;padding:12px;background:rgba(245,158,11,0.2);border-radius:8px;border-left:4px solid #f59e0b;">' +
-      '<span style="color:#fbbf24;font-weight:bold;">🎁 ' + passUI.unclaimedLevels.length + ' reward' + (passUI.unclaimedLevels.length > 1 ? 's' : '') + ' ready to claim!</span>' +
-      '</div>' : '');
-  
-  // Rewards list container
-  var rewardsList = document.createElement('div');
-  rewardsList.id = 'pass-rewards-list';
-  rewardsList.style.cssText = 'max-height:400px;overflow-y:auto;padding:20px;';
-  
-  // Build modal
-  content.appendChild(header);
-  content.appendChild(progressSection);
-  content.appendChild(rewardsList);
-  modal.appendChild(content);
-  document.body.appendChild(modal);
-  
-  // Render rewards
-  pass_renderRewards();
-  
-  // Close on backdrop click
-  modal.onclick = function(e) {
-    if (e.target === modal) {
-      pass_closeModal();
-    }
-  };
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 5. RENDER REWARDS LIST (Uses YOUR PASS_REWARDS)
-// ═══════════════════════════════════════════════════════════════════════════
-
-function pass_renderRewards() {
-  var container = document.getElementById('pass-rewards-list');
-  if (!container) return;
-  
-  container.innerHTML = '';
-  
-  // Loop through all 50 levels using YOUR PASS_REWARDS
-  for (var level = 1; level <= 50; level++) {
-    var reward = PASS_REWARDS[level];
-    if (!reward) continue;
-    
-    var _claimedArr = passProgress.claimedRewards || passProgress.claimed_rewards || [];
-    var isClaimed = _claimedArr.includes(level);
-    var isUnlocked = level <= passProgress.level && !isClaimed;
-    var isLocked = level > passProgress.level;
-    
-    var card = document.createElement('div');
-    card.className = 'pass-reward-card';
-    card.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:16px 20px;margin-bottom:12px;border-radius:12px;transition:all 0.3s;';
-    
-    // Styling based on state
-    if (isClaimed) {
-      card.style.background = 'rgba(74,222,128,0.1)';
-      card.style.border = '2px solid rgba(74,222,128,0.3)';
-    } else if (isUnlocked) {
-      card.style.background = 'rgba(251,191,36,0.15)';
-      card.style.border = '2px solid #fbbf24';
-      card.style.boxShadow = '0 0 20px rgba(251,191,36,0.3)';
-      card.style.animation = 'pulse 2s infinite';
-    } else {
-      card.style.background = 'rgba(255,255,255,0.05)';
-      card.style.border = '2px solid rgba(255,255,255,0.1)';
-      card.style.opacity = '0.6';
-    }
-    
-    // Left side: Level + reward info
-    var leftSide = document.createElement('div');
-    leftSide.style.cssText = 'flex:1;';
-    
-    var levelNumber = document.createElement('div');
-    levelNumber.style.cssText = 'font-size:12px;color:#94a3b8;margin-bottom:4px;font-weight:600;';
-    levelNumber.textContent = 'Level ' + level;
-    
-    var rewardText = document.createElement('div');
-    rewardText.style.cssText = 'font-size:16px;font-weight:500;';
-    
-    // Format reward text based on YOUR reward types
-    if (reward.type === 'points') {
-      rewardText.innerHTML = '<span style="color:#fbbf24;">💰 ' + reward.amount + ' PP</span>';
-    } else if (reward.type === 'item') {
-      rewardText.innerHTML = '<span style="color:#60a5fa;">🎁 ' + (reward.quantity || 1) + ' Item' + (reward.quantity > 1 ? 's' : '') + '</span>';
-    } else if (reward.type === 'title') {
-      var titleName = reward.titleKey.replace(/_/g, ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); });
-      rewardText.innerHTML = '<span style="color:#c084fc;">🏷️ ' + titleName + '</span>';
-    }
-    
-    leftSide.appendChild(levelNumber);
-    leftSide.appendChild(rewardText);
-    
-    // Right side: Status/button
-    var rightSide = document.createElement('div');
-    rightSide.style.cssText = 'display:flex;align-items:center;';
-    
-    if (isClaimed) {
-      rightSide.innerHTML = '<div style="color:#4ade80;font-weight:bold;display:flex;align-items:center;gap:8px;"><span style="font-size:20px;">✓</span> Claimed</div>';
-    } else if (isUnlocked) {
-      var claimBtn = document.createElement('button');
-      claimBtn.style.cssText = 'background:#fbbf24;color:#1e1e2e;border:none;padding:10px 20px;border-radius:8px;font-weight:bold;cursor:pointer;transition:all 0.2s;font-size:14px;';
-      claimBtn.textContent = 'CLAIM REWARD';
-      claimBtn.onmouseover = function() { this.style.background = '#f59e0b'; this.style.transform = 'scale(1.05)'; };
-      claimBtn.onmouseout = function() { this.style.background = '#fbbf24'; this.style.transform = 'scale(1)'; };
-      claimBtn.onclick = function() { pass_handleClaim(level); };
-      rightSide.appendChild(claimBtn);
-    } else {
-      rightSide.innerHTML = '<div style="color:#64748b;font-weight:500;display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">🔒</span> Locked</div>';
-    }
-    
-    card.appendChild(leftSide);
-    card.appendChild(rightSide);
-    container.appendChild(card);
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 6. HANDLE CLAIM BUTTON CLICK
-// ═══════════════════════════════════════════════════════════════════════════
-
-async function pass_handleClaim(level) {
-  // Disable all claim buttons temporarily
-  var buttons = document.querySelectorAll('.pass-reward-card button');
-  buttons.forEach(function(btn) { btn.disabled = true; btn.style.opacity = '0.5'; });
-  
-  // Call YOUR wrapped claimPassReward function
-  await claimPassReward(level);
-  
-  // Re-enable buttons
-  buttons.forEach(function(btn) { btn.disabled = false; btn.style.opacity = '1'; });
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 7. CLAIM SUCCESS NOTIFICATION
-// ═══════════════════════════════════════════════════════════════════════════
-
-function pass_showClaimSuccess(level) {
-  var reward = PASS_REWARDS[level];
-  if (!reward) return;
-  
-  var rewardText = '';
-  if (reward.type === 'points') {
-    rewardText = reward.amount + ' PP';
-  } else if (reward.type === 'item') {
-    rewardText = (reward.quantity || 1) + ' Item(s)';
-  } else if (reward.type === 'title') {
-    rewardText = 'New Title!';
-  }
-  
-  // Create floating notification
-  var notification = document.createElement('div');
-  notification.style.cssText = 
-    'position:fixed;top:80px;right:20px;background:linear-gradient(135deg,#4ade80,#22c55e);' +
-    'color:white;padding:16px 24px;border-radius:12px;box-shadow:0 4px 12px rgba(74,222,128,0.4);' +
-    'z-index:10001;animation:slideInRight 0.3s,fadeOut 0.3s 2.7s;font-weight:500;';
-  notification.innerHTML = 
-    '<div style="display:flex;align-items:center;gap:12px;">' +
-    '<span style="font-size:24px;">🎁</span>' +
-    '<div>' +
-    '<div style="font-weight:bold;margin-bottom:4px;">Reward Claimed!</div>' +
-    '<div style="font-size:14px;opacity:0.9;">Level ' + level + ': ' + rewardText + '</div>' +
-    '</div>' +
-    '</div>';
-  
-  document.body.appendChild(notification);
-  
-  setTimeout(function() {
-    if (notification.parentNode) {
-      notification.parentNode.removeChild(notification);
-    }
-  }, 3000);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 8. LEVEL UP NOTIFICATION
-// ═══════════════════════════════════════════════════════════════════════════
-
-function pass_showLevelUpNotification(newLevel) {
-  // Effects first
-  screenShake(5, 250);
-  screenFlash('rgba(102,126,234,0.3)', 400);
-  playChiptune('levelup');
-  createConfettiBurst(window.innerWidth / 2, window.innerHeight / 2);
-  setTimeout(function() {
-    if (typeof createStarBurst === 'function') createStarBurst(window.innerWidth / 2, window.innerHeight / 3);
-  }, 300);
-
-  // Create celebration modal
-  var modal = document.createElement('div');
-  modal.className = 'modal-overlay';
-  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10002;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s;';
-  
-  var content = document.createElement('div');
-  content.style.cssText = 
-    'background:linear-gradient(135deg,#667eea,#764ba2);padding:40px;border-radius:20px;' +
-    'text-align:center;box-shadow:0 8px 32px rgba(102,126,234,0.6);max-width:400px;' +
-    'position:relative;animation:bounceIn 0.5s;';
-  
-  content.innerHTML = 
-    '<button onclick="this.closest(\'.modal-overlay\').remove()" class="celebration-dismiss-btn" title="Dismiss">✕</button>' +
-    '<div style="font-size:80px;margin-bottom:20px;animation:bounce 1s infinite;">🎉</div>' +
-    '<h2 style="color:white;font-size:32px;margin:0 0 12px 0;">LEVEL UP!</h2>' +
-    '<div style="color:rgba(255,255,255,0.9);font-size:24px;margin-bottom:24px;">You reached <strong>Level ' + newLevel + '</strong>!</div>' +
-    '<button onclick="this.closest(\'.modal-overlay\').remove();pass_showModal();" style="background:white;color:#667eea;border:none;padding:14px 32px;border-radius:12px;font-weight:bold;font-size:16px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.transform=\'scale(1.05)\';" onmouseout="this.style.transform=\'scale(1)\';">Claim Reward 🎁</button>' +
-    '<div style="margin-top:16px;"><button onclick="this.closest(\'.modal-overlay\').remove();" style="background:none;border:none;color:rgba(255,255,255,0.7);text-decoration:underline;cursor:pointer;font-size:14px;">Later</button></div>';
-  
-  modal.appendChild(content);
-  document.body.appendChild(modal);
-  
-  // Auto-close after 12 seconds
-  setTimeout(function() { if (modal.parentNode) modal.parentNode.removeChild(modal); }, 12000);
-  
-  // Close on backdrop click
-  modal.onclick = function(e) { if (e.target === modal) modal.parentNode.removeChild(modal); };
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 9. CLOSE MODAL
-// ═══════════════════════════════════════════════════════════════════════════
-
-function pass_closeModal() {
-  passUI.isModalOpen = false;
-  var modal = document.getElementById('pass-modal-overlay');
-  if (modal) {
-    modal.style.animation = 'fadeOut 0.2s';
-    setTimeout(function() {
-      if (modal.parentNode) {
-        modal.parentNode.removeChild(modal);
-      }
-    }, 200);
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 10. INITIALIZE PASS UI (Call after loadPassProgress)
@@ -28964,10 +28585,6 @@ function pass_updateNavbar() {
 }
 
 // Wrap loadPassProgress to update UI after load
-var passUI = {
-  isModalOpen: false,
-  unclaimedLevels: []
-};
 var originalLoadPassProgress = loadPassProgress;
 
 loadPassProgress = async function() {
@@ -28975,7 +28592,7 @@ loadPassProgress = async function() {
   pass_updateNavbar();
 };
 
-dbg('✅ PawketPass UI system loaded (wrapper pattern)');
+dbg('✅ PawketPass navbar badge wired to loadPassProgress');
 // ═══════════════════════════════════════════════════════════════════════════
 // CENTERED MODAL NOTIFICATION SYSTEM
 // Completely standalone - does NOT modify any existing functions
