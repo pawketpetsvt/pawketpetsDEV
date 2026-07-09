@@ -105,29 +105,15 @@
   .goal-bar-fill { height: 100%; background: linear-gradient(90deg, var(--purple), var(--pink)); border-radius: 8px; transition: width 0.5s ease; }
   .goal-text { font-size: 0.72rem; margin-top: 4px; color: #d8c8ff; }
 
-  /* ── Live alert banner ── */
-  #alert-banner {
-    padding: 14px 20px;
-    border-width: 3px;
-    text-align: center;
+  /* ── Live activity ticker — persistent, always visible, cycles slowly
+     through recent events across the whole game (not just this stream) ── */
+  #activity-ticker {
+    padding: 12px 16px;
+    border-color: var(--purple);
+    min-height: 18px;
   }
-  .alert-icon { font-size: 1.9rem; display: block; margin-bottom: 2px; }
-  .alert-headline { font-size: 1.05rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
-  .alert-subtext { font-size: 0.85rem; margin-top: 4px; color: #f0e6ff; }
-
-  @keyframes alertPop {
-    0%   { transform: scale(0.6); }
-    55%  { transform: scale(1.1); }
-    75%  { transform: scale(0.96); }
-    100% { transform: scale(1); }
-  }
-  @keyframes alertGlow {
-    0%, 100% { filter: drop-shadow(0 0 2px currentColor); }
-    50%      { filter: drop-shadow(0 0 14px currentColor); }
-  }
-  #alert-banner.pop-in {
-    animation: alertPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1), alertGlow 1.4s ease-in-out 0.55s 2;
-  }
+  .ticker-label { font-size: 0.62rem; font-weight: bold; letter-spacing: 0.06em; text-transform: uppercase; color: var(--purple-light); margin-bottom: 5px; }
+  .ticker-text { font-size: 0.85rem; line-height: 1.4; color: #fff; transition: opacity 0.35s ease; }
 
   /* ── Chat-triggered pet pop-up ── */
   #chat-pop {
@@ -177,8 +163,11 @@
       </div>
     </div>
 
-    <div id="alert-wrap" class="obs-item">
-      <div id="alert-banner" class="obs-card"></div>
+    <div id="ticker-wrap" class="obs-item">
+      <div id="activity-ticker" class="obs-card" style="margin-bottom:0;">
+        <div class="ticker-label">🌍 Live Activity</div>
+        <div id="ticker-text" class="ticker-text">👀 Watching for adventures...</div>
+      </div>
     </div>
 
     <div id="chatpop-wrap" class="obs-item">
@@ -251,49 +240,98 @@
   setInterval(loadStats, 60000);
 
   // ══════════════════════════════════════════════════════════════
-  // 2. LIVE ALERT BANNER — realtime subscription on activity_feed
+  // 2. LIVE ACTIVITY TICKER — always on screen, cycles slowly through
+  // recent events across the whole game (not just this stream): pet
+  // adoptions (with nickname if given), fainted pets, boss kills, level
+  // ups, badges, achievements. Keeps a small rolling queue rather than
+  // popping up and disappearing, so there's always something to read.
   // ══════════════════════════════════════════════════════════════
-  function formatAlert(row) {
+  var TICKER_QUEUE_MAX = 15;
+  var TICKER_ROTATE_MS = 6000;  // how long each message stays up before advancing
+  var TICKER_IDLE_MS = 15000;   // revert to the idle message if nothing new happens for this long
+  var tickerQueue = [];
+  var tickerIndex = 0;
+  var tickerIdleTimer = null;
+
+  function buildTickerMessage(row) {
     var data = row.activity_data || {};
+    var user = data.username || 'Someone';
     switch (row.activity_type) {
-      case 'pet_adopted':
-        return { icon: '🐾', headline: 'New Pet Alert!', subtext: (data.pet_name || 'A new pet') + ' just joined the family!', color: '#ff66cc' };
+      case 'pet_adopted': {
+        var species = data.species || data.pet_name || 'a pet';
+        var nickname = data.nickname;
+        return { icon: '🐾', color: '#ff88d9', text: user + ' adopted a ' + species + (nickname ? ' and named it ' + nickname + '!' : '!') };
+      }
+      case 'pet_fainted':
+        return { icon: '😢', color: '#aab4c8', text: (data.pet_name || (user + "'s pet")) + ' was defeated in battle against ' + (data.enemy || 'an enemy') + '...' };
       case 'boss_defeated':
-        return { icon: '💀', headline: 'Boss Defeated!', subtext: (data.boss_name || 'A boss') + ' has fallen!', color: '#ff6644' };
+        return { icon: '💀', color: '#ff8866', text: user + ' defeated ' + (data.boss_name || 'a boss') + '!' };
       case 'level_up':
-        return { icon: '🎉', headline: 'Level Up!', subtext: (data.pet_name || 'A pet') + ' just hit level ' + (data.level || '?') + '!', color: '#ffcc33' };
+        return { icon: '🎉', color: '#ffd966', text: (data.pet_name || (user + "'s pet")) + ' just hit level ' + (data.level || '?') + '!' };
       case 'badge_earned':
-        return { icon: '🎖️', headline: 'Badge Earned!', subtext: 'Someone just earned ' + (data.badge_name || 'a badge') + '!', color: '#9966ff' };
+        return { icon: '🎖️', color: '#c299ff', text: user + ' just earned the ' + (data.badge_name || 'a badge') + ' badge!' };
       case 'achievement_unlocked':
-        return { icon: '⭐', headline: 'Achievement!', subtext: (data.achievement_name || 'Something cool') + ' unlocked!', color: '#33ccff' };
-      default: return null; // unrecognized types don't show a banner
+        return { icon: '⭐', color: '#66ddff', text: user + ' unlocked ' + (data.achievement_name || 'an achievement') + '!' };
+      default: return null; // unrecognized types don't show in the ticker
     }
   }
 
-  function showAlert(alert) {
-    var el = document.getElementById('alert-banner');
-    el.innerHTML =
-      '<span class="alert-icon">' + alert.icon + '</span>' +
-      '<div class="alert-headline">' + alert.headline + '</div>' +
-      '<div class="alert-subtext">' + alert.subtext + '</div>';
-    el.style.borderColor = alert.color;
-    el.style.color = alert.color;
-    el.classList.remove('pop-in');
-    void el.offsetWidth; // force reflow so the animation can re-trigger on back-to-back alerts
-    el.classList.add('pop-in');
-    expand('alert-wrap');
-    setTimeout(function() { collapse('alert-wrap'); }, 6000);
+  function renderTicker() {
+    var textEl = document.getElementById('ticker-text');
+    if (!tickerQueue.length) {
+      textEl.style.opacity = '0';
+      setTimeout(function() {
+        textEl.textContent = '👀 Watching for adventures...';
+        textEl.style.color = '#fff';
+        textEl.style.opacity = '1';
+      }, 200);
+      return;
+    }
+    var item = tickerQueue[tickerIndex % tickerQueue.length];
+    textEl.style.opacity = '0';
+    setTimeout(function() {
+      textEl.textContent = item.icon + ' ' + item.text;
+      textEl.style.color = item.color;
+      textEl.style.opacity = '1';
+    }, 200);
   }
+
+  function addToTicker(msg) {
+    tickerQueue.unshift(msg);
+    if (tickerQueue.length > TICKER_QUEUE_MAX) tickerQueue.length = TICKER_QUEUE_MAX;
+    tickerIndex = 0; // show the newest item next
+    renderTicker();
+
+    // Reset the "gone quiet" timer — if nothing new shows up for a while,
+    // stop cycling through old history and just go back to idle.
+    if (tickerIdleTimer) clearTimeout(tickerIdleTimer);
+    tickerIdleTimer = setTimeout(function() {
+      tickerQueue = [];
+      renderTicker();
+    }, TICKER_IDLE_MS);
+  }
+
+  renderTicker(); // show the idle message right away on load
+  setInterval(function() {
+    if (tickerQueue.length > 1) {
+      tickerIndex = (tickerIndex + 1) % tickerQueue.length;
+      renderTicker();
+    }
+  }, TICKER_ROTATE_MS);
 
   supa
     .channel('obs-activity-feed')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_feed' }, function(payload) {
+      console.log('[OBS] activity_feed event received:', payload);
       var row = payload.new;
-      if (!row.is_public) return;
-      var alert = formatAlert(row);
-      if (alert) showAlert(alert);
+      if (!row.is_public) { console.log('[OBS] skipped — is_public is false'); return; }
+      var msg = buildTickerMessage(row);
+      if (!msg) { console.log('[OBS] skipped — unrecognized activity_type:', row.activity_type); return; }
+      addToTicker(msg);
     })
-    .subscribe();
+    .subscribe(function(status, err) {
+      console.log('[OBS] activity_feed channel status:', status, err || '');
+    });
 
   // ══════════════════════════════════════════════════════════════
   // 3. COMMUNITY GOAL PROGRESS OVERLAY — cycles through active goals
@@ -354,9 +392,11 @@
     if (visible) {
       if (statsHasData) expand('stats-wrap');
       if (goalHasData) expand('goal-wrap');
+      expand('ticker-wrap'); // always has something to show (idle message if nothing else)
     } else {
       collapse('stats-wrap');
       collapse('goal-wrap');
+      collapse('ticker-wrap');
     }
     setTimeout(function() { runFoldCycle(!visible); }, visible ? FOLD_VISIBLE_MS : FOLD_HIDDEN_MS);
   }
@@ -380,12 +420,17 @@
     supa
       .channel('obs-chat-triggers')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_pet_triggers' }, function(payload) {
+        console.log('[OBS] chat_pet_triggers event received:', payload);
         var row = payload.new;
         if ((row.streamer_login || '').toLowerCase() === streamerLogin.toLowerCase()) {
           showChatPop(row);
+        } else {
+          console.log('[OBS] skipped — streamer_login mismatch:', row.streamer_login, 'vs', streamerLogin);
         }
       })
-      .subscribe();
+      .subscribe(function(status, err) {
+        console.log('[OBS] chat_pet_triggers channel status:', status, err || '');
+      });
   }
 })();
 </script>

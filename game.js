@@ -312,6 +312,7 @@ var STREAMER_IDS = {
 
 // ── GLOBALS ──────────────────────────────
 var currentUser = null;
+var currentUsername = null; // cached players.username — currentUser is the Supabase Auth object and has no username field of its own
 var currentPoints = 0;
 var tabsLoaded = {};
 
@@ -1758,6 +1759,7 @@ async function showApp(user) {
   
   if (pr.data) {
     el('nav-user').textContent = '\u2B50 ' + pr.data.username;
+    currentUsername = pr.data.username;
     updateAllPoints(pr.data.pawketpoints || 0);
   }
   
@@ -2569,7 +2571,7 @@ async function confirmAdopt() {
   }
   
   // ACTIVITY FEED: Log adoption so friend feeds + OBS live alerts pick it up
-  logActivity('pet_adopted', { pet_name: nickname || selectedPet.name });
+  logActivity('pet_adopted', { pet_name: nickname || selectedPet.name, species: selectedPet.name, nickname: nickname || null });
   
   // Store for social sharing
   lastAdoptedPet = {
@@ -9067,8 +9069,8 @@ async function saveProfile() {
   
   try {
     // Check if username is taken (if changed)
-    var currentUsername = el('myprofile-username-preview').textContent;
-    if (newUsername !== currentUsername) {
+    var previousUsername = el('myprofile-username-preview').textContent;
+    if (newUsername !== previousUsername) {
       var checkRes = await supabaseClient
         .from('players')
         .select('id')
@@ -9092,6 +9094,9 @@ async function saveProfile() {
       .eq('id', currentUser.id);
     
     if (updateRes.error) throw updateRes.error;
+    
+    // Keep the cached username in sync (used e.g. by logActivity for OBS/friend feeds)
+    currentUsername = newUsername;
     
     // Update preview
     el('myprofile-username-preview').textContent = newUsername;
@@ -10543,6 +10548,13 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
     if (!hasLossMemory) {
       scrapbook_addMemory(petId, 'first_battle_loss', { enemy: enemyStats.name || 'an enemy' });
     }
+    
+    // ACTIVITY FEED: Pet fainted — only for an actual 0-HP faint, not every
+    // loss, so this stays a meaningful moment rather than spamming the feed.
+    var faintedPetState = window.petState && window.petState[petId];
+    var faintedPetName = (faintedPetState && (faintedPetState.name || faintedPetState.pet_name ||
+      (faintedPetState.pets && faintedPetState.pets.name))) || 'Their pet';
+    logActivity('pet_fainted', { pet_name: faintedPetName, enemy: enemyStats.name || 'an enemy' });
   }
   
   // ═══════════════════════════════════════════════════════════
@@ -15079,17 +15091,26 @@ function updateActivityFeedDisplay() {
 async function logActivity(activityType, activityData) {
   if (!currentUser) return;
   
+  // Inject username here once, rather than at every call site — needed
+  // since OBS's activity ticker reads raw INSERT payloads (no join
+  // available) and wants to say "so-and-so did X", not just "X happened".
+  // currentUser is the raw Supabase Auth object and has no username field
+  // of its own — the real in-game username lives in the players table and
+  // is cached in currentUsername right after login (see showApp()).
+  var username = currentUsername || 'Someone';
+  var enrichedData = Object.assign({ username: username }, activityData || {});
+  
   try {
     await supabaseClient
       .from('activity_feed')
       .insert([{
         user_id: currentUser.id,
         activity_type: activityType,
-        activity_data: activityData,
+        activity_data: enrichedData,
         is_public: true
       }]);
     
-    dbg('📢 Activity logged:', activityType, activityData);
+    dbg('📢 Activity logged:', activityType, enrichedData);
   } catch (err) {
     console.error('Error logging activity:', err);
   }
@@ -15112,6 +15133,10 @@ function formatActivityMessage(activity, username) {
     case 'pet_adopted':
       var petName = data.pet_name || 'a new pet';
       return username + ' just adopted ' + petName + '! 🐾';
+    
+    case 'pet_fainted':
+      var faintedName = data.pet_name || 'Their pet';
+      return faintedName + ' fainted in battle against ' + (data.enemy || 'an enemy') + '... 😢';
     
     case 'achievement_unlocked':
       return username + ' unlocked: ' + (data.achievement_name || 'Achievement') + '! ⭐';
@@ -17668,6 +17693,9 @@ async function checkAchievementTierProgress(achievementKey, petId, currentValue)
       // Show notification
       showToast('🏆 ' + escapeHtml(achievement.name || achievementKey) + ' reached Tier ' + newTier + '!', 4000);
       addPassXP(10 * newTier, 'tier_unlock').catch(function(){});
+
+      // ACTIVITY FEED: Log so friend feeds + OBS live alerts pick it up
+      logActivity('achievement_unlocked', { achievement_name: (achievement.name || achievementKey) + ' (Tier ' + newTier + ')' });
     }
   } catch(e) { dbg('checkAchievementTierProgress error:', e); }
 }
@@ -25790,13 +25818,9 @@ async function scrapbook_addMemory(userPetId, memoryType, variables) {
                   'Your pet';
     }
     
-    // Get trainer name
-    var trainerName = 'their trainer';
-    if (window.currentUser) {
-        trainerName = window.currentUser.username || 
-                      (window.currentUser.user_metadata && window.currentUser.user_metadata.username) ||
-                      'their trainer';
-    }
+    // Get trainer name — currentUser has no username field of its own,
+    // the real one is cached in currentUsername (see showApp())
+    var trainerName = currentUsername || 'their trainer';
     
     // Get templates — for random_flavor, prefer today's weather flavor about
     // half the time so entries actually reflect the world (weatherSystem is
