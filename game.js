@@ -938,7 +938,7 @@ function esw_getEventBonusText(effects) {
 function esw_getWeatherBonusText(weatherId) {
   // These match the actual values in weatherSystem.getWeatherBonus()
   var map = {
-    clear:  '☀️ Normal conditions — no bonuses or penalties',
+    clear:  '☀️ Normal conditions, no bonuses or penalties',
     sunny:  '☀️ +10% XP from all sources\n⚡ +15% Energy regen\n😊 Happiness decays 15% slower',
     rainy:  '🌧️ +5% PP from all sources\n😟 Happiness decays 10% faster',
     foggy:  '🌫️ +15% rare item drop chance',
@@ -1095,8 +1095,8 @@ async function calendar_load(modal) {
         { id:'clear',  name:'Clear Skies',   icon:'☀️',  description:'Normal conditions today.' },
         { id:'sunny',  name:'Sunny',          icon:'🌤️', description:'Warm and bright!' },
         { id:'rainy',  name:'Rainy',          icon:'🌧️', description:'Great day to stay cozy inside.' },
-        { id:'foggy',  name:'Foggy',          icon:'🌫️', description:'Mysterious conditions — rare encounter bonus!' },
-        { id:'windy',  name:'Windy',          icon:'💨',  description:'Breezy day — pets move faster!' },
+        { id:'foggy',  name:'Foggy',          icon:'🌫️', description:'Mysterious conditions with a rare encounter bonus!' },
+        { id:'windy',  name:'Windy',          icon:'💨',  description:'Breezy day, pets move faster!' },
         { id:'starry', name:'Starry Night',   icon:'✨',  description:'Make a wish tonight!' }
       ];
 
@@ -2771,7 +2771,7 @@ function makeDropdown(petId) {
   }
   var row = makeEl('div', {class:'use-item-row'});
   var sel = makeEl('select', {class:'item-select', id:'sel-'+petId});
-  sel.appendChild(makeEl('option', {value:''}, '— Select an item —'));
+  sel.appendChild(makeEl('option', {value:''}, 'Select an item'));
   inventoryItems.forEach(function(item) {
     sel.appendChild(makeEl('option', {value:item.invId}, item.name + ' (x'+item.qty+')'));
   });
@@ -3262,7 +3262,7 @@ function makeMyPetCard(pet) {
     var hpColor = hpPercent > 50 ? '#5dde7a' : hpPercent > 25 ? '#ffaa00' : '#ff6b6b';
     
     var hpStat = makeEl('div', {class:'battle-stat-mini'});
-    hpStat.setAttribute('data-tooltip', '❤️ HEALTH POINTS\nHP carries over between battles!\nAt 0 HP your pet faints — use a Revive Potion.\n\n💡 HP regenerates slowly over time.\nHeal faster with potions from the Shop.');
+    hpStat.setAttribute('data-tooltip', '❤️ HEALTH POINTS\nHP carries over between battles!\nAt 0 HP your pet faints. Use a Revive Potion.\n\n💡 HP regenerates slowly over time.\nHeal faster with potions from the Shop.');
     hpStat.style.cursor = 'help';
     hpStat.innerHTML = '<div style="font-size:0.7rem;color:var(--text-light);text-transform:uppercase;">HP</div>' +
       '<div style="font-weight:bold;color:var(--purple);font-size:1.1rem;">' + currentHP + '/' + maxHP + '</div>' +
@@ -3860,7 +3860,7 @@ function expedition_renderSelector() {
   });
 
   var petOptions = eligiblePets.length === 0
-    ? '<p style="color:#ff6b6b;text-align:center;font-size:0.88rem;">No pets available — adopt one first! 🐾</p>'
+    ? '<p style="color:#ff6b6b;text-align:center;font-size:0.88rem;">No pets available. Adopt one first! 🐾</p>'
     : '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px;">' +
       eligiblePets.map(function(p) {
         return '<button class="btn btn-outline expedition-pet-btn" data-pet-id="' + p.id + '" onclick="expedition_selectPet(\'' + p.id + '\')" style="padding:8px 14px;font-size:0.82rem;">' +
@@ -3922,7 +3922,7 @@ function expedition_updateStartBtn() {
   var ready = _expeditionPetId && _expeditionZoneKey;
   btn.disabled = !ready;
   btn.style.opacity = ready ? '1' : '0.5';
-  if (zone && ready) btn.textContent = '⚡ ' + zone.energyCost + ' energy — Send to ' + zone.label + '!';
+  if (zone && ready) btn.textContent = '⚡ ' + zone.energyCost + ' energy. Send to ' + zone.label + '!';
 }
 
 async function expedition_start() {
@@ -4218,7 +4218,7 @@ async function race_renderSetup() {
   } catch(e) { dbg('race_renderSetup: DB query failed', e); }
 
   var petsHtml = myPets.length === 0
-    ? '<div style="color:#ff6b6b;font-size:0.85rem;text-align:center;">No pets found — adopt one first! 🐾</div>'
+    ? '<div style="color:#ff6b6b;font-size:0.85rem;text-align:center;">No pets found. Adopt one first! 🐾</div>'
     : myPets.map(function(p) {
         var spd = p.base_speed || 4;
         var spdColor = spd >= 7 ? '#4ade80' : spd >= 5 ? '#fbbf24' : '#ff9966';
@@ -4271,10 +4271,10 @@ async function race_renderSetup() {
       '</div>' +
       '<div style="background:rgba(153,102,255,0.08);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:0.75rem;color:var(--text-light);line-height:1.6;">' +
         '<strong style="color:var(--purple-dark);">🏁 Race Rewards:</strong><br>' +
-        '🥇 1st Place — Win 1.5× to 3× your bet<br>' +
-        '🥈 2nd Place — Get your bet back (small bonus if close)<br>' +
-        '🥉 3rd Place — Get half your bet back<br>' +
-        '4️⃣ 4th Place — Lose your full bet · Faster pets = bigger wins!' +
+        '🥇 1st Place: Win 1.5× to 3× your bet<br>' +
+        '🥈 2nd Place: Get your bet back (small bonus if close)<br>' +
+        '🥉 3rd Place: Get half your bet back<br>' +
+        '4️⃣ 4th Place: Lose your full bet. Faster pets = bigger wins!' +
       '</div>' +
       '<button id="race-start-btn" class="btn btn-primary" onclick="race_start()" ' +
         (canRace ? '' : 'disabled ') +
@@ -4302,7 +4302,7 @@ function race_togglePet(petId) {
     if (raceState.selectedPets.length >= 2) { showToast('Max 2 of your pets per race!', 2000); return; }
     // Look up from the DB-fetched cache first, then fall back to petState
     var pet = (window._racePetsCache || []).find(function(p) { return p.id === petId; }) || petState[petId];
-    if (!pet) { showToast('Pet data not found — try refreshing', 2500); return; }
+    if (!pet) { showToast('Pet data not found. Try refreshing', 2500); return; }
     raceState.selectedPets.push(pet);
   }
   race_renderSetup();
@@ -4827,7 +4827,7 @@ function personality_renderWidget(petId) {
       '<div style="font-size:0.75rem;font-weight:600;color:#9966ff;margin-bottom:4px;">📋 Today\'s Wishes:</div>' +
       wishRows +
       (allDone && !mood.rewardClaimed
-        ? '<div style="margin-top:8px;padding:6px 10px;background:rgba(93,222,122,0.15);border-radius:8px;font-size:0.78rem;color:#2d8a4e;font-weight:600;">🎁 Bonus ready: +100 PP — complete a wish to claim!</div>'
+        ? '<div style="margin-top:8px;padding:6px 10px;background:rgba(93,222,122,0.15);border-radius:8px;font-size:0.78rem;color:#2d8a4e;font-weight:600;">🎁 Bonus ready: +100 PP, complete a wish to claim!</div>'
         : '') +
     '</div>';
 }
@@ -6282,7 +6282,7 @@ var petFoodPreferences = {
     fun_fact: 'A grand mage who can open portals to other worlds!',
     sleep_habit: 'night owl',
     weather_preference: 'loves fog',
-    catchphrase: 'Yip, yap, teehee — I opened a portal! ✨',
+    catchphrase: 'Yip, yap, teehee, I opened a portal! ✨',
     secret_talent: 'Can sense when someone is about to say something stupid'
   },
   
@@ -7640,7 +7640,7 @@ var TEAM_MEMBERS = [
   {
     name: 'Kelta', login: 'keltathepomeranian', twitchUrl: 'https://twitch.tv/keltathepomeranian',
     petName: 'Kleat', twitchId: '121490227',
-    bio: 'A grand mage Pomeranian who studies void, space, and galaxy magic. Streams adventure games and explores new worlds — sometimes literally.',
+    bio: 'A grand mage Pomeranian who studies void, space, and galaxy magic. Streams adventure games and explores new worlds, sometimes literally.',
     accentColor: '#44aaff', bgGradient: 'linear-gradient(135deg,#000d1a 0%,#0d0d2e 100%)',
     socialLinks: [
       { label: 'Twitch', url: 'https://twitch.tv/keltathepomeranian', icon: '🎮' },
@@ -7658,7 +7658,7 @@ var TEAM_MEMBERS = [
   {
     name: 'Gnarly', login: 'gnarly_neon_smilodon', twitchUrl: 'https://twitch.tv/gnarly_neon_smilodon',
     petName: 'Gnarly', twitchId: '531222973',
-    bio: 'A neon Smilodon with retro arcade energy. Gnarly streams games with big personality and zero chill — in the best way.',
+    bio: 'A neon Smilodon with retro arcade energy. Gnarly streams games with big personality and zero chill, in the best way.',
     accentColor: '#ff4488', bgGradient: 'linear-gradient(135deg,#1a0d00 0%,#1a001a 100%)',
     socialLinks: [{ label: 'Twitch', url: 'https://twitch.tv/gnarly_neon_smilodon', icon: '🎮' }]
   }
@@ -7791,7 +7791,7 @@ async function streamerLanding_checkLive(member) {
     dot.style.animation = 'live-dot-pulse 1.4s ease-in-out infinite';
     dot.style.boxShadow = '0 0 6px #ff4444';
     inviteEl.innerHTML = '<span class="streamer-landing-dot" style="background:#ff4444;animation:live-dot-pulse 1.4s ease-in-out infinite;box-shadow:0 0 6px #ff4444;"></span>' +
-      escapeHtml(member.name) + ' is <strong style="color:#ff4444;">LIVE RIGHT NOW</strong> — check them out!';
+      escapeHtml(member.name) + ' is <strong style="color:#ff4444;">LIVE RIGHT NOW</strong>, check them out!';
   }
 }
 
@@ -8191,7 +8191,7 @@ async function redeemCode() {
 
     // 2. Check max uses
     if (promo.max_uses !== null && promo.times_used >= promo.max_uses) {
-      errEl.textContent = 'This code has been fully claimed — sorry!';
+      errEl.textContent = 'This code has been fully claimed, sorry!';
       errEl.classList.add('show');
       btn.textContent = '✨ Redeem!';
       btn.disabled = false;
@@ -11371,7 +11371,7 @@ async function battleExp_start() {
   // If petState not loaded, fetch directly from DB
   if (!pet) {
     var { data: dbPet } = await supabaseClient.from('user_pets').select('*').eq('id', petId).single().catch(function(){ return { data: null }; });
-    if (!dbPet) { showToast('Pet not found — try refreshing', 2500); return; }
+    if (!dbPet) { showToast('Pet not found. Try refreshing', 2500); return; }
     petState[petId] = dbPet;
     pet = dbPet;
   }
@@ -11640,22 +11640,22 @@ async function loadBattlePets() {
       var maxHP = pet.max_hp || pet.base_hp || 30;
 
       var hpStat = makeEl('div', { class: 'battle-pet-stat' });
-      hpStat.setAttribute('data-tooltip', '❤️ HP — Carries over between battles. At 0 your pet faints.');
+      hpStat.setAttribute('data-tooltip', '❤️ HP. Carries over between battles. At 0 your pet faints.');
       hpStat.style.cursor = 'help';
       hpStat.innerHTML = '<div class="battle-pet-stat-label">HP</div><div class="battle-pet-stat-value">' + currentHP + '/' + maxHP + '</div>';
       stats.appendChild(hpStat);
       var atkStat = makeEl('div', { class: 'battle-pet-stat' });
-      atkStat.setAttribute('data-tooltip', '⚔️ ATK — Damage dealt per hit. Boosted by weapons and level-ups.');
+      atkStat.setAttribute('data-tooltip', '⚔️ ATK. Damage dealt per hit. Boosted by weapons and level-ups.');
       atkStat.style.cursor = 'help';
       atkStat.innerHTML = '<div class="battle-pet-stat-label">ATK</div><div class="battle-pet-stat-value">' + (pet.base_attack || 5) + '</div>';
       stats.appendChild(atkStat);
       var defStat = makeEl('div', { class: 'battle-pet-stat' });
-      defStat.setAttribute('data-tooltip', '🛡️ DEF — Reduces incoming damage. Boosted by armor and level-ups.');
+      defStat.setAttribute('data-tooltip', '🛡️ DEF. Reduces incoming damage. Boosted by armor and level-ups.');
       defStat.style.cursor = 'help';
       defStat.innerHTML = '<div class="battle-pet-stat-label">DEF</div><div class="battle-pet-stat-value">' + (pet.base_defense || 3) + '</div>';
       stats.appendChild(defStat);
       var spdStat = makeEl('div', { class: 'battle-pet-stat' });
-      spdStat.setAttribute('data-tooltip', '💨 SPD — Who attacks first. Also affects racing performance.');
+      spdStat.setAttribute('data-tooltip', '💨 SPD. Who attacks first. Also affects racing performance.');
       spdStat.style.cursor = 'help';
       spdStat.innerHTML = '<div class="battle-pet-stat-label">SPD</div><div class="battle-pet-stat-value">' + (pet.base_speed || 4) + '</div>';
       stats.appendChild(spdStat);
@@ -15141,6 +15141,9 @@ function formatActivityMessage(activity, username) {
     case 'achievement_unlocked':
       return username + ' unlocked: ' + (data.achievement_name || 'Achievement') + '! ⭐';
     
+    case 'title_unlocked':
+      return username + ' unlocked the title "' + (data.title_name || 'a new title') + '"! 👑';
+    
     case 'battle_victory':
       var enemy = data.enemy_name || 'an enemy';
       return username + ' defeated ' + enemy + '! ⚔️';
@@ -15457,7 +15460,7 @@ async function furniture_loadShop() {
     var html =
       // Info banner: shared across rooms + daily happiness tip
       '<div style="background:rgba(255,170,0,0.1);border:1px solid rgba(255,170,0,0.3);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:0.78rem;color:#b37700;">'
-      + '🏠 <strong>Furniture is shared</strong> — one purchase works in every pet\'s room!'
+      + '🏠 <strong>Furniture is shared</strong>, one purchase works in every pet\'s room!'
       + '<br>✨ Each item gives your pets a <strong>daily happiness boost</strong> on login.'
       + '</div>'
       + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;padding:8px 0;">';
@@ -15474,7 +15477,7 @@ async function furniture_loadShop() {
           (owned
             ? '<div style="font-size:0.75rem;color:#5dde7a;font-weight:700;">✅ Owned</div>'
             : canAfford
-              ? '<button class="btn btn-primary btn-sm" onclick="furniture_buy(\'' + item.id + '\',' + item.cost + ')" style="width:100%;font-size:0.8rem;">🪙 ' + item.cost + ' PP — Buy</button>'
+              ? '<button class="btn btn-primary btn-sm" onclick="furniture_buy(\'' + item.id + '\',' + item.cost + ')" style="width:100%;font-size:0.8rem;">🪙 Buy for ' + item.cost + ' PP</button>'
               : '<button class="btn btn-outline btn-sm" disabled style="width:100%;font-size:0.8rem;opacity:0.5;">🪙 ' + item.cost + ' PP</button>'
           ) +
         '</div>';
@@ -15612,7 +15615,7 @@ function furniture_renderRoomModal(petId) {
 
   // Equipped list
   var equippedHtml = equippedItems.length === 0
-    ? '<div style="color:var(--text-light);font-style:italic;font-size:0.85rem;">Nothing here yet — equip some furniture!</div>'
+    ? '<div style="color:var(--text-light);font-style:italic;font-size:0.85rem;">Nothing here yet. Equip some furniture!</div>'
     : equippedItems.map(function(f) {
         return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(153,102,255,0.08);">' +
           '<span style="font-size:1.2rem;">' + f.emoji + '</span>' +
@@ -16614,7 +16617,7 @@ async function guild_loadChatMessages() {
     if (error) throw error;
 
     if (!messages || messages.length === 0) {
-      container.innerHTML = '<div style="color:var(--text-light);text-align:center;padding:20px;font-style:italic;">No messages yet — say hello to your guild! 👋</div>';
+      container.innerHTML = '<div style="color:var(--text-light);text-align:center;padding:20px;font-style:italic;">No messages yet. Say hello to your guild! 👋</div>';
       return;
     }
 
@@ -16672,7 +16675,7 @@ async function guild_donate() {
       // Treasury RPC failed — refund the player rather than silently losing their donation
       // (direct client writes to guild_treasury are blocked at the database level)
       await awardPP(amount, 'guild_donation_refund').catch(function(){});
-      showToast('Could not process donation — refunded. Please try again later.', 3500);
+      showToast('Could not process donation. Refunded. Please try again later.', 3500);
       return;
     }
 
@@ -16771,7 +16774,7 @@ async function guild_renderTreasury() {
           var username = l.players ? escapeHtml(l.players.username) : 'Someone';
           return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(153,102,255,0.08);font-size:0.78rem;">' +
             '<span>' + icon + '</span>' +
-            '<span style="flex:1;color:var(--purple-dark);">' + username + ' — ' + escapeHtml(l.description||l.action) + '</span>' +
+            '<span style="flex:1;color:var(--purple-dark);">' + username + ' • ' + escapeHtml(l.description||l.action) + '</span>' +
             '<span style="color:' + (l.amount>0?'#5dde7a':'#ff6b6b') + ';font-weight:600;">' + (l.amount>0?'+':'') + l.amount + ' PP</span>' +
           '</div>';
         }).join('')
@@ -16925,7 +16928,7 @@ async function guild_processPassedVote(vote) {
       p_guild_id:    vote.guild_id,
       p_amount:      vote.cost,
       p_action:      'proposal_passed',
-      p_description: vote.proposal + ' — proposal passed'
+      p_description: vote.proposal + ' (proposal passed)'
     });
     if (rpcErr) {
       // Treasury RPC failed — don't mark the vote passed or apply the perk, since the
@@ -17044,7 +17047,7 @@ async function guild_renderDungeons() {
     });
 
     var guildmateOptions = (liaisons||[]).map(function(l) {
-      return '<option value="' + l.user_id + '">' + escapeHtml(l.username) + ' — ' + escapeHtml(l.pet_name||'Pet') + ' Lv.' + (l.pet_level||1) + '</option>';
+      return '<option value="' + l.user_id + '">' + escapeHtml(l.username) + ' • ' + escapeHtml(l.pet_name||'Pet') + ' Lv.' + (l.pet_level||1) + '</option>';
     }).join('') || '<option disabled>No guildmates have set a liaison yet</option>';
 
     // My liaison — re-fetch from DB directly rather than trusting possibly-stale
@@ -17065,7 +17068,7 @@ async function guild_renderDungeons() {
       }
     } catch(e) { dbg('Could not fetch liaison for dungeon page:', e); }
 
-    var myPetDisplay = myLiaisonPet ? escapeHtml(myLiaisonPet.nickname||'Pet') + ' Lv.' + (myLiaisonPet.level||1) : '⚠️ Not set — go set a Guild Pet first!';
+    var myPetDisplay = myLiaisonPet ? escapeHtml(myLiaisonPet.nickname||'Pet') + ' Lv.' + (myLiaisonPet.level||1) : '⚠️ Not set. Go set a Guild Pet first!';
 
     mount.innerHTML =
       '<button class="btn btn-outline btn-sm" onclick="loadGuildPage()" style="margin-bottom:16px;">← Back to Guild</button>' +
@@ -17136,7 +17139,7 @@ function guild_addPartyMember() {
 
   var listEl = document.getElementById('guild-party-list');
   if (listEl) {
-    listEl.innerHTML = '<strong>Party:</strong> You' + (_guildPartyData.length > 0 ? ' + ' + _guildPartyData.map(function(p){ return escapeHtml(p.label.split('—')[0].trim()); }).join(', ') : '');
+    listEl.innerHTML = '<strong>Party:</strong> You' + (_guildPartyData.length > 0 ? ' + ' + _guildPartyData.map(function(p){ return escapeHtml(p.label.split('•')[0].trim()); }).join(', ') : '');
   }
   guild_updateDungeonBtn();
 }
@@ -17348,7 +17351,7 @@ function guild_runBattle(dungeon, party, waves, waveIndex, fullLog) {
   var partyAlive = party.some(function(p) { return p.currentHp > 0; });
 
   mount.innerHTML =
-    '<div style="font-size:0.78rem;font-weight:700;color:var(--text-light);letter-spacing:1px;margin-bottom:10px;">⚔️ ' + escapeHtml(dungeon.name) + ' — Wave ' + (waveIndex+1) + '/' + waves.length + '</div>' +
+    '<div style="font-size:0.78rem;font-weight:700;color:var(--text-light);letter-spacing:1px;margin-bottom:10px;">⚔️ ' + escapeHtml(dungeon.name) + ' • Wave ' + (waveIndex+1) + '/' + waves.length + '</div>' +
 
     '<div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">' +
       // Party side
@@ -17380,7 +17383,7 @@ function guild_runBattle(dungeon, party, waves, waveIndex, fullLog) {
         ? '<button class="btn btn-primary" onclick="guild_nextWave()" style="width:100%;margin-bottom:6px;">Continue to Wave ' + (waveIndex+2) + ' →</button>'
         : '') +
       '<button class="btn btn-outline btn-sm" onclick="guild_endDungeon(' + JSON.stringify(waveVictory && !hasMoreWaves || (waveVictory && !partyAlive)) + ',' + (waveIndex+1) + ',' + waves.length + ')" style="width:100%;">' +
-        (waveVictory && !hasMoreWaves ? '🏆 Claim Rewards' : (waveVictory && hasMoreWaves && !partyAlive ? '💀 Party defeated — End Run' : '🏃 Retreat')) +
+        (waveVictory && !hasMoreWaves ? '🏆 Claim Rewards' : (waveVictory && hasMoreWaves && !partyAlive ? '💀 Party Defeated: End Run' : '🏃 Retreat')) +
       '</button>' +
     '</div>';
 
@@ -17399,7 +17402,7 @@ function guild_nextWave() {
   s.party.forEach(function(p) {
     if (p.currentHp > 0) p.currentHp = Math.min(p.maxHp, p.currentHp + Math.floor(p.maxHp * 0.10));
   });
-  s.fullLog.push({ type: 'heal', text: '— Wave ' + (s.waveIndex+2) + ' begins! Party recovered 10% HP. —', waveIdx: s.waveIndex+1 });
+  s.fullLog.push({ type: 'heal', text: 'Wave ' + (s.waveIndex+2) + ' begins! Party recovered 10% HP.', waveIdx: s.waveIndex+1 });
   guild_runBattle(s.dungeon, s.party, s.waves, s.waveIndex + 1, s.fullLog);
 }
 
@@ -17977,7 +17980,7 @@ async function race_renderWeeklyLeaderboard() {
     var medals = ['🥇','🥈','🥉'];
     var rows = (scores || []).map(function(s, i) {
       var isMe = s.user_id === currentUser.id;
-      var timeStr = s.best_time_ms ? Math.floor(s.best_time_ms/1000) + '.' + String(s.best_time_ms%1000).padStart(3,'0') + 's' : '—';
+      var timeStr = s.best_time_ms ? Math.floor(s.best_time_ms/1000) + '.' + String(s.best_time_ms%1000).padStart(3,'0') + 's' : '-';
       return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(153,102,255,0.08);font-size:0.78rem;' + (isMe?'font-weight:700;':'') + '">' +
         '<span style="width:20px;">' + (medals[i]||('#'+(i+1))) + '</span>' +
         '<span style="flex:1;color:' + (isMe?'var(--purple)':'var(--purple-dark)') + ';">' + escapeHtml(s.players ? s.players.username : 'Player') + (isMe?' (You)':'') + '</span>' +
@@ -18244,7 +18247,7 @@ async function gp_renderEntryForm() {
 
   if (eligiblePets.length === 0) {
     return '<div style="border:2px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;">' +
-      '<div style="color:#ff6b6b;font-size:0.82rem;">No eligible pets — need level 10+ to enter the Grand Prix.</div>' +
+      '<div style="color:#ff6b6b;font-size:0.82rem;">No eligible pets. Need level 10+ to enter the Grand Prix.</div>' +
     '</div>';
   }
 
@@ -18398,7 +18401,7 @@ async function gp_renderRacing(mount) {
             ? '<div style="font-size:0.75rem;color:#5dde7a;font-weight:600;">✅ Cap reached!</div>'
             : '<div style="font-size:0.75rem;color:var(--purple);">' + remaining + ' pts remaining</div>') +
         '</div>' +
-        '<div style="background:rgba(153,102,255,0.06);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:0.75rem;color:var(--text-light);">Train as much as you want right now! Cap is 15 pts per week — no daily limit.</div>' +
+        '<div style="background:rgba(153,102,255,0.06);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:0.75rem;color:var(--text-light);">Train as much as you want right now! Cap is 15 pts per week, no daily limit.</div>' +
         '<div style="margin-bottom:10px;">' +
           '<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-light);margin-bottom:4px;">' +
             '<span>Weekly training bonus</span><span>' + trainingBonus + '/15</span>' +
@@ -18632,7 +18635,7 @@ async function simulateGrandPrix(eventId) {
     // Generate replay text for top 10
     var replayTemplates = {
       first: [
-        '🏁 {name} launches out of the gate! The crowd erupts as they take an early lead. No one can catch them — {name} crosses the finish line FIRST! 🏆',
+        '🏁 {name} launches out of the gate! The crowd erupts as they take an early lead. No one can catch them, {name} crosses the finish line FIRST! 🏆',
         '{name} races with pure determination, pulling ahead at every turn. An unforgettable champion performance! 👑'
       ],
       top3: [
@@ -18705,7 +18708,7 @@ async function gp_simulateMyScore() {
   if (!gpState.replay) {
     var petName = (pet.nickname || pet.pet_type || 'Your pet');
     var templates = [
-      petName + ' charges out of the gate! The crowd roars. A fierce race unfolds — ' + petName + ' gives everything they have!',
+      petName + ' charges out of the gate! The crowd roars. A fierce race unfolds as ' + petName + ' gives everything they have!',
       petName + ' weaves through the competition with incredible focus. What an incredible performance!',
       petName + ' pushes hard every lap. The finish line approaches... and they give one final burst of speed!'
     ];
@@ -22469,6 +22472,9 @@ async function awardPlayerTitle(titleKey, reason) {
     // Show notification
     showPlayerTitleUnlockNotification(title, reason);
     
+    // ACTIVITY FEED: Log so friend feeds + OBS live alerts pick it up
+    logActivity('title_unlocked', { title_name: title.display_name || titleKey });
+    
     dbg('👑✨ Player title unlocked:', title.display_name);
     
   } catch (err) {
@@ -24363,7 +24369,7 @@ async function loadEquipmentShop() {
         (item.defense_bonus > 0 ? ' | +' + item.defense_bonus + ' DEF' : '') +
         (item.speed_bonus   > 0 ? ' | +' + item.speed_bonus   + ' SPD' : '') +
         (item.hp_bonus      > 0 ? ' | +' + item.hp_bonus      + ' HP'  : '') +
-        ' | Tier ' + item.tier + ' — hover to compare stats"' +
+        ' | Tier ' + item.tier + ' (hover to compare stats)"' +
         ' data-tooltip="' + (item.equipment_type === 'weapon' ? '⚔️ Weapon Stats' : '🛡️ Armor Stats') +
         (item.attack_bonus  > 0 ? '\n+' + item.attack_bonus  + ' Attack'  : '') +
         (item.defense_bonus > 0 ? '\n+' + item.defense_bonus + ' Defense' : '') +
@@ -25683,7 +25689,7 @@ var WEATHER_MEMORY_LINES = {
   clear:  ['{pet} enjoyed a bright, sunny day outside with {trainer}.', '{pet} basked in the warm sunshine all afternoon.'],
   rainy:  ['{pet} splashed happily through puddles in the rain.', '{pet} watched raindrops race down the window with {trainer}.'],
   foggy:  ['{pet} crept curiously through the misty fog, exploring.', '{pet} could barely see through the thick fog, but had fun anyway.'],
-  windy:  ['{pet} chased leaves swirling in the wind.', 'A gust of wind sent {pet} tumbling — much to {trainer}\'s amusement!'],
+  windy:  ['{pet} chased leaves swirling in the wind.', 'A gust of wind sent {pet} tumbling, much to {trainer}\'s amusement!'],
   starry: ['{pet} gazed up at the sparkling night sky with {trainer}.', '{pet} tried to count the stars and lost track after a hundred.'],
   cursed: ['{pet} shivered as an eerie fog rolled through... something felt off.', '{pet} refused to leave {trainer}\'s side during the cursed weather.']
 };
@@ -26122,7 +26128,7 @@ function community_updateLocalProgress(metricKey, increment) {
 
 var COMMUNITY_GOAL_NARRATIVES = {
   'corrupted_kills_e1': [
-    { threshold: 0,   text: "Reports are trickling in — pets returning from the forest with strange, twisted markings. Piper's tune echoes a little differently these days..." },
+    { threshold: 0,   text: "Reports are trickling in. Pets returning from the forest with strange, twisted markings. Piper's tune echoes a little differently these days..." },
     { threshold: 25,  text: 'The corruption is spreading faster than anyone expected. Trainers are banding together to fight back.' },
     { threshold: 50,  text: "Halfway there. The corrupted are thinning out, but Piper's presence still lingers at the edges of the forest." },
     { threshold: 75,  text: 'Almost clear! Just a little more effort and the corruption will retreat... for now.' },
@@ -26133,9 +26139,9 @@ var COMMUNITY_GOAL_NARRATIVES = {
 // Generic fallback arc — used for any goal without a bespoke entry above.
 var COMMUNITY_GENERIC_NARRATIVE = [
   { threshold: 0,   text: 'The community has just begun working toward "{title}."' },
-  { threshold: 25,  text: 'Progress is building — "{title}" is starting to take shape.' },
+  { threshold: 25,  text: 'Progress is building. "{title}" is starting to take shape.' },
   { threshold: 50,  text: 'Halfway there! The whole server is feeling the momentum on "{title}."' },
-  { threshold: 75,  text: 'Almost there — one final push and "{title}" will be complete!' },
+  { threshold: 75,  text: 'Almost there! One final push and "{title}" will be complete!' },
   { threshold: 100, text: '"{title}" is complete! Thank you to everyone who contributed.' }
 ];
 
@@ -27658,7 +27664,7 @@ async function showPetVariantModal(petId, petName) {
   var currentVariantData = currentVariantId ? BASIC_VARIANTS[currentVariantId] : null;
   var keys = skinKeyState.keys;
 
-  var header = '<h2 style="text-align:center;color:var(--purple);margin:0 0 4px;">🎨 ' + escapeHtml(petName) + ' — Variants</h2>' +
+  var header = '<h2 style="text-align:center;color:var(--purple);margin:0 0 4px;">🎨 ' + escapeHtml(petName) + ' Variants</h2>' +
     '<p style="text-align:center;color:var(--text-light);font-size:0.88rem;margin:0 0 14px;">🔑 Skin Keys: <strong style="color:#FFD700;">' + keys + '</strong></p>' +
     '<div style="background:rgba(153,102,255,0.1);border-radius:10px;padding:10px 14px;margin-bottom:16px;text-align:center;">' +
     '<span style="font-size:0.9rem;color:var(--text-light);">Currently equipped: </span>' +
@@ -27991,7 +27997,7 @@ async function todayCard_render() {
 
   var weatherHtml = weather
     ? '<div class="today-card-weather"><span class="today-card-icon">' + weather.icon + '</span> ' +
-      '<strong>' + weather.name + '</strong> — ' + weather.effect + '</div>'
+      '<strong>' + weather.name + '</strong>: ' + weather.effect + '</div>'
     : '<div class="today-card-weather">Loading weather...</div>';
 
   var statsHtml = '<div class="today-card-stats">' +
@@ -28004,7 +28010,7 @@ async function todayCard_render() {
   if (goal) {
     var pct = Math.min(100, Math.round(((goal.current_progress || 0) / Math.max(1, goal.goal_target || 1)) * 100));
     goalHtml = '<div class="today-card-goal">' +
-      '🎯 <strong>' + goal.title + '</strong> — ' + (goal.current_progress || 0) + ' / ' + goal.goal_target + ' (' + pct + '%)' +
+      '🎯 <strong>' + goal.title + '</strong>: ' + (goal.current_progress || 0) + ' / ' + goal.goal_target + ' (' + pct + '%)' +
       '<div class="today-card-goal-bar"><div class="today-card-goal-fill" style="width:' + pct + '%;"></div></div>' +
       '</div>';
   }
@@ -29305,7 +29311,7 @@ async function gift_showSendModal(toUserId, toUsername) {
         return '<option value="' + inv.items.id + '" data-max="' + inv.quantity + '">' +
           escapeHtml(inv.items.name) + ' (x' + inv.quantity + ')</option>';
       }).join('')
-    : '<option value="">— No items available —</option>';
+    : '<option value="">No items available</option>';
 
   modal.innerHTML =
     '<h2 style="text-align:center;margin-bottom:20px;">🎁 Send a Gift</h2>' +
@@ -29795,7 +29801,7 @@ async function polls_loadPastResults(mountId) {
       var winner = opts[r.winning_option];
       html += '<div style="border:2px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;">' +
         '<div style="font-weight:700;margin-bottom:6px;">🏆 ' + escapeHtml(r.polls.question) + '</div>' +
-        '<div style="color:var(--text-light);font-size:0.9rem;">Winner: ' + (winner ? escapeHtml(winner.icon + ' ' + winner.text) : '—') + '</div>' +
+        '<div style="color:var(--text-light);font-size:0.9rem;">Winner: ' + (winner ? escapeHtml(winner.icon + ' ' + winner.text) : '-') + '</div>' +
         '<div style="color:var(--text-light);font-size:0.8rem;margin-top:4px;">' + r.total_votes + ' total votes</div>' +
         '</div>';
     });
@@ -30098,7 +30104,7 @@ function gp_adminBtnLoading(btn, loadingText) {
 
 async function gp_adminForceStatus(status) {
   if (!await isAdmin()) return;
-  if (!gpState.event && !confirm('No cached event — fetch and update anyway?')) return;
+  if (!gpState.event && !confirm('No cached event. Fetch and update anyway?')) return;
   var btn = event && event.target; var restore = gp_adminBtnLoading(btn, '⏳ Updating…');
 
   // Get the event ID from DB directly
@@ -30400,10 +30406,10 @@ function showHelpModal() {
       '<div style="margin-bottom:16px;">' +
         '<div style="font-weight:700;color:var(--purple-dark);margin-bottom:6px;font-size:0.9rem;">🐾 Pet Stats</div>' +
         '<div style="font-size:0.82rem;color:var(--text-light);line-height:1.7;">' +
-          '<b>❤️ HP</b> — Health Points. Carries between battles! Heal with potions or wait for regen.<br>' +
-          '<b>⚔️ Attack</b> — Battle damage dealt. Increase via level-ups &amp; weapons.<br>' +
-          '<b>🛡️ Defense</b> — Damage reduction. Increase via level-ups &amp; armor.<br>' +
-          '<b>💨 Speed</b> — Turn order in battles &amp; race performance. Level up or equip speed gear.' +
+          '<b>❤️ HP</b>: Health Points. Carries between battles! Heal with potions or wait for regen.<br>' +
+          '<b>⚔️ Attack</b>: Battle damage dealt. Increase via level-ups &amp; weapons.<br>' +
+          '<b>🛡️ Defense</b>: Damage reduction. Increase via level-ups &amp; armor.<br>' +
+          '<b>💨 Speed</b>: Turn order in battles &amp; race performance. Level up or equip speed gear.' +
         '</div>' +
       '</div>' +
       '<div style="margin-bottom:16px;">' +
@@ -30434,7 +30440,7 @@ function showHelpModal() {
       '<div style="margin-bottom:16px;">' +
         '<div style="font-weight:700;color:var(--purple-dark);margin-bottom:6px;font-size:0.9rem;">🎯 Daily Bingo</div>' +
         '<div style="font-size:0.82rem;color:var(--text-light);line-height:1.7;">' +
-          'Complete tasks to mark squares — each gives PP + Pass XP.<br>' +
+          'Complete tasks to mark squares. Each gives PP + Pass XP.<br>' +
           'Complete a full line for bonus rewards! Blackout for BIG rewards.<br>' +
           'Resets daily at midnight.' +
         '</div>' +
@@ -30503,7 +30509,7 @@ async function submitReport() {
     if (error) throw error;
 
     closeModal();
-    showToast('🚩 Report submitted — thank you for helping keep PawketPets safe!', 4000);
+    showToast('🚩 Report submitted. Thank you for helping keep PawketPets safe!', 4000);
   } catch(err) {
     showToast('Could not submit report: ' + err.message, 3500);
   }

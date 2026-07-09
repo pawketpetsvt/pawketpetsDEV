@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PawketPetsVT — OBS Overlay</title>
+<title>PawketPetsVT: OBS Overlay</title>
 <link href="https://fonts.googleapis.com/css2?family=Chewy&display=swap" rel="stylesheet">
 <style>
   /* Transparent, click-through overlay meant for an OBS Browser Source. */
@@ -137,8 +137,8 @@
         <div class="stats-header">
           <img id="stats-pet-img" class="stats-pet-img" src="" alt="">
           <div class="stats-name-block">
-            <div id="stats-name" class="stats-name">—</div>
-            <div id="stats-sub" class="stats-sub">—</div>
+            <div id="stats-name" class="stats-name">...</div>
+            <div id="stats-sub" class="stats-sub">...</div>
           </div>
           <div class="stats-brand-text">
             <span class="stats-brand-line">Pawket</span>
@@ -156,10 +156,10 @@
     <div id="goal-wrap" class="obs-item">
       <div id="goal-overlay" class="obs-card">
         <div class="goal-badge">🌍 COMMUNITY GOAL</div>
-        <div id="goal-title" class="goal-title">—</div>
-        <div id="goal-desc" class="goal-desc">—</div>
+        <div id="goal-title" class="goal-title">...</div>
+        <div id="goal-desc" class="goal-desc">...</div>
         <div class="goal-bar-track"><div id="goal-bar" class="goal-bar-fill" style="width:0%"></div></div>
-        <div id="goal-text" class="goal-text">—</div>
+        <div id="goal-text" class="goal-text">...</div>
       </div>
     </div>
 
@@ -272,6 +272,8 @@
         return { icon: '🎖️', color: '#c299ff', text: user + ' just earned the ' + (data.badge_name || 'a badge') + ' badge!' };
       case 'achievement_unlocked':
         return { icon: '⭐', color: '#66ddff', text: user + ' unlocked ' + (data.achievement_name || 'an achievement') + '!' };
+      case 'title_unlocked':
+        return { icon: '👑', color: '#ffcc66', text: user + ' unlocked the title "' + (data.title_name || 'a new title') + '"!' };
       default: return null; // unrecognized types don't show in the ticker
     }
   }
