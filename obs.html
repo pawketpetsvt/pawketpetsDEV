@@ -140,44 +140,35 @@
 
   // ══════════════════════════════════════════════════════════════
   // 1. PERSISTENT STATS OVERLAY
-  // Requires the streamer's players row to have is_public_overlay = true
-  // (see obs_widget_setup.sql — this is an explicit opt-in allowlist).
+  // Uses the Worker's existing /api/overlay endpoint (already live,
+  // already using the service key server-side) rather than querying
+  // Supabase directly — simpler and no RLS changes needed.
+  // NOTE: ?streamer= must match the player's in-game username (the
+  // Worker's /api/overlay matches on players.username), which may not
+  // be identical to their Twitch login used elsewhere for landing pages.
   // ══════════════════════════════════════════════════════════════
+  var WORKER_URL = 'https://pawketpets-twitch.pawketpetsvt.workers.dev';
+
   async function loadStats() {
     if (!streamerLogin) return;
     try {
-      var { data: player } = await supa
-        .from('players')
-        .select('id, username, companion_pet_id')
-        .ilike('username', streamerLogin)
-        .eq('is_public_overlay', true)
-        .maybeSingle();
+      var res = await fetch(WORKER_URL + '/api/overlay?streamer=' + encodeURIComponent(streamerLogin));
+      var json = await res.json();
+      if (!json.success || !json.pet) return;
 
-      if (!player || !player.companion_pet_id) return;
+      var pet = json.pet;
+      document.getElementById('stats-name').textContent = pet.name || 'Pet';
+      document.getElementById('stats-sub').textContent = 'Lv. ' + (pet.level || 1) + ' ' + (pet.species || '');
+      if (pet.image) document.getElementById('stats-pet-img').src = pet.image;
 
-      var { data: pet } = await supa
-        .from('user_pets')
-        .select('nickname, level, current_hp, max_hp, hunger, max_hunger, energy, max_energy, happiness, max_happiness, pets(name, image_file)')
-        .eq('id', player.companion_pet_id)
-        .single();
+      document.getElementById('bar-hp').style.width = (pet.stats.hp.percent || 0) + '%';
+      document.getElementById('bar-hunger').style.width = (pet.stats.hunger.percent || 0) + '%';
+      document.getElementById('bar-energy').style.width = (pet.stats.energy.percent || 0) + '%';
+      document.getElementById('bar-happiness').style.width = (pet.stats.happiness.percent || 0) + '%';
 
-      if (!pet) return;
-
-      var hpPct = Math.round((pet.current_hp / Math.max(1, pet.max_hp)) * 100);
-      var hungerPct = Math.round((pet.hunger / Math.max(1, pet.max_hunger)) * 100);
-      var energyPct = Math.round((pet.energy / Math.max(1, pet.max_energy)) * 100);
-      var happinessPct = Math.round((pet.happiness / Math.max(1, pet.max_happiness)) * 100);
-
-      document.getElementById('stats-name').textContent = pet.nickname || (pet.pets && pet.pets.name) || 'Pet';
-      document.getElementById('stats-sub').textContent = 'Lv. ' + (pet.level || 1) + ' ' + ((pet.pets && pet.pets.name) || '');
-      if (pet.pets && pet.pets.image_file) {
-        document.getElementById('stats-pet-img').src = pet.pets.image_file;
-      }
-      document.getElementById('bar-hp').style.width = hpPct + '%';
-      document.getElementById('bar-hunger').style.width = hungerPct + '%';
-      document.getElementById('bar-energy').style.width = energyPct + '%';
-      document.getElementById('bar-happiness').style.width = happinessPct + '%';
-
+      var hungerPct = pet.stats.hunger.percent || 0;
+      var energyPct = pet.stats.energy.percent || 0;
+      var happinessPct = pet.stats.happiness.percent || 0;
       var tip = hungerPct < 30 ? '🍽️ Hungry! Feed me in the game!' :
                 energyPct < 30 ? '😴 Tired! Let me rest...' :
                 happinessPct < 40 ? '💔 Sad! Play with me in the game!' :
