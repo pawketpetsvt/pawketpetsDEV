@@ -38,6 +38,8 @@
   }
   .stats-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
   .stats-pet-img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: rgba(255,255,255,0.1); }
+  .stats-name-row { display: flex; align-items: center; gap: 6px; }
+  .stats-brand-logo { width: 18px; height: 18px; border-radius: 4px; object-fit: contain; }
   .stats-name { font-weight: bold; font-size: 1.05rem; }
   .stats-sub { font-size: 0.78rem; color: #d8c8ff; }
   .stat-row { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 0.78rem; }
@@ -76,9 +78,26 @@
     display: none;
   }
   .goal-title { font-size: 0.85rem; font-weight: bold; margin-bottom: 6px; }
+  .goal-badge { font-size: 0.65rem; font-weight: bold; letter-spacing: 0.05em; color: var(--pink); margin-bottom: 4px; }
+  .goal-desc { font-size: 0.72rem; color: #e8ddff; margin-bottom: 8px; line-height: 1.3; }
   .goal-bar-track { height: 14px; background: rgba(255,255,255,0.12); border-radius: 8px; overflow: hidden; }
   .goal-bar-fill { height: 100%; background: linear-gradient(90deg, var(--purple), var(--pink)); border-radius: 8px; transition: width 0.5s ease; }
   .goal-text { font-size: 0.72rem; margin-top: 4px; color: #d8c8ff; }
+
+  /* ── Fold/unfold cycle for the two persistent panels (stats + goal),
+     so they don't permanently sit on top of the stream ── */
+  .fold-cycle {
+    overflow: hidden;
+    transition: opacity 0.6s ease, max-height 0.6s ease, padding-top 0.6s ease, padding-bottom 0.6s ease;
+    max-height: 400px;
+  }
+  .fold-cycle.folded {
+    opacity: 0;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    pointer-events: none;
+  }
 
   /* ── Chat-triggered pet pop-up (bottom-left) ── */
   #chat-pop {
@@ -100,11 +119,14 @@
 </head>
 <body>
 
-  <div id="stats-overlay" class="obs-card">
+  <div id="stats-overlay" class="obs-card fold-cycle">
     <div class="stats-header">
       <img id="stats-pet-img" class="stats-pet-img" src="" alt="">
       <div>
-        <div id="stats-name" class="stats-name">—</div>
+        <div class="stats-name-row">
+          <img src="images/pawket-logo.png" alt="PawketPetsVT" class="stats-brand-logo" onerror="this.style.display='none'">
+          <div id="stats-name" class="stats-name">—</div>
+        </div>
         <div id="stats-sub" class="stats-sub">—</div>
       </div>
     </div>
@@ -117,8 +139,10 @@
 
   <div id="alert-banner" class="obs-card"></div>
 
-  <div id="goal-overlay" class="obs-card">
+  <div id="goal-overlay" class="obs-card fold-cycle">
+    <div class="goal-badge">🌍 COMMUNITY GOAL</div>
     <div id="goal-title" class="goal-title">—</div>
+    <div id="goal-desc" class="goal-desc">—</div>
     <div class="goal-bar-track"><div id="goal-bar" class="goal-bar-fill" style="width:0%"></div></div>
     <div id="goal-text" class="goal-text">—</div>
   </div>
@@ -245,6 +269,7 @@
     var progress = goal.current_progress || 0;
     var pct = Math.min(100, (progress / goal.goal_target) * 100);
     document.getElementById('goal-title').textContent = '📖 ' + goal.title;
+    document.getElementById('goal-desc').textContent = goal.description || '';
     document.getElementById('goal-bar').style.width = pct + '%';
     document.getElementById('goal-text').textContent = progress.toLocaleString() + ' / ' + goal.goal_target.toLocaleString() + ' (' + Math.round(pct) + '%)';
     el.style.display = 'block';
@@ -252,10 +277,29 @@
 
   loadGoals();
   setInterval(loadGoals, 60000);
-  // Cycle to the next goal every 10s if more than one is active
+  // Cycle to the next goal every 60s if more than one is active
   setInterval(function() {
     if (goalList.length > 1) { goalIndex++; renderGoal(); }
-  }, 10000);
+  }, 60000);
+
+  // ══════════════════════════════════════════════════════════════
+  // FOLD/UNFOLD CYCLE — the two persistent panels (stats + goal) don't
+  // stay on screen forever; they unfold into view, sit for a while, then
+  // fold back away so they're not permanently covering stream content.
+  // Tweak the two constants below to adjust timing.
+  // ══════════════════════════════════════════════════════════════
+  var FOLD_VISIBLE_MS = 150000; // 2.5 minutes visible
+  var FOLD_HIDDEN_MS = 300000;  // 5 minutes hidden
+
+  function runFoldCycle(visible) {
+    ['stats-overlay', 'goal-overlay'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (visible) el.classList.remove('folded');
+      else el.classList.add('folded');
+    });
+    setTimeout(function() { runFoldCycle(!visible); }, visible ? FOLD_VISIBLE_MS : FOLD_HIDDEN_MS);
+  }
+  runFoldCycle(true); // start visible
 
   // ══════════════════════════════════════════════════════════════
   // 4. CHAT-TRIGGERED PET POP-UP — realtime subscription on
