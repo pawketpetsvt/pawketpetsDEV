@@ -11590,6 +11590,12 @@ body[data-theme="dark"] .modal-content {
   margin-bottom: 4px;
 }
 
+.sb-memory-badge {
+  font-size: 11px;
+  margin-left: 4px;
+  cursor: default;
+}
+
 .sb-memory-text {
   font-size: 13px;
   line-height: 1.4;

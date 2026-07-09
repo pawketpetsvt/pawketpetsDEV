@@ -25617,6 +25617,40 @@ async function loadStatistics() {
 // SCRAPBOOK SYSTEM - COMPLETE IMPLEMENTATION
 // ══════════════════════════════════════════════════════════════════════════
 
+// Shared mood calculation — same formula screenshot_generate() uses for the
+// shareable card, so a memory's mood tag always matches what the card shows.
+function computePetMood(pet) {
+  if (!pet) return { label: 'Okay', icon: '😐' };
+  var moodScore = ((pet.hunger || 0) + (pet.energy || 0) + (pet.happiness || 0)) /
+    ((pet.max_hunger || 100) + (pet.max_energy || 100) + (pet.max_happiness || 100));
+  if (moodScore > 0.75) return { label: 'Thriving', icon: '😄' };
+  if (moodScore > 0.5)  return { label: 'Happy',    icon: '😊' };
+  if (moodScore > 0.25) return { label: 'Okay',     icon: '😐' };
+  return { label: 'Needs Care', icon: '😢' };
+}
+
+// Lightweight calendar season — flavor only, not tied to any shop/event system
+// (that's the separate "Mini seasons" roadmap item). Northern-hemisphere months.
+function scrapbook_getCalendarSeason() {
+  var month = new Date().getMonth(); // 0-11
+  if (month >= 2 && month <= 4)  return { id: 'spring', name: 'Spring', icon: '🌸' };
+  if (month >= 5 && month <= 7)  return { id: 'summer', name: 'Summer', icon: '☀️' };
+  if (month >= 8 && month <= 10) return { id: 'fall',   name: 'Fall',   icon: '🍂' };
+  return { id: 'winter', name: 'Winter', icon: '❄️' };
+}
+
+// Weather-flavored memory lines — used in place of the generic random_flavor
+// pool when today's weather (from weatherSystem, the single source of truth)
+// is known, so scrapbook entries actually reflect the world around the pet.
+var WEATHER_MEMORY_LINES = {
+  clear:  ['{pet} enjoyed a bright, sunny day outside with {trainer}.', '{pet} basked in the warm sunshine all afternoon.'],
+  rainy:  ['{pet} splashed happily through puddles in the rain.', '{pet} watched raindrops race down the window with {trainer}.'],
+  foggy:  ['{pet} crept curiously through the misty fog, exploring.', '{pet} could barely see through the thick fog, but had fun anyway.'],
+  windy:  ['{pet} chased leaves swirling in the wind.', 'A gust of wind sent {pet} tumbling — much to {trainer}\'s amusement!'],
+  starry: ['{pet} gazed up at the sparkling night sky with {trainer}.', '{pet} tried to count the stars and lost track after a hundred.'],
+  cursed: ['{pet} shivered as an eerie fog rolled through... something felt off.', '{pet} refused to leave {trainer}\'s side during the cursed weather.']
+};
+
 // Memory templates
 var SCRAPBOOK_TEMPLATES = {
     adopted: [
@@ -25755,8 +25789,14 @@ async function scrapbook_addMemory(userPetId, memoryType, variables) {
                       'their trainer';
     }
     
-    // Get templates
+    // Get templates — for random_flavor, prefer today's weather flavor about
+    // half the time so entries actually reflect the world (weatherSystem is
+    // the single source of truth here, same as everywhere else this session).
+    var currentWeather = (typeof weatherSystem !== 'undefined' && weatherSystem.currentWeather) ? weatherSystem.currentWeather : null;
     var templates = SCRAPBOOK_TEMPLATES[memoryType];
+    if (memoryType === 'random_flavor' && currentWeather && WEATHER_MEMORY_LINES[currentWeather.id] && Math.random() < 0.5) {
+        templates = WEATHER_MEMORY_LINES[currentWeather.id];
+    }
     if (!templates) {
         console.error('Scrapbook: unknown memory type', memoryType);
         return false;
@@ -25773,6 +25813,10 @@ async function scrapbook_addMemory(userPetId, memoryType, variables) {
     memoryText = memoryText.replace(/{food}/g, variables.food || 'a treat');
     memoryText = memoryText.replace(/{hp}/g, variables.hp || 'low');
     
+    // Tag this memory with today's weather + the pet's current mood, so the
+    // scrapbook and shareable cards can both show it later.
+    var memoryMood = computePetMood(window.petState && window.petState[userPetId]);
+    
     // Save to database
     try {
         var res = await supabaseClient
@@ -25780,7 +25824,9 @@ async function scrapbook_addMemory(userPetId, memoryType, variables) {
             .insert({
                 user_pet_id: userPetId,
                 memory_text: memoryText,
-                memory_type: memoryType
+                memory_type: memoryType,
+                weather: currentWeather ? currentWeather.id : null,
+                mood: memoryMood.label
             });
         
         if (res.error) {
@@ -25822,7 +25868,7 @@ async function scrapbook_loadMemories(userPetId, limit) {
     limit = limit || 15;
     var res = await supabaseClient
         .from('pet_memories')
-        .select('memory_text, memory_type, created_at')
+        .select('memory_text, memory_type, created_at, weather, mood')
         .eq('user_pet_id', userPetId)
         .order('created_at', { ascending: false })
         .limit(limit);
@@ -25845,6 +25891,10 @@ function scrapbook_formatDate(dateString) {
     return date.toLocaleDateString();
 }
 
+// Small icon lookup for weather/mood badges on memory cards
+var SCRAPBOOK_WEATHER_ICONS = { clear: '☀️', rainy: '🌧️', foggy: '🌫️', windy: '🌬️', starry: '✨', cursed: '👻' };
+var SCRAPBOOK_MOOD_ICONS = { 'Thriving': '😄', 'Happy': '😊', 'Okay': '😐', 'Needs Care': '😢' };
+
 // Refresh UI
 async function scrapbook_refreshMemories(userPetId) {
     var container = document.getElementById('sb-memories-container');
@@ -25856,8 +25906,15 @@ async function scrapbook_refreshMemories(userPetId) {
     }
     container.innerHTML = memories.map(function(mem) {
         var escapedText = escapeHtml(mem.memory_text);
+        var badges = '';
+        if (mem.weather && SCRAPBOOK_WEATHER_ICONS[mem.weather]) {
+            badges += '<span class="sb-memory-badge" title="Weather: ' + mem.weather + '">' + SCRAPBOOK_WEATHER_ICONS[mem.weather] + '</span>';
+        }
+        if (mem.mood && SCRAPBOOK_MOOD_ICONS[mem.mood]) {
+            badges += '<span class="sb-memory-badge" title="Mood: ' + mem.mood + '">' + SCRAPBOOK_MOOD_ICONS[mem.mood] + '</span>';
+        }
         return '<div class="sb-memory-card">' +
-            '<div class="sb-memory-date">📅 ' + scrapbook_formatDate(mem.created_at) + '</div>' +
+            '<div class="sb-memory-date">📅 ' + scrapbook_formatDate(mem.created_at) + (badges ? ' ' + badges : '') + '</div>' +
             '<div class="sb-memory-text">💭 ' + escapedText + '</div>' +
             '</div>';
     }).join('');
@@ -28108,7 +28165,7 @@ async function screenshot_generate(petId) {
 
     // Most recent scrapbook memory
     var memory = null;
-    var { data: mems } = await supabaseClient.from('pet_scrapbook').select('memory_text').eq('pet_id', petId).order('created_at', { ascending: false }).limit(1);
+    var { data: mems } = await supabaseClient.from('pet_memories').select('memory_text').eq('user_pet_id', petId).order('created_at', { ascending: false }).limit(1);
     if (mems && mems.length) memory = mems[0].memory_text;
 
     // ── Resolve values ──
@@ -28122,12 +28179,13 @@ async function screenshot_generate(petId) {
     var stage = petLevel >= 20 ? 'Adult' : petLevel >= 10 ? 'Teen' : 'Baby';
     var stageEmoji = petLevel >= 20 ? '🦋' : petLevel >= 10 ? '🌿' : '🥚';
 
-    // Mood from hunger/energy/happiness
-    var moodScore = ((pet.hunger || 0) + (pet.energy || 0) + (pet.happiness || 0)) / ((pet.max_hunger||100) + (pet.max_energy||100) + (pet.max_happiness||100));
-    var mood = moodScore > 0.75 ? { label: 'Thriving', icon: '😄' } :
-               moodScore > 0.5  ? { label: 'Happy',    icon: '😊' } :
-               moodScore > 0.25 ? { label: 'Okay',     icon: '😐' } :
-                                  { label: 'Needs Care',icon: '😢' };
+    // Mood from hunger/energy/happiness — shared helper, same formula the
+    // scrapbook uses so a memory's mood tag always matches the card.
+    var mood = computePetMood(pet);
+
+    // Today's weather + season — same source of truth as the scrapbook tags
+    var cardWeather = (typeof weatherSystem !== 'undefined' && weatherSystem.currentWeather) ? weatherSystem.currentWeather : null;
+    var cardSeason = (typeof scrapbook_getCalendarSeason === 'function') ? scrapbook_getCalendarSeason() : null;
 
     // Variant
     var variantKey  = pet.current_variant || null;
@@ -28298,10 +28356,12 @@ async function screenshot_generate(petId) {
     ctx.font = '14px Arial';
     ctx.fillText(typeEmoji + ' ' + petType + '  •  Lv. ' + petLevel, W/2, 276);
 
-    // ── Mood ──
+    // ── Mood + Weather/Season (kept on one line — canvas below here uses
+    // absolute y-coordinates, so no new line is added to avoid shifting it) ──
+    var contextBits = [cardWeather ? (cardWeather.icon + ' ' + cardWeather.name) : '', cardSeason ? (cardSeason.icon + ' ' + cardSeason.name) : ''].filter(Boolean).join(' · ');
     ctx.fillStyle = '#888';
     ctx.font = '13px Arial';
-    ctx.fillText(mood.icon + ' ' + mood.label + '  |  🎮 Pass Lv.' + passLevel, W/2, 300);
+    ctx.fillText(mood.icon + ' ' + mood.label + '  |  🎮 Lv.' + passLevel + (contextBits ? '  |  ' + contextBits : ''), W/2, 300);
 
     // ── Divider ──
     ctx.strokeStyle = '#e0d5ff';
