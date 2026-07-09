@@ -17287,3 +17287,37 @@ body.night-mode .item-icon-img {
 .eq-stat.spirit {
   color: #c47fff;
 }
+
+
+/* ── Streamer landing social links ───────────────────────────────────────── */
+.streamer-landing-socials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.streamer-landing-social-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none !important;
+  transition: opacity 0.15s, transform 0.12s;
+  background: rgba(255,255,255,0.06);
+}
+
+.streamer-landing-social-btn:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}
+
+/* Subtle form card border uses streamer accent when on a landing page */
+body.streamer-landing-active .form-card {
+  border-color: var(--streamer-accent, var(--purple));
+  box-shadow: 0 4px 24px color-mix(in srgb, var(--streamer-accent, var(--purple)) 20%, transparent);
+}

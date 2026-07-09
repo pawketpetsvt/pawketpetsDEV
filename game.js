@@ -4087,6 +4087,7 @@ async function expedition_claim(expeditionId) {
   checkPetWishes('expedition', row.pet_id).catch(function(){});
   progressQuestArc(row.pet_id, 'expedition').catch(function(){});
   community_increment('expeditions_week1', 1);
+  trackDailyStat('expeditions_completed').catch(function(){});
   checkAchievementTierProgress('expeditions_completed', row.pet_id, streak).catch(function(){});
 
   showToast('🏴‍☠️ Claimed ' + (row.reward_pp || 0) + ' PP from your expedition!', 4000);
@@ -7604,14 +7605,69 @@ async function initTwitchTab() {
 var _currentlyLiveStreamers = []; // array of { name, login, twitchUrl, petName, viewers, title }
 
 var TEAM_MEMBERS = [
-  { name: 'Embertail', login: 'embertail', twitchUrl: 'https://twitch.tv/Embertail', petName: 'Ember',    twitchId: '91821604' },
-  { name: 'Pyxshuul',  login: 'pyxshuul',  twitchUrl: 'https://twitch.tv/Pyxshuul',  petName: 'Pyxie',   twitchId: '1459912293' },
-  { name: 'Aria',      login: 'ariadoestwitch', twitchUrl: 'https://twitch.tv/ariadoestwitch', petName: 'Aria',      twitchId: '1445288832' },
-  { name: 'Blushimia', login: 'realblushimia',  twitchUrl: 'https://twitch.tv/realblushimia',  petName: 'Blushimia', twitchId: '659500662' },
-  { name: 'Steve',     login: 'cowbeevt',       twitchUrl: 'https://twitch.tv/cowbeevt',       petName: 'Steve',     twitchId: '203845195' },
-  { name: 'Kleat',     login: 'keltathepomeranian', twitchUrl: 'https://twitch.tv/keltathepomeranian', petName: 'Kleat', twitchId: '121490227' },
-  { name: 'Jess',      login: 'teatimejess',    twitchUrl: 'https://twitch.tv/teatimejess',    petName: 'Jess',     twitchId: '88727356' },
-  { name: 'Gnarly',    login: 'gnarly_neon_smilodon', twitchUrl: 'https://twitch.tv/gnarly_neon_smilodon', petName: 'Gnarly', twitchId: '531222973' }
+  {
+    name: 'Embertail', login: 'embertail', twitchUrl: 'https://twitch.tv/Embertail',
+    petName: 'Ember', twitchId: '91821604',
+    bio: 'Co-founder of PawketPetsVT and the developer behind the game itself. Ember streams variety content and is the reason any of this exists.',
+    accentColor: '#ff6eb4', bgGradient: 'linear-gradient(135deg,#2d0a1a 0%,#1a0a2e 100%)',
+    socialLinks: [{ label: 'Twitch', url: 'https://twitch.tv/Embertail', icon: '🎮' }]
+  },
+  {
+    name: 'Pyxshuul', login: 'pyxshuul', twitchUrl: 'https://twitch.tv/Pyxshuul',
+    petName: 'Pyxie', twitchId: '1459912293',
+    bio: 'Co-founder of PawketPetsVT. Pyxshuul is chaotic good energy in streamer form.',
+    accentColor: '#9966ff', bgGradient: 'linear-gradient(135deg,#1a0a2e 0%,#0a0a1a 100%)',
+    socialLinks: [{ label: 'Twitch', url: 'https://twitch.tv/Pyxshuul', icon: '🎮' }]
+  },
+  {
+    name: 'Aria', login: 'ariadoestwitch', twitchUrl: 'https://twitch.tv/ariadoestwitch',
+    petName: 'Aria', twitchId: '1445288832',
+    bio: 'A gothic moth VTuber with impeccable taste and a love of bones. Aria streams a mix of games and just vibes.',
+    accentColor: '#8844cc', bgGradient: 'linear-gradient(135deg,#0d0d1a 0%,#1a0d2e 100%)',
+    socialLinks: [{ label: 'Twitch', url: 'https://twitch.tv/ariadoestwitch', icon: '🎮' }]
+  },
+  {
+    name: 'Blushimia', login: 'realblushimia', twitchUrl: 'https://twitch.tv/realblushimia',
+    petName: 'Blushimia', twitchId: '659500662',
+    bio: 'A puppy VTuber with big energy and even bigger heart. Blushimia streams games, art, and wholesome chaos.',
+    accentColor: '#ff99cc', bgGradient: 'linear-gradient(135deg,#2d0a1a 0%,#1a1a2e 100%)',
+    socialLinks: [{ label: 'Twitch', url: 'https://twitch.tv/realblushimia', icon: '🎮' }]
+  },
+  {
+    name: 'Cowbee', login: 'cowbeevt', twitchUrl: 'https://twitch.tv/cowbeevt',
+    petName: 'Steve', twitchId: '203845195',
+    bio: 'A chaotic cowbee hybrid who has been streaming since before Twitch was cool. Steve (the pet) is just as unhinged.',
+    accentColor: '#f0c040', bgGradient: 'linear-gradient(135deg,#1a1200 0%,#1a0a00 100%)',
+    socialLinks: [
+      { label: 'Twitch', url: 'https://twitch.tv/cowbeevt', icon: '🎮' },
+      { label: 'Bluesky', url: 'https://bsky.app/profile/cowbeevt.vtubers.social', icon: '🦋' }
+    ]
+  },
+  {
+    name: 'Kelta', login: 'keltathepomeranian', twitchUrl: 'https://twitch.tv/keltathepomeranian',
+    petName: 'Kleat', twitchId: '121490227',
+    bio: 'A grand mage Pomeranian who studies void, space, and galaxy magic. Streams adventure games and explores new worlds — sometimes literally.',
+    accentColor: '#44aaff', bgGradient: 'linear-gradient(135deg,#000d1a 0%,#0d0d2e 100%)',
+    socialLinks: [
+      { label: 'Twitch', url: 'https://twitch.tv/keltathepomeranian', icon: '🎮' },
+      { label: 'Bluesky', url: 'https://bsky.app/profile/keltathepomeranian.bsky.social', icon: '🦋' },
+      { label: 'X / Twitter', url: 'https://x.com/AilkaKelta', icon: '🐦' }
+    ]
+  },
+  {
+    name: 'Jess', login: 'teatimejess', twitchUrl: 'https://twitch.tv/teatimejess',
+    petName: 'Jess', twitchId: '88727356',
+    bio: 'A parasaur VTuber who brings prehistoric energy to everything she touches. Cozy streams, big personality.',
+    accentColor: '#44cc88', bgGradient: 'linear-gradient(135deg,#001a0d 0%,#0a1a00 100%)',
+    socialLinks: [{ label: 'Twitch', url: 'https://twitch.tv/teatimejess', icon: '🎮' }]
+  },
+  {
+    name: 'Gnarly', login: 'gnarly_neon_smilodon', twitchUrl: 'https://twitch.tv/gnarly_neon_smilodon',
+    petName: 'Gnarly', twitchId: '531222973',
+    bio: 'A neon Smilodon with retro arcade energy. Gnarly streams games with big personality and zero chill — in the best way.',
+    accentColor: '#ff4488', bgGradient: 'linear-gradient(135deg,#1a0d00 0%,#1a001a 100%)',
+    socialLinks: [{ label: 'Twitch', url: 'https://twitch.tv/gnarly_neon_smilodon', icon: '🎮' }]
+  }
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -7650,49 +7706,78 @@ function streamerLanding_init() {
 }
 
 function streamerLanding_buildHero(member) {
-  // Replace the landing hero on both login and register sections
   var petImageFile = member.petName.toLowerCase() + '.png';
+  var accent = member.accentColor || '#9966ff';
+  var bg = member.bgGradient || 'linear-gradient(135deg,#1a0a2e 0%,#0a0a1a 100%)';
+
+  // Build social links
+  var socialHTML = '';
+  if (member.socialLinks && member.socialLinks.length > 0) {
+    socialHTML = '<div class="streamer-landing-socials">' +
+      member.socialLinks.map(function(link) {
+        return '<a href="' + escapeHtml(link.url) + '" target="_blank" rel="noopener" ' +
+               'class="streamer-landing-social-btn" ' +
+               'style="border-color:' + accent + ';color:' + accent + ';">' +
+               escapeHtml(link.icon) + ' ' + escapeHtml(link.label) + '</a>';
+      }).join('') + '</div>';
+  }
 
   var heroHTML =
-    '<div class="landing-hero streamer-landing-hero">' +
+    '<div class="landing-hero streamer-landing-hero" ' +
+         'style="background:' + bg + ';border-radius:20px;padding:28px 20px 24px;margin-bottom:20px;' +
+                'border:2px solid ' + accent + ';box-shadow:0 8px 32px rgba(0,0,0,0.4);">' +
       '<div class="streamer-landing-pet-wrap">' +
         '<img src="images/pets/' + petImageFile + '" ' +
              'alt="' + escapeHtml(member.petName) + '" ' +
              'class="streamer-landing-pet-img" ' +
-             'onerror="this.src='images/logo.png'" />' +
+             'style="filter:drop-shadow(0 0 20px ' + accent + ');" ' +
+             'onerror="this.src=&quot;images/logo.png&quot;" />' +
       '</div>' +
       '<div class="streamer-landing-info">' +
-        '<div class="streamer-landing-invited">' +
-          '<span class="streamer-landing-dot"></span>' +
-          escapeHtml(member.name) + ' invited you to PawketPets<span style="color:var(--pink);">VT</span>!' +
+        '<div class="streamer-landing-invited" style="color:rgba(255,255,255,0.65);">' +
+          '<span class="streamer-landing-dot" style="background:' + accent + ';flex-shrink:0;"></span>' +
+          '<span>' + escapeHtml(member.name) + ' invited you to PawketPets<span style="color:' + accent + ';">VT</span>!</span>' +
         '</div>' +
-        '<h1 class="landing-title" style="font-size:2rem;margin:8px 0 6px;">' +
-          'Adopt <span style="color:var(--pink);">' + escapeHtml(member.petName) + '</span>!' +
+        '<h1 class="landing-title" style="font-size:1.9rem;margin:10px 0 6px;color:#fff;' +
+            'text-shadow:0 2px 12px ' + accent + ';">' +
+          'Adopt <span style="color:' + accent + ';">' + escapeHtml(member.petName) + '</span>!' +
         '</h1>' +
-        '<p class="landing-tagline" style="font-size:0.9rem;margin-bottom:14px;">' +
-          'Create a free account and adopt ' + escapeHtml(member.name) + ''s pet. ' +
-          'Your first pet is always free!' +
+        (member.bio
+          ? '<p style="font-size:0.84rem;color:rgba(255,255,255,0.65);line-height:1.6;margin:0 0 12px;max-width:340px;">' +
+              escapeHtml(member.bio) + '</p>'
+          : '') +
+        '<p style="font-size:0.82rem;color:rgba(255,255,255,0.45);margin:0 0 14px;">' +
+          'Free to play \u00b7 Your first pet is on us!' +
         '</p>' +
         '<div class="streamer-landing-links">' +
           '<a href="' + escapeHtml(member.twitchUrl) + '" target="_blank" rel="noopener" ' +
-             'class="streamer-landing-twitch-btn">' +
-            '🎮 Watch ' + escapeHtml(member.name) + ' on Twitch' +
+             'class="streamer-landing-twitch-btn" ' +
+             'style="background:' + accent + ';box-shadow:0 4px 14px ' + accent + '80;">' +
+            '\u{1F3AE} Watch ' + escapeHtml(member.name) + ' on Twitch' +
           '</a>' +
         '</div>' +
+        socialHTML +
       '</div>' +
     '</div>';
 
-  // Replace heroes on both sections
+  // Apply to both auth sections
   ['section-login', 'section-register'].forEach(function(sectionId) {
     var section = document.getElementById(sectionId);
-    if (!section) return;
+    if (!section) { dbg('[Landing] Section not found:', sectionId); return; }
     var existingHero = section.querySelector('.landing-hero');
     if (existingHero) {
       existingHero.outerHTML = heroHTML;
+      dbg('[Landing] Hero replaced in', sectionId, 'for', member.name);
+    } else {
+      dbg('[Landing] .landing-hero not found in', sectionId);
     }
   });
 
-  // Pre-select register tab since this is a new visitor
+  // Set accent CSS variable for streamer-themed form card borders etc.
+  document.body.style.setProperty('--streamer-accent', accent);
+  document.body.classList.add('streamer-landing-active');
+
+  // Show register tab for new visitors
   showAuthSection('register');
 }
 
@@ -9984,6 +10069,8 @@ async function executeBattle(playerStats, enemyStats, petId) {
     }
     // WISHES: battle win
     checkPetWishes('win_battle', petId).catch(function(){});
+    trackDailyStat('battles_won').catch(function(){});
+    if (enemyStats && enemyStats.is_boss) trackDailyStat('bosses_killed').catch(function(){});
   }
 
   // CRITICAL: Force reload pet data AFTER HP is saved
@@ -13471,6 +13558,8 @@ var newsTicker = {
     this.shuffle();
     this.updateTicker();
     this.startScrollDetection();
+    // Pre-load today's stats for dynamic headlines (non-blocking)
+    this.loadDailyStats().catch(function(){});
   },
   
   shuffle: function() {
@@ -13524,6 +13613,33 @@ var newsTicker = {
     }, 100);
   },
   
+  // Cache for today's stats — loaded once and reused
+  _dailyStatsCache: null,
+  _dailyStatsCacheDate: null,
+
+  loadDailyStats: async function() {
+    var today = new Date().toISOString().slice(0, 10);
+    if (this._dailyStatsCache && this._dailyStatsCacheDate === today) return this._dailyStatsCache;
+    try {
+      var { data } = await supabaseClient.from('daily_stats').select('*').eq('stat_date', today).maybeSingle();
+      this._dailyStatsCache = data || {};
+      this._dailyStatsCacheDate = today;
+    } catch(e) { this._dailyStatsCache = {}; }
+    return this._dailyStatsCache;
+  },
+
+  getDynamicHeadline: function(stats) {
+    if (!stats) return null;
+    var headlines = [];
+    var s = stats;
+    if (s.battles_won > 0)           headlines.push('Community update: ' + s.battles_won + ' battles fought across PawketPets today. The monsters are getting nervous.');
+    if (s.bosses_killed > 0)         headlines.push('BREAKING: The community has defeated ' + s.bosses_killed + ' boss' + (s.bosses_killed !== 1 ? 'es' : '') + ' today. Impressive.');
+    if (s.pets_adopted > 0)          headlines.push('Heartwarming: ' + s.pets_adopted + ' new pet' + (s.pets_adopted !== 1 ? 's' : '') + ' adopted today. The team grows.');
+    if (s.expeditions_completed > 0) headlines.push('Exploration report: ' + s.expeditions_completed + ' expeditions completed today. Whatever they found out there, nobody is saying.');
+    if (headlines.length === 0) return null;
+    return headlines[Math.floor(Math.random() * headlines.length)];
+  },
+
   updateTicker: function() {
     var tickerElement = document.querySelector('.news-ticker-inner');
     if (tickerElement) {
@@ -13533,11 +13649,17 @@ var newsTicker = {
       this.currentIndex = this.getRandomUnusedIndex();
       var message = this.messages[this.currentIndex];
       var isSpookyLine = false;
+      var isDynamic = false;
 
-      // Rare chance to substitute a creepy line instead — gated by spooky_enabled
+      // Rare chance to substitute a creepy line — gated by spooky_enabled
       if (playerSettings.spooky_enabled && Math.random() < this.SPOOKY_TICKER_CHANCE) {
         message = this.spookyMessages[Math.floor(Math.random() * this.spookyMessages.length)];
         isSpookyLine = true;
+      }
+      // 20% chance to show a real stat headline if we have cached stats
+      else if (Math.random() < 0.20 && this._dailyStatsCache) {
+        var dynHeadline = this.getDynamicHeadline(this._dailyStatsCache);
+        if (dynHeadline) { message = dynHeadline; isDynamic = true; }
       }
       
       // Get event announcement if active
@@ -18494,7 +18616,7 @@ async function checkDailyLogin() {
     }
     
     // Cap streak at 30 days
-    if (streak > 30) streak = 30;
+    // streak cap removed — long-term milestones need 100+ days
     
     dailyLoginStreak = streak;
     
@@ -25122,6 +25244,7 @@ function onPetLevelUp(petId) {
 // Hook for adoption - call this when adopting a pet
 function onPetAdopted(petId) {
   updateBingoProgress('adopt_pet', 1);
+  trackDailyStat('pets_adopted').catch(function(){});
 }
 
 // Hook for minigame completion
@@ -25553,6 +25676,38 @@ async function community_loadUserClaims() {
 }
 
 // Increment goal progress (local, batched)
+// ═══════════════════════════════════════════════════════════════════════════
+// DAILY STATS TRACKING
+// Increments daily_stats table for newspaper, analytics, and Discord bot
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function trackDailyStat(column, amount) {
+  amount = amount || 1;
+  try {
+    var today = new Date().toISOString().slice(0, 10);
+    // Upsert: create today's row if it doesn't exist, then increment
+    var { data: existing } = await supabaseClient
+      .from('daily_stats')
+      .select('id, ' + column)
+      .eq('stat_date', today)
+      .maybeSingle();
+
+    if (existing) {
+      var update = {};
+      update[column] = (existing[column] || 0) + amount;
+      update.updated_at = new Date().toISOString();
+      await supabaseClient.from('daily_stats').update(update).eq('id', existing.id);
+    } else {
+      var insert = { stat_date: today, updated_at: new Date().toISOString() };
+      insert[column] = amount;
+      await supabaseClient.from('daily_stats').insert([insert]);
+    }
+  } catch(e) {
+    dbg('[DailyStat] Failed to track', column, ':', e.message);
+    // Non-critical — never throw, just log
+  }
+}
+
 function community_increment(goalKey, amount, metadata) {
     if (!goalKey) return;
     amount = amount || 1;
