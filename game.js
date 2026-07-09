@@ -9745,7 +9745,10 @@ var PASSIVE_EFFECTS = {
   royal_spores:         { type: 'defend', label: "Royal Spores",        icon: '🍄', healMaxPct: 0.15 },
   warding_chimes:        { type: 'defend', label: "Warding Chimes",      icon: '🔔', fullBlock: true },
   trash_royalty:         { type: 'defend', label: "Trash Royalty",       icon: '👑', reflectPct: 0.30 },
-  forbidden_knowledge:   { type: 'defend', label: "Forbidden Knowledge", icon: '📜', flatReduction: 4 }
+  forbidden_knowledge:   { type: 'defend', label: "Forbidden Knowledge", icon: '📜', flatReduction: 4 },
+
+  // ---- Enemy-side passives ----
+  corrupted_fury: { type: 'enemyAttack', label: 'Corrupted Fury', icon: '🔥', bonusDamagePct: 0.4 }
 };
 
 /**
@@ -9896,6 +9899,18 @@ function simulateBattle(playerStats, enemyStats) {
       var enemyDamageResult = calculateDamage(enemyStats.attack, playerStats.stats.defense, isBossAttack);
       var finalDamage = enemyDamageResult.damage;
       var defendPassiveLogs = [];
+
+      // --- Enemy attack passive (e.g. Corrupted Fury) ---
+      if (enemyStats.passive) {
+        var epx = PASSIVE_EFFECTS[enemyStats.passive.effect];
+        if (epx && epx.type === 'enemyAttack' && Math.random() * 100 < enemyStats.passive.chance) {
+          if (epx.bonusDamagePct) {
+            var bonusDmg = Math.floor(finalDamage * epx.bonusDamagePct);
+            finalDamage += bonusDmg;
+            defendPassiveLogs.push(epx.icon + ' ' + epx.label + '! ' + enemyStats.name + ' strikes with corrupted power for ' + bonusDmg + ' extra damage!');
+          }
+        }
+      }
 
       // --- Armor passive procs (defending) ---
       if (playerStats.passives && playerStats.passives.length) {
@@ -10148,7 +10163,8 @@ async function startBattleWithEnemy(petId, enemy) {
     pp_reward: enemy.pp_reward || calculateReward(enemy.level, enemy.forest_zone, 'pp'),
     sprite_sheet: enemy.sprite_sheet || null,
     sprite_frames: enemy.sprite_frames || null,
-    is_boss: enemy.is_boss || false
+    is_boss: enemy.is_boss || false,
+    passive: enemy.passive || null
   };
   
   // BOSS ENTRANCE SEQUENCE!
@@ -12127,32 +12143,52 @@ async function getRandomEnemy(zone, playerLevel) {
   var specialVariant = null;
   var specialMultiplier = 1.0;
   var rewardMultiplier = 1.0;
+  var enemyPassive = null;
   
   // Roll for special variants (independent of age/elemental)
   var specialRoll = Math.random();
+
+  // Base chances (as widths, not thresholds yet)
+  var goldenChance = 0.005;
+  var shinyChance = 0.01;
+  var glitchedChance = 0.01;
+  var corruptedChance = 0.03;
+  var rareChance = 0.05;
+
+  // Cursed weather makes the world friendlier to corruption
+  if (typeof weatherSystem !== 'undefined' && weatherSystem.currentWeather && weatherSystem.currentWeather.id === 'cursed') {
+    corruptedChance = 0.12; // 3% -> 12% during Cursed Fog
+  }
+
+  var goldenThreshold = goldenChance;
+  var shinyThreshold = goldenThreshold + shinyChance;
+  var glitchedThreshold = shinyThreshold + glitchedChance;
+  var corruptedThreshold = glitchedThreshold + corruptedChance;
+  var rareThreshold = corruptedThreshold + rareChance;
   
-  if (specialRoll < 0.005) {
-    // 0.5% - GOLDEN (Ultra Rare)
+  if (specialRoll < goldenThreshold) {
+    // GOLDEN (Ultra Rare)
     specialVariant = 'golden';
     specialMultiplier = 1.8;
     rewardMultiplier = 2.5;
-  } else if (specialRoll < 0.015) {
-    // 1% - SHINY (Very Rare)
+  } else if (specialRoll < shinyThreshold) {
+    // SHINY (Very Rare)
     specialVariant = 'shiny';
     specialMultiplier = 1.4;
     rewardMultiplier = 1.8;
-  } else if (specialRoll < 0.025) {
-    // 1% - GLITCHED (Very Rare, random stats)
+  } else if (specialRoll < glitchedThreshold) {
+    // GLITCHED (Very Rare, random stats)
     specialVariant = 'glitched';
     specialMultiplier = 0.8 + (Math.random() * 1.0); // 0.8-1.8x random
     rewardMultiplier = 1.6;
-  } else if (specialRoll < 0.055) {
-    // 3% - CORRUPTED (Rare, harder)
+  } else if (specialRoll < corruptedThreshold) {
+    // CORRUPTED (Rare, harder) — boosted during Cursed weather
     specialVariant = 'corrupted';
     specialMultiplier = 1.5;
     rewardMultiplier = 1.5;
-  } else if (specialRoll < 0.105) {
-    // 5% - RARE (Uncommon)
+    enemyPassive = { effect: 'corrupted_fury', chance: 20 };
+  } else if (specialRoll < rareThreshold) {
+    // RARE (Uncommon)
     specialVariant = 'rare';
     specialMultiplier = 1.2;
     rewardMultiplier = 1.25;
@@ -12237,7 +12273,8 @@ async function getRandomEnemy(zone, playerLevel) {
     variant: variant,
     elementalType: elementalType,
     specialVariant: specialVariant,
-    rewardMultiplier: rewardMultiplier
+    rewardMultiplier: rewardMultiplier,
+    passive: enemyPassive
   };
   
   dbg('Generated enemy:', scaledEnemy.name, 'Level', enemyLevel, 'Variant:', variant, 'Elemental:', elementalType, 'Special:', specialVariant, 'Stats:', {
