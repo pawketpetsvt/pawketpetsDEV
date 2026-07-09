@@ -14302,7 +14302,7 @@ var CompanionBuddy = {
     // Recent battle memory
     if (this.lastBattleResult && context !== 'shop') {
       if (this.lastBattleResult.victory) {
-        msgs.push('That battle earlier was amazing! 💪 You really showed ' + (this.lastBattleResult.enemyName || 'them') + ' who's boss!');
+        msgs.push('That battle earlier was amazing! 💪 You really showed ' + (this.lastBattleResult.enemyName || 'them') + ' who was boss!');
         if (this.lastBattleResult.finalHP && this.lastBattleResult.finalHP < 10) {
           msgs.push('That last fight was SO close... 😰 Let us heal up before the next one!');
         }
@@ -14321,7 +14321,7 @@ var CompanionBuddy = {
       msgs.push(streak + ' days in a row! 🔥 You are so dedicated!');
     }
     if (streak >= 30) {
-      msgs.push('A whole month together! 💖 I'm so glad you keep coming back!');
+      msgs.push('A whole month together! 💖 So glad you keep coming back!');
     }
 
     // Login time awareness
