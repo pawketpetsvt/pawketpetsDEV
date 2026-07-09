@@ -2568,6 +2568,9 @@ async function confirmAdopt() {
     scrapbook_addMemory(result.pet_id, 'adopted', {});
   }
   
+  // ACTIVITY FEED: Log adoption so friend feeds + OBS live alerts pick it up
+  logActivity('pet_adopted', { pet_name: nickname || selectedPet.name });
+  
   // Store for social sharing
   lastAdoptedPet = {
     name: selectedPet.name,

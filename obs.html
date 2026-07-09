@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PawketPetsVT — OBS Overlay</title>
+<style>
+  /* Transparent, click-through overlay meant for an OBS Browser Source. */
+  html, body {
+    margin: 0; padding: 0;
+    width: 100vw; height: 100vh;
+    background: transparent;
+    overflow: hidden;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    pointer-events: none; /* never blocks stream interaction */
+  }
+
+  :root {
+    --purple: #9966ff;
+    --purple-dark: #6633cc;
+    --pink: #ff66cc;
+  }
+
+  .obs-card {
+    position: absolute;
+    background: rgba(20, 10, 35, 0.82);
+    border: 2px solid var(--purple);
+    border-radius: 14px;
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+  /* ── Persistent stats overlay (top-left) ── */
+  #stats-overlay {
+    top: 24px; left: 24px;
+    width: 300px;
+    padding: 14px 16px;
+    display: none; /* shown once data loads */
+  }
+  .stats-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .stats-pet-img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: rgba(255,255,255,0.1); }
+  .stats-name { font-weight: bold; font-size: 1.05rem; }
+  .stats-sub { font-size: 0.78rem; color: #d8c8ff; }
+  .stat-row { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 0.78rem; }
+  .stat-label { width: 56px; flex-shrink: 0; }
+  .stat-bar-track { flex: 1; height: 8px; background: rgba(255,255,255,0.12); border-radius: 6px; overflow: hidden; }
+  .stat-bar-fill { height: 100%; border-radius: 6px; transition: width 0.4s ease; }
+  .stat-fill-hp        { background: linear-gradient(90deg,#ff5566,#ff8899); }
+  .stat-fill-hunger    { background: linear-gradient(90deg,#ffaa33,#ffcc66); }
+  .stat-fill-energy    { background: linear-gradient(90deg,#33ccff,#66ddff); }
+  .stat-fill-happiness { background: linear-gradient(90deg,#66dd88,#99eeaa); }
+  .stats-tip { margin-top: 8px; font-size: 0.75rem; font-style: italic; color: #ffd9a0; }
+
+  /* ── Live alert banner (top-center) ── */
+  #alert-banner {
+    top: 24px; left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    padding: 12px 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    border-color: var(--pink);
+  }
+  #alert-banner.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ── Community goal bar (bottom-center) ── */
+  #goal-overlay {
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    width: 420px;
+    padding: 12px 18px;
+    display: none;
+  }
+  .goal-title { font-size: 0.85rem; font-weight: bold; margin-bottom: 6px; }
+  .goal-bar-track { height: 14px; background: rgba(255,255,255,0.12); border-radius: 8px; overflow: hidden; }
+  .goal-bar-fill { height: 100%; background: linear-gradient(90deg, var(--purple), var(--pink)); border-radius: 8px; transition: width 0.5s ease; }
+  .goal-text { font-size: 0.72rem; margin-top: 4px; color: #d8c8ff; }
+
+  /* ── Chat-triggered pet pop-up (bottom-left) ── */
+  #chat-pop {
+    bottom: 24px; left: 24px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-color: var(--pink);
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+  }
+  #chat-pop.show { opacity: 1; transform: translateY(0); }
+  #chat-pop img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
+  #chat-pop .chat-pop-text { font-size: 0.85rem; }
+  #chat-pop .chat-pop-viewer { font-weight: bold; color: var(--pink); }
+</style>
+</head>
+<body>
+
+  <div id="stats-overlay" class="obs-card">
+    <div class="stats-header">
+      <img id="stats-pet-img" class="stats-pet-img" src="" alt="">
+      <div>
+        <div id="stats-name" class="stats-name">—</div>
+        <div id="stats-sub" class="stats-sub">—</div>
+      </div>
+    </div>
+    <div class="stat-row"><span class="stat-label">HP</span><div class="stat-bar-track"><div id="bar-hp" class="stat-bar-fill stat-fill-hp" style="width:0%"></div></div></div>
+    <div class="stat-row"><span class="stat-label">Hunger</span><div class="stat-bar-track"><div id="bar-hunger" class="stat-bar-fill stat-fill-hunger" style="width:0%"></div></div></div>
+    <div class="stat-row"><span class="stat-label">Energy</span><div class="stat-bar-track"><div id="bar-energy" class="stat-bar-fill stat-fill-energy" style="width:0%"></div></div></div>
+    <div class="stat-row"><span class="stat-label">Happy</span><div class="stat-bar-track"><div id="bar-happiness" class="stat-bar-fill stat-fill-happiness" style="width:0%"></div></div></div>
+    <div id="stats-tip" class="stats-tip"></div>
+  </div>
+
+  <div id="alert-banner" class="obs-card"></div>
+
+  <div id="goal-overlay" class="obs-card">
+    <div id="goal-title" class="goal-title">—</div>
+    <div class="goal-bar-track"><div id="goal-bar" class="goal-bar-fill" style="width:0%"></div></div>
+    <div id="goal-text" class="goal-text">—</div>
+  </div>
+
+  <div id="chat-pop" class="obs-card">
+    <img id="chat-pop-img" src="" alt="">
+    <div class="chat-pop-text"><span id="chat-pop-viewer" class="chat-pop-viewer"></span>'s <span id="chat-pop-pet"></span> says hi! 👋</div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.4"></script>
+<script>
+(function() {
+  var SUPABASE_URL = 'https://hqzugbxutgefjilgmxqu.supabase.co';
+  var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxenVnYnh1dGdlZmppbGdteHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MTE5NjEsImV4cCI6MjA5MDQ4Nzk2MX0.A3bQMriwY8j9GasUywq_8hKlnkEQQNMyB2ykSaQR68c';
+  var supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  var params = new URLSearchParams(window.location.search);
+  var streamerLogin = params.get('streamer') || '';
+
+  // ══════════════════════════════════════════════════════════════
+  // 1. PERSISTENT STATS OVERLAY
+  // Requires the streamer's players row to have is_public_overlay = true
+  // (see obs_widget_setup.sql — this is an explicit opt-in allowlist).
+  // ══════════════════════════════════════════════════════════════
+  async function loadStats() {
+    if (!streamerLogin) return;
+    try {
+      var { data: player } = await supa
+        .from('players')
+        .select('id, username, companion_pet_id')
+        .ilike('username', streamerLogin)
+        .eq('is_public_overlay', true)
+        .maybeSingle();
+
+      if (!player || !player.companion_pet_id) return;
+
+      var { data: pet } = await supa
+        .from('user_pets')
+        .select('nickname, level, current_hp, max_hp, hunger, max_hunger, energy, max_energy, happiness, max_happiness, pets(name, image_file)')
+        .eq('id', player.companion_pet_id)
+        .single();
+
+      if (!pet) return;
+
+      var hpPct = Math.round((pet.current_hp / Math.max(1, pet.max_hp)) * 100);
+      var hungerPct = Math.round((pet.hunger / Math.max(1, pet.max_hunger)) * 100);
+      var energyPct = Math.round((pet.energy / Math.max(1, pet.max_energy)) * 100);
+      var happinessPct = Math.round((pet.happiness / Math.max(1, pet.max_happiness)) * 100);
+
+      document.getElementById('stats-name').textContent = pet.nickname || (pet.pets && pet.pets.name) || 'Pet';
+      document.getElementById('stats-sub').textContent = 'Lv. ' + (pet.level || 1) + ' ' + ((pet.pets && pet.pets.name) || '');
+      if (pet.pets && pet.pets.image_file) {
+        document.getElementById('stats-pet-img').src = pet.pets.image_file;
+      }
+      document.getElementById('bar-hp').style.width = hpPct + '%';
+      document.getElementById('bar-hunger').style.width = hungerPct + '%';
+      document.getElementById('bar-energy').style.width = energyPct + '%';
+      document.getElementById('bar-happiness').style.width = happinessPct + '%';
+
+      var tip = hungerPct < 30 ? '🍽️ Hungry! Feed me in the game!' :
+                energyPct < 30 ? '😴 Tired! Let me rest...' :
+                happinessPct < 40 ? '💔 Sad! Play with me in the game!' :
+                '✨ Happy and healthy! Thanks for watching!';
+      document.getElementById('stats-tip').textContent = tip;
+
+      document.getElementById('stats-overlay').style.display = 'block';
+    } catch (e) {
+      console.error('[OBS] stats load error', e);
+    }
+  }
+  loadStats();
+  setInterval(loadStats, 60000);
+
+  // ══════════════════════════════════════════════════════════════
+  // 2. LIVE ALERT BANNER — realtime subscription on activity_feed
+  // ══════════════════════════════════════════════════════════════
+  function formatAlert(row) {
+    var data = row.activity_data || {};
+    switch (row.activity_type) {
+      case 'pet_adopted':        return '🐾 A new pet was just adopted: ' + (data.pet_name || 'a new pet') + '!';
+      case 'boss_defeated':      return '💀 Boss defeated: ' + (data.boss_name || 'a boss') + '!';
+      case 'level_up':           return '🎉 ' + (data.pet_name || 'A pet') + ' just hit level ' + (data.level || '?') + '!';
+      case 'badge_earned':       return '🎖️ Someone just earned the ' + (data.badge_name || 'a badge') + '!';
+      case 'achievement_unlocked': return '⭐ Achievement unlocked: ' + (data.achievement_name || 'something cool') + '!';
+      default: return null; // unrecognized types don't show a banner
+    }
+  }
+
+  function showAlert(text) {
+    var el = document.getElementById('alert-banner');
+    el.textContent = text;
+    el.classList.add('show');
+    setTimeout(function() { el.classList.remove('show'); }, 6000);
+  }
+
+  supa
+    .channel('obs-activity-feed')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_feed' }, function(payload) {
+      var row = payload.new;
+      if (!row.is_public) return;
+      var text = formatAlert(row);
+      if (text) showAlert(text);
+    })
+    .subscribe();
+
+  // ══════════════════════════════════════════════════════════════
+  // 3. COMMUNITY GOAL PROGRESS OVERLAY — cycles through active goals
+  // ══════════════════════════════════════════════════════════════
+  var goalList = [];
+  var goalIndex = 0;
+
+  async function loadGoals() {
+    try {
+      var nowIso = new Date().toISOString();
+      var { data } = await supa
+        .from('community_goals')
+        .select('*')
+        .eq('is_active', true)
+        .eq('is_completed', false)
+        .lte('started_at', nowIso)
+        .or('ends_at.is.null,ends_at.gte.' + nowIso);
+      goalList = data || [];
+      renderGoal();
+    } catch (e) {
+      console.error('[OBS] goal load error', e);
+    }
+  }
+
+  function renderGoal() {
+    var el = document.getElementById('goal-overlay');
+    if (!goalList.length) { el.style.display = 'none'; return; }
+    var goal = goalList[goalIndex % goalList.length];
+    var progress = goal.current_progress || 0;
+    var pct = Math.min(100, (progress / goal.goal_target) * 100);
+    document.getElementById('goal-title').textContent = '📖 ' + goal.title;
+    document.getElementById('goal-bar').style.width = pct + '%';
+    document.getElementById('goal-text').textContent = progress.toLocaleString() + ' / ' + goal.goal_target.toLocaleString() + ' (' + Math.round(pct) + '%)';
+    el.style.display = 'block';
+  }
+
+  loadGoals();
+  setInterval(loadGoals, 60000);
+  // Cycle to the next goal every 10s if more than one is active
+  setInterval(function() {
+    if (goalList.length > 1) { goalIndex++; renderGoal(); }
+  }, 10000);
+
+  // ══════════════════════════════════════════════════════════════
+  // 4. CHAT-TRIGGERED PET POP-UP — realtime subscription on
+  // chat_pet_triggers, filtered to this streamer. Requires the Worker
+  // to insert a row here on chat messages (see accompanying snippet —
+  // this page only handles the receiving/display side).
+  // ══════════════════════════════════════════════════════════════
+  function showChatPop(row) {
+    var el = document.getElementById('chat-pop');
+    document.getElementById('chat-pop-viewer').textContent = row.viewer_username;
+    document.getElementById('chat-pop-pet').textContent = row.pet_name || 'pet';
+    document.getElementById('chat-pop-img').src = row.pet_image || '';
+    el.classList.add('show');
+    setTimeout(function() { el.classList.remove('show'); }, 5000);
+  }
+
+  if (streamerLogin) {
+    supa
+      .channel('obs-chat-triggers')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_pet_triggers' }, function(payload) {
+        var row = payload.new;
+        if ((row.streamer_login || '').toLowerCase() === streamerLogin.toLowerCase()) {
+          showChatPop(row);
+        }
+      })
+      .subscribe();
+  }
+})();
+</script>
+</body>
+</html>
