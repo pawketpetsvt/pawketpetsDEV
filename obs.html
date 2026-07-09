@@ -20,8 +20,35 @@
     --pink: #ff66cc;
   }
 
+  /* ── Single top-left column — all widgets stack top-down here instead
+     of being scattered around the screen, so they only ever occupy one
+     corner rather than covering gameplay elsewhere. ── */
+  #obs-stack {
+    position: fixed;
+    top: 24px;
+    left: 24px;
+    width: 300px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Each widget is wrapped in a collapsible slot so hidden widgets take
+     up zero space (no gaps left in the stack) and visible ones unfold
+     in smoothly rather than snapping in/out. */
+  .obs-item {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    margin-bottom: 0;
+    transition: max-height 0.5s ease, opacity 0.4s ease, margin-bottom 0.5s ease;
+  }
+  .obs-item.expanded {
+    max-height: 500px;
+    opacity: 1;
+    margin-bottom: 14px;
+  }
+
   .obs-card {
-    position: absolute;
     background: rgba(20, 10, 35, 0.82);
     border: 2px solid var(--purple);
     border-radius: 14px;
@@ -29,13 +56,8 @@
     box-shadow: 0 4px 20px rgba(0,0,0,0.4);
   }
 
-  /* ── Persistent stats overlay (top-left) ── */
-  #stats-overlay {
-    top: 24px; left: 24px;
-    width: 300px;
-    padding: 14px 16px;
-    display: none; /* shown once data loads */
-  }
+  /* ── Persistent stats card ── */
+  #stats-overlay { padding: 14px 16px; }
   .stats-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
   .stats-pet-img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: rgba(255,255,255,0.1); }
   .stats-name-row { display: flex; align-items: center; gap: 6px; }
@@ -52,66 +74,31 @@
   .stat-fill-happiness { background: linear-gradient(90deg,#66dd88,#99eeaa); }
   .stats-tip { margin-top: 8px; font-size: 0.75rem; font-style: italic; color: #ffd9a0; }
 
-  /* ── Live alert banner (top-center) ── */
-  #alert-banner {
-    top: 24px; left: 50%;
-    transform: translateX(-50%) translateY(-20px);
-    padding: 12px 24px;
-    font-size: 1rem;
-    font-weight: 600;
-    white-space: nowrap;
-    opacity: 0;
-    transition: opacity 0.4s ease, transform 0.4s ease;
-    border-color: var(--pink);
-  }
-  #alert-banner.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-
-  /* ── Community goal bar (bottom-center) ── */
-  #goal-overlay {
-    bottom: 24px; left: 50%;
-    transform: translateX(-50%);
-    width: 420px;
-    padding: 12px 18px;
-    display: none;
-  }
-  .goal-title { font-size: 0.85rem; font-weight: bold; margin-bottom: 6px; }
+  /* ── Community goal card ── */
+  #goal-overlay { padding: 12px 18px; border-color: var(--purple); }
   .goal-badge { font-size: 0.65rem; font-weight: bold; letter-spacing: 0.05em; color: var(--pink); margin-bottom: 4px; }
+  .goal-title { font-size: 0.85rem; font-weight: bold; margin-bottom: 6px; }
   .goal-desc { font-size: 0.72rem; color: #e8ddff; margin-bottom: 8px; line-height: 1.3; }
   .goal-bar-track { height: 14px; background: rgba(255,255,255,0.12); border-radius: 8px; overflow: hidden; }
   .goal-bar-fill { height: 100%; background: linear-gradient(90deg, var(--purple), var(--pink)); border-radius: 8px; transition: width 0.5s ease; }
   .goal-text { font-size: 0.72rem; margin-top: 4px; color: #d8c8ff; }
 
-  /* ── Fold/unfold cycle for the two persistent panels (stats + goal),
-     so they don't permanently sit on top of the stream ── */
-  .fold-cycle {
-    overflow: hidden;
-    transition: opacity 0.6s ease, max-height 0.6s ease, padding-top 0.6s ease, padding-bottom 0.6s ease;
-    max-height: 400px;
-  }
-  .fold-cycle.folded {
-    opacity: 0;
-    max-height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    pointer-events: none;
+  /* ── Live alert banner ── */
+  #alert-banner {
+    padding: 12px 18px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-color: var(--pink);
   }
 
-  /* ── Chat-triggered pet pop-up (bottom-left) ── */
+  /* ── Chat-triggered pet pop-up ── */
   #chat-pop {
-    bottom: 24px; left: 24px;
     padding: 10px 16px;
     display: flex;
     align-items: center;
     gap: 10px;
     border-color: var(--pink);
-    opacity: 0;
-    transform: translateY(20px);
-    transition: opacity 0.35s ease, transform 0.35s ease;
   }
-  #chat-pop.show { opacity: 1; transform: translateY(0); }
   #chat-pop img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
   #chat-pop .chat-pop-text { font-size: 0.85rem; }
   #chat-pop .chat-pop-viewer { font-weight: bold; color: var(--pink); }
@@ -119,37 +106,49 @@
 </head>
 <body>
 
-  <div id="stats-overlay" class="obs-card fold-cycle">
-    <div class="stats-header">
-      <img id="stats-pet-img" class="stats-pet-img" src="" alt="">
-      <div>
-        <div class="stats-name-row">
-          <img src="images/pawket-logo.png" alt="PawketPetsVT" class="stats-brand-logo" onerror="this.style.display='none'">
-          <div id="stats-name" class="stats-name">—</div>
+  <div id="obs-stack">
+
+    <div id="stats-wrap" class="obs-item">
+      <div id="stats-overlay" class="obs-card">
+        <div class="stats-header">
+          <img id="stats-pet-img" class="stats-pet-img" src="" alt="">
+          <div>
+            <div class="stats-name-row">
+              <img src="images/pawket-logo.png" alt="PawketPetsVT" class="stats-brand-logo" onerror="this.style.display='none'">
+              <div id="stats-name" class="stats-name">—</div>
+            </div>
+            <div id="stats-sub" class="stats-sub">—</div>
+          </div>
         </div>
-        <div id="stats-sub" class="stats-sub">—</div>
+        <div class="stat-row"><span class="stat-label">HP</span><div class="stat-bar-track"><div id="bar-hp" class="stat-bar-fill stat-fill-hp" style="width:0%"></div></div></div>
+        <div class="stat-row"><span class="stat-label">Hunger</span><div class="stat-bar-track"><div id="bar-hunger" class="stat-bar-fill stat-fill-hunger" style="width:0%"></div></div></div>
+        <div class="stat-row"><span class="stat-label">Energy</span><div class="stat-bar-track"><div id="bar-energy" class="stat-bar-fill stat-fill-energy" style="width:0%"></div></div></div>
+        <div class="stat-row"><span class="stat-label">Happy</span><div class="stat-bar-track"><div id="bar-happiness" class="stat-bar-fill stat-fill-happiness" style="width:0%"></div></div></div>
+        <div id="stats-tip" class="stats-tip"></div>
       </div>
     </div>
-    <div class="stat-row"><span class="stat-label">HP</span><div class="stat-bar-track"><div id="bar-hp" class="stat-bar-fill stat-fill-hp" style="width:0%"></div></div></div>
-    <div class="stat-row"><span class="stat-label">Hunger</span><div class="stat-bar-track"><div id="bar-hunger" class="stat-bar-fill stat-fill-hunger" style="width:0%"></div></div></div>
-    <div class="stat-row"><span class="stat-label">Energy</span><div class="stat-bar-track"><div id="bar-energy" class="stat-bar-fill stat-fill-energy" style="width:0%"></div></div></div>
-    <div class="stat-row"><span class="stat-label">Happy</span><div class="stat-bar-track"><div id="bar-happiness" class="stat-bar-fill stat-fill-happiness" style="width:0%"></div></div></div>
-    <div id="stats-tip" class="stats-tip"></div>
-  </div>
 
-  <div id="alert-banner" class="obs-card"></div>
+    <div id="goal-wrap" class="obs-item">
+      <div id="goal-overlay" class="obs-card">
+        <div class="goal-badge">🌍 COMMUNITY GOAL</div>
+        <div id="goal-title" class="goal-title">—</div>
+        <div id="goal-desc" class="goal-desc">—</div>
+        <div class="goal-bar-track"><div id="goal-bar" class="goal-bar-fill" style="width:0%"></div></div>
+        <div id="goal-text" class="goal-text">—</div>
+      </div>
+    </div>
 
-  <div id="goal-overlay" class="obs-card fold-cycle">
-    <div class="goal-badge">🌍 COMMUNITY GOAL</div>
-    <div id="goal-title" class="goal-title">—</div>
-    <div id="goal-desc" class="goal-desc">—</div>
-    <div class="goal-bar-track"><div id="goal-bar" class="goal-bar-fill" style="width:0%"></div></div>
-    <div id="goal-text" class="goal-text">—</div>
-  </div>
+    <div id="alert-wrap" class="obs-item">
+      <div id="alert-banner" class="obs-card"></div>
+    </div>
 
-  <div id="chat-pop" class="obs-card">
-    <img id="chat-pop-img" src="" alt="">
-    <div class="chat-pop-text"><span id="chat-pop-viewer" class="chat-pop-viewer"></span>'s <span id="chat-pop-pet"></span> says hi! 👋</div>
+    <div id="chatpop-wrap" class="obs-item">
+      <div id="chat-pop" class="obs-card">
+        <img id="chat-pop-img" src="" alt="">
+        <div class="chat-pop-text"><span id="chat-pop-viewer" class="chat-pop-viewer"></span>'s <span id="chat-pop-pet"></span> says hi! 👋</div>
+      </div>
+    </div>
+
   </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.4"></script>
@@ -161,6 +160,9 @@
 
   var params = new URLSearchParams(window.location.search);
   var streamerLogin = params.get('streamer') || '';
+
+  function expand(wrapId) { document.getElementById(wrapId).classList.add('expanded'); }
+  function collapse(wrapId) { document.getElementById(wrapId).classList.remove('expanded'); }
 
   // ══════════════════════════════════════════════════════════════
   // 1. PERSISTENT STATS OVERLAY
@@ -199,11 +201,13 @@
                 '✨ Happy and healthy! Thanks for watching!';
       document.getElementById('stats-tip').textContent = tip;
 
-      document.getElementById('stats-overlay').style.display = 'block';
+      statsHasData = true;
+      if (!foldedNow) expand('stats-wrap');
     } catch (e) {
       console.error('[OBS] stats load error', e);
     }
   }
+  var statsHasData = false;
   loadStats();
   setInterval(loadStats, 60000);
 
@@ -223,10 +227,9 @@
   }
 
   function showAlert(text) {
-    var el = document.getElementById('alert-banner');
-    el.textContent = text;
-    el.classList.add('show');
-    setTimeout(function() { el.classList.remove('show'); }, 6000);
+    document.getElementById('alert-banner').textContent = text;
+    expand('alert-wrap');
+    setTimeout(function() { collapse('alert-wrap'); }, 6000);
   }
 
   supa
@@ -263,8 +266,7 @@
   }
 
   function renderGoal() {
-    var el = document.getElementById('goal-overlay');
-    if (!goalList.length) { el.style.display = 'none'; return; }
+    if (!goalList.length) { goalHasData = false; collapse('goal-wrap'); return; }
     var goal = goalList[goalIndex % goalList.length];
     var progress = goal.current_progress || 0;
     var pct = Math.min(100, (progress / goal.goal_target) * 100);
@@ -272,8 +274,10 @@
     document.getElementById('goal-desc').textContent = goal.description || '';
     document.getElementById('goal-bar').style.width = pct + '%';
     document.getElementById('goal-text').textContent = progress.toLocaleString() + ' / ' + goal.goal_target.toLocaleString() + ' (' + Math.round(pct) + '%)';
-    el.style.display = 'block';
+    goalHasData = true;
+    if (!foldedNow) expand('goal-wrap');
   }
+  var goalHasData = false;
 
   loadGoals();
   setInterval(loadGoals, 60000);
@@ -290,13 +294,17 @@
   // ══════════════════════════════════════════════════════════════
   var FOLD_VISIBLE_MS = 150000; // 2.5 minutes visible
   var FOLD_HIDDEN_MS = 300000;  // 5 minutes hidden
+  var foldedNow = false;
 
   function runFoldCycle(visible) {
-    ['stats-overlay', 'goal-overlay'].forEach(function(id) {
-      var el = document.getElementById(id);
-      if (visible) el.classList.remove('folded');
-      else el.classList.add('folded');
-    });
+    foldedNow = !visible;
+    if (visible) {
+      if (statsHasData) expand('stats-wrap');
+      if (goalHasData) expand('goal-wrap');
+    } else {
+      collapse('stats-wrap');
+      collapse('goal-wrap');
+    }
     setTimeout(function() { runFoldCycle(!visible); }, visible ? FOLD_VISIBLE_MS : FOLD_HIDDEN_MS);
   }
   runFoldCycle(true); // start visible
@@ -304,16 +312,15 @@
   // ══════════════════════════════════════════════════════════════
   // 4. CHAT-TRIGGERED PET POP-UP — realtime subscription on
   // chat_pet_triggers, filtered to this streamer. Requires the Worker
-  // to insert a row here on chat messages (see accompanying snippet —
-  // this page only handles the receiving/display side).
+  // to insert a row here on chat messages (already wired in on the
+  // Worker side) — this page only handles the receiving/display side.
   // ══════════════════════════════════════════════════════════════
   function showChatPop(row) {
-    var el = document.getElementById('chat-pop');
     document.getElementById('chat-pop-viewer').textContent = row.viewer_username;
     document.getElementById('chat-pop-pet').textContent = row.pet_name || 'pet';
     document.getElementById('chat-pop-img').src = row.pet_image || '';
-    el.classList.add('show');
-    setTimeout(function() { el.classList.remove('show'); }, 5000);
+    expand('chatpop-wrap');
+    setTimeout(function() { collapse('chatpop-wrap'); }, 5000);
   }
 
   if (streamerLogin) {
