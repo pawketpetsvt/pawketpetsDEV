@@ -11643,6 +11643,17 @@ body[data-theme="dark"] .modal-content {
   margin-bottom: 15px;
 }
 
+.com-goal-narrative {
+  font-size: 13px;
+  font-style: italic;
+  color: #ffb37a;
+  background: rgba(255, 107, 53, 0.08);
+  border-left: 3px solid #ff6b35;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+}
+
 .com-progress-bar {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;

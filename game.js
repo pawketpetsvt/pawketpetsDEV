@@ -26067,6 +26067,65 @@ function community_updateLocalProgress(goalKey, increment) {
     if (progressText) progressText.textContent = (current + increment) + '/' + goal.goal_target;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// COMMUNITY GOAL NARRATIVE LAYER
+// Story beats that swap in as a goal's progress crosses thresholds, so a
+// server-wide goal reads like an unfolding event instead of a raw counter.
+// Generic arc works for any goal_key automatically; add a key below to give
+// a specific goal its own bespoke story instead.
+// ═══════════════════════════════════════════════════════════════════════════
+
+var COMMUNITY_GOAL_NARRATIVES = {
+  // Example of a bespoke arc for a specific goal — add more goal_key entries
+  // here as you create bespoke story goals. {title} is replaced with the
+  // goal's own title so even the generic arc reads naturally.
+  // 'piper_ritual_2026': [
+  //   { threshold: 0,  text: 'Something stirs in the fog beyond town...' },
+  //   { threshold: 25, text: 'The whispers are getting louder.' },
+  //   { threshold: 50, text: 'Piper has started humming a new tune.' },
+  //   { threshold: 75, text: 'The bells will not stop ringing.' },
+  //   { threshold: 100, text: 'It is done. For now.' }
+  // ]
+};
+
+// Generic fallback arc — used for any goal without a bespoke entry above.
+var COMMUNITY_GENERIC_NARRATIVE = [
+  { threshold: 0,   text: 'The community has just begun working toward "{title}."' },
+  { threshold: 25,  text: 'Progress is building — "{title}" is starting to take shape.' },
+  { threshold: 50,  text: 'Halfway there! The whole server is feeling the momentum on "{title}."' },
+  { threshold: 75,  text: 'Almost there — one final push and "{title}" will be complete!' },
+  { threshold: 100, text: '"{title}" is complete! Thank you to everyone who contributed.' }
+];
+
+function community_getNarrative(goal, percent) {
+  var arc = COMMUNITY_GOAL_NARRATIVES[goal.goal_key] || COMMUNITY_GENERIC_NARRATIVE;
+  var beat = arc[0];
+  for (var i = 0; i < arc.length; i++) {
+    if (percent >= arc[i].threshold) beat = arc[i];
+  }
+  return beat.text.replace(/{title}/g, goal.title);
+}
+
+// Track which narrative tier each goal was last seen at, so a milestone
+// celebration only fires once per goal per tier crossed (per browser).
+function community_checkMilestoneCrossed(goal, percent) {
+  var tier = percent >= 100 ? 100 : percent >= 75 ? 75 : percent >= 50 ? 50 : percent >= 25 ? 25 : 0;
+  var storageKey = 'com_milestone_' + goal.goal_key;
+  var lastTier = parseInt(localStorage.getItem(storageKey) || '0');
+  if (tier > lastTier) {
+    localStorage.setItem(storageKey, tier);
+    if (lastTier > 0 || tier === 100) { // don't fire a false "milestone" on first-ever page load at tier 0->0
+      var messages = {
+        25: '📖 "' + goal.title + '" has reached 25%! The story is just beginning...',
+        50: '📖 "' + goal.title + '" is halfway complete! Keep it up!',
+        75: '📖 "' + goal.title + '" is at 75%! The finish line is in sight!',
+        100: '🎉 "' + goal.title + '" is complete! Claim your reward!'
+      };
+      if (messages[tier]) community_showToast(messages[tier], 'success');
+    }
+  }
+}
+
 // Refresh entire UI
 async function community_refreshUI() {
     var goals = await community_loadGoals();
@@ -26082,6 +26141,8 @@ async function community_refreshUI() {
         var isCompleted = progress >= goal.goal_target;
         var isClaimed = community_claimedGoalIds.indexOf(goal.id) >= 0;
         var endsAt = goal.ends_at ? new Date(goal.ends_at).toLocaleDateString() : 'soon';
+        var narrativeText = community_getNarrative(goal, percent);
+        community_checkMilestoneCrossed(goal, percent);
         
         var rewardDisplay = '';
         if (goal.reward_type === 'points') rewardDisplay = '💰 ' + goal.reward_value + ' PawketPoints';
@@ -26101,6 +26162,7 @@ async function community_refreshUI() {
         return '<div class="com-goal-card">' +
             '<div class="com-goal-title">' + escapeHtml(goal.title) + '</div>' +
             '<div class="com-goal-desc">' + escapeHtml(goal.description) + '</div>' +
+            '<div class="com-goal-narrative">📖 ' + escapeHtml(narrativeText) + '</div>' +
             '<div class="com-progress-bar">' +
             '<div class="com-progress-fill com-progress-' + goal.goal_key + '" style="width:' + percent + '%"></div>' +
             '</div>' +
