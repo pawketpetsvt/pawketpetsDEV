@@ -14248,12 +14248,12 @@ var CompanionBuddy = {
   spookyPhrases: [
     'help me..',
     'let me out let me out let me out',
-    'i'm not supposed to say this',
-    'she's watching',
+    'i am not supposed to say this',
+    'she is watching',
     'can you hear it too',
     'something is wrong with this place',
-    'don't open the ruins door',
-    'i've been here before. so have you.',
+    'do not open the ruins door',
+    'i have been here before. so have you.',
     'help me',
     'please',
   ],
@@ -14288,12 +14288,12 @@ var CompanionBuddy = {
     // Weather-aware messages
     if (weather) {
       var weatherMsgs = {
-        sunny:  ['What a beautiful day! ☀️ Perfect for exploring!', 'Sun's out! Energy feels great today! ☀️'],
+        sunny:  ['What a beautiful day! ☀️ Perfect for exploring!', 'Sun is out! Energy feels great today! ☀️'],
         rainy:  ['Cozy inside while it rains... 🌧️', 'Rainy days are perfect for minigames! 🌧️'],
-        stormy: ['Stay safe out there! ⛈️ It's rough today...', 'The storms make battle feel extra intense! ⚡'],
-        foggy:  ['Something feels... off today. 🌫️', 'I can't see very far in this fog... 🌫️ Stay close.'],
-        snowy:  ['It's so cold! 🌨️ Let's stay warm!', 'Snow day! ❄️ Perfect for napping!'],
-        windy:  ['Windy days make me want to run! 💨', 'Hold on tight! 💨 It's gusty out there!']
+        stormy: ['Stay safe out there! ⛈️ It is rough today...', 'The storms make battle feel extra intense! ⚡'],
+        foggy:  ['Something feels... off today. 🌫️', 'I cannot see very far in this fog... 🌫️ Stay close.'],
+        snowy:  ['It is so cold! 🌨️ Let us stay warm!', 'Snow day! ❄️ Perfect for napping!'],
+        windy:  ['Windy days make me want to run! 💨', 'Hold on tight! 💨 It is gusty out there!']
       };
       var wKey = weather.type || weather.id || '';
       if (weatherMsgs[wKey]) msgs = msgs.concat(weatherMsgs[wKey]);
@@ -14304,10 +14304,10 @@ var CompanionBuddy = {
       if (this.lastBattleResult.victory) {
         msgs.push('That battle earlier was amazing! 💪 You really showed ' + (this.lastBattleResult.enemyName || 'them') + ' who's boss!');
         if (this.lastBattleResult.finalHP && this.lastBattleResult.finalHP < 10) {
-          msgs.push('That last fight was SO close... 😰 Let's heal up before the next one!');
+          msgs.push('That last fight was SO close... 😰 Let us heal up before the next one!');
         }
       } else {
-        msgs.push('Don't worry about that last battle... 💕 We'll get them next time!');
+        msgs.push('Do not worry about that last battle... 💕 We will get them next time!');
       }
     }
 
@@ -14318,7 +14318,7 @@ var CompanionBuddy = {
 
     // Streak messages
     if (streak >= 7) {
-      msgs.push(streak + ' days in a row! 🔥 You're so dedicated!');
+      msgs.push(streak + ' days in a row! 🔥 You are so dedicated!');
     }
     if (streak >= 30) {
       msgs.push('A whole month together! 💖 I'm so glad you keep coming back!');
@@ -14326,7 +14326,7 @@ var CompanionBuddy = {
 
     // Login time awareness
     var hour = new Date().getHours();
-    if (hour < 6)  msgs.push('You're up so late! 🌙 Or... really early? Either way, I'm here!');
+    if (hour < 6)  msgs.push('You are up so late! 🌙 Or... really early? Either way, I am here!');
     if (hour >= 6  && hour < 10) msgs.push('Good morning! ☀️ Ready to start the day?');
     if (hour >= 22) msgs.push('Getting late... 🌙 One more adventure before bed?');
 
