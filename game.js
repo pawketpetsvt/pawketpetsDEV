@@ -10153,7 +10153,8 @@ async function startBattleWithEnemy(petId, enemy) {
     sprite_sheet: enemy.sprite_sheet || null,
     sprite_frames: enemy.sprite_frames || null,
     is_boss: enemy.is_boss || false,
-    passive: enemy.passive || null
+    passive: enemy.passive || null,
+    specialVariant: enemy.specialVariant || null
   };
   
   // BOSS ENTRANCE SEQUENCE!
@@ -10453,6 +10454,11 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
     // COMMUNITY GOALS: Track mushroom defeats
     if (enemyStats.name && enemyStats.name.toLowerCase().indexOf('mushroom') !== -1) {
       community_increment('defeat_mushrooms_week1', 1);
+    }
+
+    // COMMUNITY GOALS: Track corrupted enemy defeats (for the big spooky goal)
+    if (enemyStats.specialVariant === 'corrupted') {
+      community_increment('corrupted_kills_event1', 1);
     }
     
     // SCRAPBOOK: Add first battle win memory
@@ -25944,11 +25950,18 @@ async function community_loadGoals() {
     if (community_cachedGoals && (now - community_lastFetch) < 300000) {
         return community_cachedGoals;
     }
+    // Date-range filter added so a whole month of rotating goals can be
+    // pre-scheduled at once (each with its own started_at/ends_at) without
+    // all of them showing simultaneously — only whichever goal(s) are
+    // "current" for right now actually appear.
+    var nowIso = new Date().toISOString();
     var res = await supabaseClient
         .from('community_goals')
         .select('*')
         .eq('is_active', true)
-        .eq('is_completed', false);
+        .eq('is_completed', false)
+        .lte('started_at', nowIso)
+        .or('ends_at.is.null,ends_at.gte.' + nowIso);
     if (!res.error && res.data) {
         community_cachedGoals = res.data;
         community_lastFetch = now;
@@ -26076,16 +26089,13 @@ function community_updateLocalProgress(goalKey, increment) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 var COMMUNITY_GOAL_NARRATIVES = {
-  // Example of a bespoke arc for a specific goal — add more goal_key entries
-  // here as you create bespoke story goals. {title} is replaced with the
-  // goal's own title so even the generic arc reads naturally.
-  // 'piper_ritual_2026': [
-  //   { threshold: 0,  text: 'Something stirs in the fog beyond town...' },
-  //   { threshold: 25, text: 'The whispers are getting louder.' },
-  //   { threshold: 50, text: 'Piper has started humming a new tune.' },
-  //   { threshold: 75, text: 'The bells will not stop ringing.' },
-  //   { threshold: 100, text: 'It is done. For now.' }
-  // ]
+  'corrupted_kills_event1': [
+    { threshold: 0,   text: "Reports are trickling in — pets returning from the forest with strange, twisted markings. Piper's tune echoes a little differently these days..." },
+    { threshold: 25,  text: 'The corruption is spreading faster than anyone expected. Trainers are banding together to fight back.' },
+    { threshold: 50,  text: "Halfway there. The corrupted are thinning out, but Piper's presence still lingers at the edges of the forest." },
+    { threshold: 75,  text: 'Almost clear! Just a little more effort and the corruption will retreat... for now.' },
+    { threshold: 100, text: "The corruption has been pushed back! Piper's tune returns to something more familiar. But everyone knows it never really goes away completely..." }
+  ]
 };
 
 // Generic fallback arc — used for any goal without a bespoke entry above.
