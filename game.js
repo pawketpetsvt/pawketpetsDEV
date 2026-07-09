@@ -27886,8 +27886,8 @@ async function calendar_loadRewards() {
 }
 
 function calendar_displayWidget() {
-  var homeContent = document.getElementById('home-content');
-  if (!homeContent) return;
+  var mount = document.getElementById('calendar-widget-mount');
+  if (!mount) return;
   
   var streak = loginCalendar.currentStreak || 0;
   var nextDay = Math.min(streak + 1, 30);
@@ -27921,13 +27921,8 @@ function calendar_displayWidget() {
   
   widget.innerHTML = html;
   
-  // Insert after today banner
-  var todayBanner = homeContent.querySelector('.today-banner');
-  if (todayBanner && todayBanner.nextSibling) {
-    homeContent.insertBefore(widget, todayBanner.nextSibling);
-  } else {
-    homeContent.appendChild(widget);
-  }
+  mount.innerHTML = ''; // clear any previous render before re-inserting
+  mount.appendChild(widget);
 }
 
 function calendar_showFullModal() {
