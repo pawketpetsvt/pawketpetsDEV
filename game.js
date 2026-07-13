@@ -2214,12 +2214,48 @@ async function handleLogin() {
 
 // ── USERNAME PROFANITY FILTER ─────────────────────────────
 var PROFANITY_LIST = [
-  'fuck', 'shit', 'bitch', 'ass', 'damn', 'hell', 'crap', 'piss',
-  'dick', 'cock', 'pussy', 'cunt', 'fag', 'whore', 'slut', 'bastard',
-  'nigger', 'nigga', 'chink', 'spic', 'kike', 'retard', 'rape',
-  'sex', 'porn', 'nude', 'xxx', 'anal', 'penis', 'vagina', 'testicle',
-  'nazi', 'hitler', 'kkk', 'isis', 'kill', 'death', 'murder', 'suicide'
+  // Profanity
+  'fuck', 'shit', 'bitch', 'ass', 'damn', 'hell', 'crap', 'piss', 'douche', 'twat', 'wanker', 'bollocks',
+  // Sexual anatomy / content
+  'dick', 'cock', 'pussy', 'cunt', 'whore', 'slut', 'sex', 'porn', 'nude', 'xxx', 'anal', 'penis', 'vagina',
+  'testicle', 'boner', 'cum', 'jizz', 'dildo', 'blowjob', 'handjob', 'creampie', 'orgasm', 'fetish', 'incest',
+  'pedo', 'loli', 'rape', 'rapist',
+  // Racial / ethnic slurs
+  'nigger', 'nigga', 'chink', 'spic', 'kike', 'gook', 'wetback', 'coon', 'jap', 'paki', 'raghead',
+  'sandnigger', 'towelhead', 'beaner', 'gypsy',
+  // Homophobic / transphobic slurs
+  'fag', 'faggot', 'dyke', 'tranny', 'shemale',
+  // Ableist slurs
+  'retard', 'retarded', 'spastic', 'cripple', 'mongoloid',
+  // Antisemitic / hate group terms
+  'nazi', 'hitler', 'kkk', 'isis', 'heil',
+  // Misogynistic / general slurs
+  'bastard', 'skank', 'thot', 'whorebag',
+  // Violence / self-harm
+  'kill', 'death', 'murder', 'suicide', 'lynch', 'genocide'
 ];
+
+// Extra letter substitutions frequently used to dodge filters — kept
+// separate from the main word list so it's easy to extend on its own.
+var PROFANITY_SUBSTITUTIONS = {
+  a: 'a@4', e: 'e3', i: 'i1!|', o: 'o0', s: 's5$z', t: 't7',
+  g: 'g69', l: 'l1', b: 'b8', u: 'uv', c: 'ck', z: 'z2'
+};
+
+// Builds a regex pattern for one word that tolerates:
+//  - letter substitutions (n1gga, a55, etc — see PROFANITY_SUBSTITUTIONS above)
+//  - stretched/repeated letters (fuuuck, shiiiit, etc)
+// Word-boundary anchors on the outside keep this from matching inside
+// unrelated words (e.g. "class" should never trip on "ass").
+function buildProfanityPattern(word) {
+  var pattern = '';
+  for (var i = 0; i < word.length; i++) {
+    var ch = word[i];
+    var subs = PROFANITY_SUBSTITUTIONS[ch];
+    pattern += (subs ? '[' + subs + ']' : ch) + '+';
+  }
+  return pattern;
+}
 
 function containsProfanity(text) {
   if (!text) return false;
@@ -2236,16 +2272,12 @@ function containsProfanity(text) {
       return true;
     }
     
-    // Check for leetspeak and common substitutions — with word boundaries to avoid false positives
-    var variations = word
-      .replace(/a/g, '[a@4]')
-      .replace(/e/g, '[e3]')
-      .replace(/i/g, '[i1!]')
-      .replace(/o/g, '[o0]')
-      .replace(/s/g, '[s5$]')
-      .replace(/t/g, '[t7]');
-    
-    var variationRegex = new RegExp('\\b' + variations + '\\b', 'i');
+    // Check for leetspeak, common substitutions, and stretched/repeated
+    // letters (n1gga, fuuuck, a$$, etc). Uses lookaround instead of \b —
+    // \b only works when the match starts/ends on a letter or digit, but
+    // these patterns can start/end on a symbol (like the $ in "a$$"),
+    // which \b silently fails to anchor correctly.
+    var variationRegex = new RegExp('(?<![a-zA-Z0-9])' + buildProfanityPattern(word) + '(?![a-zA-Z0-9])', 'i');
     if (variationRegex.test(lowerText)) {
       return true;
     }
@@ -2255,7 +2287,7 @@ function containsProfanity(text) {
     // word boundaries around the whole match, so "hello" doesn't trip on "hell"
     // and "scrapbook" doesn't trip on "crap"
     var spacedWord = word.split('').join('[^a-z0-9]+');
-    var spacedRegex = new RegExp('\\b' + spacedWord + '\\b', 'i');
+    var spacedRegex = new RegExp('(?<![a-zA-Z0-9])' + spacedWord + '(?![a-zA-Z0-9])', 'i');
     if (spacedRegex.test(lowerText)) {
       return true;
     }
@@ -5685,6 +5717,164 @@ function getCurrentRotationWeek() {
   return ['A', 'B', 'C'][weekInCycle];
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// MINI SEASONS SYSTEM
+// A themed ~3-month (or shorter, for custom events) period that layers
+// seasonal shop items into the existing weekly rotation, can carry its own
+// themed community goals (via the existing community_goals date-range
+// system — no new mechanism needed there), and has its own cosmetic
+// reward track separate from the main PawketPass.
+// ══════════════════════════════════════════════════════════════════════════
+
+var _activeMiniSeasonsCache = null;
+var _activeMiniSeasonsFetchedAt = 0;
+
+// Multiple seasons can be active at once on purpose (e.g. a short custom
+// event layered over a longer calendar season), so this returns an array.
+async function getActiveMiniSeasons() {
+  var now = Date.now();
+  if (_activeMiniSeasonsCache && (now - _activeMiniSeasonsFetchedAt) < 300000) {
+    return _activeMiniSeasonsCache;
+  }
+  try {
+    var nowIso = new Date().toISOString();
+    var res = await supabaseClient
+      .from('mini_seasons')
+      .select('*')
+      .eq('is_active', true)
+      .lte('started_at', nowIso)
+      .gte('ends_at', nowIso);
+    _activeMiniSeasonsCache = res.data || [];
+    _activeMiniSeasonsFetchedAt = now;
+  } catch (e) {
+    dbg('[MiniSeasons] load error:', e);
+    _activeMiniSeasonsCache = [];
+  }
+  return _activeMiniSeasonsCache;
+}
+
+// Independent weekly counter for seasonal item rotation (1-4), deliberately
+// separate from getCurrentRotationWeek()'s A/B/C engine above so seasonal
+// items rotating in doesn't touch or risk the existing rotation logic.
+function getSeasonalWeekSlot() {
+  var weeksSinceEpoch = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+  return (weeksSinceEpoch % 4) + 1; // 1-4
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// WORLD STATE FLAGS
+// Persistent, genuinely-shared values (unlike the old localStorage-only
+// worldEvents below) that boss kills nudge a little each time. Currently
+// one flag exists — corruption_level (0-100) — but the table is key-value
+// so more can be added later without a schema change.
+// ══════════════════════════════════════════════════════════════════════════
+
+var _worldStateCache = null;
+var _worldStateFetchedAt = 0;
+
+async function getWorldStateFlags() {
+  var now = Date.now();
+  if (_worldStateCache && (now - _worldStateFetchedAt) < 60000) {
+    return _worldStateCache;
+  }
+  try {
+    var res = await supabaseClient.from('world_state_flags').select('*');
+    var flags = {};
+    (res.data || []).forEach(function(row) {
+      // Skip expired temporary-buff-style flags (e.g. celebration_buff)
+      if (row.expires_at && new Date(row.expires_at) < new Date()) return;
+      flags[row.flag_key] = row;
+    });
+    _worldStateCache = flags;
+    _worldStateFetchedAt = now;
+  } catch (e) {
+    dbg('[WorldState] load error:', e);
+    _worldStateCache = _worldStateCache || {};
+  }
+  return _worldStateCache;
+}
+
+async function getWorldStateValue(flagKey, fallback) {
+  var flags = await getWorldStateFlags();
+  return (flags[flagKey] && typeof flags[flagKey].value === 'number') ? flags[flagKey].value : fallback;
+}
+
+// Synchronous, cache-only read (no network call) — for spots that can't
+// await, like weatherSystem.generateWeather() below. A slightly-stale
+// value here is fine; this never blocks weather from being set.
+function getWorldStateValueSync(flagKey, fallback) {
+  if (_worldStateCache && _worldStateCache[flagKey] && typeof _worldStateCache[flagKey].value === 'number') {
+    return _worldStateCache[flagKey].value;
+  }
+  return fallback;
+}
+
+// Called on every boss kill — nudges corruption down a little (the
+// community is pushing back) always, but the celebration buff only
+// triggers every 10th community-wide boss kill (not every single one —
+// with even a small player base, boss kills happen constantly, so this
+// keeps the buff feeling earned rather than automatic).
+async function nudgeWorldStateForBossKill() {
+  try {
+    // Reduced from -2: boss kills are now an ambient nudge, not the
+    // dominant force — the corruption ritual (see performCorruptionRitual)
+    // is the real, deliberate lever players can use in either direction.
+    await supabaseClient.rpc('nudge_world_state', { p_flag_key: 'corruption_level', p_delta: -1 });
+    var killRes = await supabaseClient.rpc('record_boss_kill');
+    _worldStateCache = null; // force a fresh read next time something checks
+    if (killRes.data && killRes.data.triggered) {
+      showToast('🎉 10 bosses defeated by the community! Everyone gets a 1-hour +15% XP/PP bonus!', 'success', true);
+      _lastAnnouncedCelebrationCheck = Date.now(); // this browser already saw it, skip the poll-based announce below
+    }
+  } catch (e) {
+    dbg('[WorldState] boss-kill nudge error:', e);
+  }
+}
+
+// Broader announcement: since only the specific player whose kill landed
+// on the 10th gets the toast above, this periodic check lets anyone else
+// who's currently using the app find out too, within about a minute of
+// it triggering — without needing full realtime infrastructure for it.
+var _lastAnnouncedCelebrationCheck = 0;
+async function checkForNewCelebrationBuff() {
+  try {
+    var flags = await getWorldStateFlags();
+    var buff = flags.celebration_buff;
+    if (!buff || !buff.expires_at) return;
+    var startedAt = new Date(buff.updated_at || buff.expires_at).getTime();
+    if (startedAt > _lastAnnouncedCelebrationCheck) {
+      _lastAnnouncedCelebrationCheck = Date.now();
+      showToast('🎉 The community just earned a 1-hour +15% XP/PP bonus from boss kills!', 'success', true);
+    }
+  } catch (e) { /* silent — this is just a periodic nicety, not critical */ }
+}
+
+// Deliberate player-driven lever on corruption — unlike boss kills (an
+// ambient side-effect), this is a real choice: spend 100 PP, once per
+// day, to push the world 5 points toward Light ('purify') or Darkness
+// ('corrupt'). Exists specifically so players who want Dark gear (or
+// Light gear) have a way to actually make that happen, rather than
+// waiting on random boss-kill timing they can't control.
+async function performCorruptionRitual(direction) {
+  if (!currentUser) return;
+  try {
+    var res = await supabaseClient.rpc('perform_corruption_ritual', { p_direction: direction });
+    if (res.error || !res.data || res.data.error) {
+      showToast(res.data && res.data.error ? res.data.error : 'The ritual failed', 'error');
+      return;
+    }
+    var data = res.data;
+    updateAllPoints(data.new_pp);
+    _worldStateCache = null; // force a fresh read so the UI reflects the new value
+    var directionText = direction === 'purify' ? '🕯️ You purified the forest a little!' : '🌑 You fed the corruption a little!';
+    showToast(directionText + ' World corruption is now ' + Math.round(data.new_value) + '%.', 'success', true);
+    if (typeof todayCard_render === 'function') todayCard_render();
+  } catch (e) {
+    console.error('[CorruptionRitual] error:', e);
+    showToast('The ritual failed', 'error');
+  }
+}
+
 
 async function loadShop() {
   var grid = el('shop-grid');
@@ -5710,6 +5900,27 @@ async function loadShop() {
   var seen={}, deduped=[];
   res.data.forEach(function(item){ var k=item.name.toLowerCase().trim(); if(!seen[k]||item.price<seen[k].price)seen[k]=item; });
   Object.values(seen).forEach(function(i){deduped.push(i);});
+  
+  // MINI SEASONS: filter out seasonal items unless their season is
+  // currently active AND it's their week to appear (separate 1-4 rotation
+  // from the regular A/B/C weekly rotation below, see getSeasonalWeekSlot())
+  var activeSeasons = await getActiveMiniSeasons();
+  var activeSeasonKeys = activeSeasons.map(function(s) { return s.season_key; });
+  var currentSeasonalSlot = getSeasonalWeekSlot();
+  deduped = deduped.filter(function(item) {
+    if (!item.season_key) return true; // not a seasonal item, always eligible
+    return activeSeasonKeys.indexOf(item.season_key) !== -1 && item.season_week_slot === currentSeasonalSlot;
+  });
+  
+  // WORLD STATE: some items only appear once corruption crosses a
+  // threshold in either direction (unlock_min_corruption / unlock_max_corruption,
+  // both nullable — leave unset for items that should always be visible)
+  var corruptionLevelForShop = await getWorldStateValue('corruption_level', 50);
+  deduped = deduped.filter(function(item) {
+    if (item.unlock_min_corruption != null && corruptionLevelForShop < item.unlock_min_corruption) return false;
+    if (item.unlock_max_corruption != null && corruptionLevelForShop > item.unlock_max_corruption) return false;
+    return true;
+  });
   
   // Categorize items
   var categories = {
@@ -9067,6 +9278,16 @@ async function saveProfile() {
     return;
   }
   
+  // Check for profanity in bio — this was previously never checked at all
+  if (containsProfanity(newBio)) {
+    errorEl.textContent = 'Bio cannot contain offensive language';
+    errorEl.style.display = 'block';
+    saveBtn.innerHTML = originalBtnText;
+    saveBtn.disabled = false;
+    saveBtn.style.opacity = '1';
+    return;
+  }
+  
   try {
     // Check if username is taken (if changed)
     var previousUsername = el('myprofile-username-preview').textContent;
@@ -9679,6 +9900,7 @@ async function calculatePetStats(petId) {
   
   // Apply equipment bonuses
   var equippedPassives = [];
+  var totalHpPenaltyPct = 0;
   if (!equipRes.error && equipRes.data) {
     equipRes.data.forEach(function(item) {
       var equip = item.equipment;
@@ -9687,6 +9909,7 @@ async function calculatePetStats(petId) {
       stats.speed += equip.speed_bonus || 0;
       stats.luck = (stats.luck || 0) + (equip.luck_bonus || 0);
       stats.spirit = (stats.spirit || 0) + (equip.spirit_bonus || 0);
+      totalHpPenaltyPct += equip.hp_penalty_pct || 0;
 
       if (equip.passive_effect && equip.passive_chance > 0) {
         equippedPassives.push({
@@ -9696,6 +9919,20 @@ async function calculatePetStats(petId) {
         });
       }
     });
+  }
+  
+  // WORLD STATE: dark/corrupted gear's drawback — a permanent max-HP
+  // reduction while equipped (e.g. -10% from Shadowfang Dagger or Void
+  // Cloak), rather than a per-turn HP cost that would fight against
+  // their own lifesteal passives. Only affects battle-time stats here,
+  // not the pet's true stored max_hp in the database. Capped at 50% so
+  // stacking multiple such items can't be absurd.
+  if (totalHpPenaltyPct > 0) {
+    var hpMultiplier = 1 - Math.min(0.5, totalHpPenaltyPct);
+    stats.maxHP = Math.max(1, Math.floor(stats.maxHP * hpMultiplier));
+    stats.hp = Math.min(stats.hp, stats.maxHP);
+    maxHP = stats.maxHP;
+    currentHP = stats.hp;
   }
   
   return {
@@ -9745,7 +9982,21 @@ var PASSIVE_EFFECTS = {
   forbidden_knowledge:   { type: 'defend', label: "Forbidden Knowledge", icon: '📜', flatReduction: 4 },
 
   // ---- Enemy-side passives ----
-  corrupted_fury: { type: 'enemyAttack', label: 'Corrupted Fury', icon: '🔥', bonusDamagePct: 0.4 }
+  corrupted_fury: { type: 'enemyAttack', label: 'Corrupted Fury', icon: '🔥', bonusDamagePct: 0.4 },
+
+  // ---- World-state-gated signature items (Light / Darkness) ----
+  // Light: reliable protection/healing, deliberately modest so it stays
+  // supportive rather than overpowered. No drawback.
+  // Darkness: notably stronger passive effect than Light's equivalent,
+  // but the item itself carries a permanent max-HP penalty while equipped
+  // (see hp_penalty_pct in calculatePetStats) — a genuine risk/reward
+  // trade rather than a strictly-better upgrade. Deliberately NOT a
+  // per-turn HP cost here, since that would fight against these same
+  // passives' own lifesteal/reflect effects.
+  radiant_purge:  { type: 'attack', label: 'Radiant Purge',  icon: '✨', bonusDamage: 3, healPct: 0.12 },
+  sunlight_aegis: { type: 'defend', label: 'Sunlight Aegis', icon: '☀️', fullBlock: true, healMaxPct: 0.08 },
+  shadow_drain:   { type: 'attack', label: 'Shadow Drain',   icon: '🌑', healPct: 0.40 },
+  void_embrace:   { type: 'defend', label: 'Void Embrace',   icon: '🕳️', reflectPct: 0.30 }
 };
 
 /**
@@ -9865,6 +10116,12 @@ function simulateBattle(playerStats, enemyStats) {
               playerHP = Math.min(playerStats.maxHP, playerHP + healAmt);
               log.push({ type: 'passive', text: fx.icon + ' ' + fx.label + '! ' + playerStats.name + ' heals ' + healAmt + ' HP!', playerHP: playerHP, enemyHP: Math.max(0, enemyHP) });
             }
+            if (fx.selfDamage) {
+              // Drawback effects (e.g. corrupted/dark gear) — the power
+              // comes at a real cost, not just a smaller number elsewhere
+              playerHP = Math.max(0, playerHP - fx.selfDamage);
+              log.push({ type: 'passive', text: fx.icon + ' ' + fx.label + ' takes its toll... ' + playerStats.name + ' loses ' + fx.selfDamage + ' HP!', playerHP: playerHP, enemyHP: Math.max(0, enemyHP) });
+            }
             if (fx.defenseShred) {
               enemyStats.defense = Math.max(0, enemyStats.defense - fx.defenseShred);
             }
@@ -9935,6 +10192,13 @@ function simulateBattle(playerStats, enemyStats) {
             var healAmt2 = Math.floor(playerStats.maxHP * fx.healMaxPct);
             playerHP = Math.min(playerStats.maxHP, playerHP + healAmt2);
             defendPassiveLogs.push(fx.icon + ' ' + fx.label + '! Healed ' + healAmt2 + ' HP!');
+          }
+          if (fx.selfDamage) {
+            // Drawback effects (e.g. corrupted/dark gear) — applied after
+            // the reflect/heal above so the net effect of the proc is
+            // visible in the log as a real cost, not hidden
+            playerHP = Math.max(0, playerHP - fx.selfDamage);
+            defendPassiveLogs.push(fx.icon + ' ' + fx.label + ' takes its toll... lost ' + fx.selfDamage + ' HP!');
           }
         });
       }
@@ -10384,6 +10648,10 @@ async function saveBattleHistory(petId, enemyId, battleResult, enemyStats) {
       boss_name: enemyStats.name
     });
     
+    // WORLD STATE: every boss kill nudges the world a little (corruption
+    // ticks down) and triggers a short community-wide "big kill" buff
+    nudgeWorldStateForBossKill();
+    
     // Get boss drops for this specific boss zone
     var bossDropRes = await supabaseClient
       .from('items')
@@ -10701,7 +10969,7 @@ function showBattleUI(playerStats, enemyStats, battleResult) {
     'bird': '🐦', 'bunny': '🐰', 'baby bunny': '🐰', 'rabbit': '🐰',
     'squirrel': '🐿️', 'fox': '🦊', 'boar': '🐗', 'wolf': '🐺',
     'bear': '🐻', 'deer': '🦌', 'mushroom': '🍄', 'slime': '💚',
-    'raccoon': '🦝', 'spider': '🕷️', 'snake': '🐍', 'bat': '🦇',
+    'spider': '🕷️', 'snake': '🐍', 'bat': '🦇',
     'ghost': '👻', 'bee': '🐝', 'cat': '🐱', 'dog': '🐶',
     'frog': '🐸', 'crab': '🦀', 'fish': '🐟', 'owl': '🦉',
     'rat': '🐀', 'mouse': '🐭', 'pig': '🐷', 'sheep': '🐑',
@@ -12018,7 +12286,11 @@ async function getRandomEnemy(zone, playerLevel) {
     var piperRate = Math.max(0.005, GAME_CONSTANTS.BOSS_ENCOUNTER_RATE - (Math.floor(spiritTotal / 10) * 0.003));
     if (bossRoll < piperRate) {
       dbg('🔥 BOSS ENCOUNTER! Shadow of Piper! Spirit:', spiritTotal, 'Rate:', piperRate.toFixed(3));
-      return await getBossEnemy(zone, playerLevel);
+      var bossEnemy = await getBossEnemy(zone, playerLevel);
+      if (bossEnemy) return bossEnemy;
+      // No boss configured for this zone — fall through to a normal enemy
+      // instead of aborting the whole battle attempt.
+      dbg('[Boss] No boss found for zone', zone, '- falling back to a normal enemy');
     }
   }
   
@@ -12058,16 +12330,15 @@ async function getRandomEnemy(zone, playerLevel) {
     return null;
   }
   
-  // CRITICAL: Filter out raccoons completely (guard against null species/name)
+  // Guard against malformed rows with no name (raccoon-specific filtering
+  // removed — that species was fully removed from enemy_pets, this check
+  // was only ever a workaround for it)
   var filteredEnemies = res.data.filter(function(enemy) {
-    if (!enemy.name) return false;
-    var speciesOk = !enemy.species || enemy.species !== 'raccoon';
-    var nameOk = enemy.name.toLowerCase().indexOf('raccoon') === -1;
-    return speciesOk && nameOk;
+    return !!enemy.name;
   });
   
   if (filteredEnemies.length === 0) {
-    console.error('No enemies found after filtering raccoons');
+    console.error('No valid enemies found for zone:', zone);
     return null;
   }
   
@@ -12165,9 +12436,18 @@ async function getRandomEnemy(zone, playerLevel) {
   var corruptedChance = 0.03;
   var rareChance = 0.05;
 
-  // Cursed weather makes the world friendlier to corruption
+  // WORLD STATE: corruption_level (0-100, nudged down a little by every
+  // boss kill, drifts back up slowly if nobody's fighting it) raises the
+  // baseline corrupted spawn rate — up to +6% at full corruption (100)
+  try {
+    var corruptionLevel = await getWorldStateValue('corruption_level', 50);
+    corruptedChance += (corruptionLevel / 100) * 0.06;
+  } catch (e) { /* fall through with base chance if this fails */ }
+
+  // Cursed weather makes the world friendlier to corruption — takes
+  // whichever is higher between its flat boost and the world-state value
   if (typeof weatherSystem !== 'undefined' && weatherSystem.currentWeather && weatherSystem.currentWeather.id === 'cursed') {
-    corruptedChance = 0.12; // 3% -> 12% during Cursed Fog
+    corruptedChance = Math.max(corruptedChance, 0.12); // 3% -> 12% during Cursed Fog
   }
 
   var goldenThreshold = goldenChance;
@@ -12302,21 +12582,15 @@ async function getRandomEnemy(zone, playerLevel) {
 // ═══════════════════════════════════════════════════════════════════════
 
 async function getBossEnemy(zone, playerLevel) {
-  // Convert zone shorthand to full name for database lookup
-  var zoneNameMap = {
-    'outskirts': 'City Outskirts',
-    'glade': 'Forest Glade',
-    'deepwoods': 'Deep Woods'
-  };
-  
-  var fullZoneName = zoneNameMap[zone] || zone;
-  
-  // Fetch the boss from database
+  // Use the same raw zone shorthand ('outskirts', 'glade', etc.) that the
+  // normal-enemy query below uses — forest_zone is stored in that format,
+  // not full names. Translating to "City Outskirts" etc. here was causing
+  // every boss lookup to silently fail to find a match.
   var res = await supabaseClient
     .from('enemy_pets')
     .select('*')
     .eq('is_boss', true)
-    .eq('forest_zone', fullZoneName)
+    .eq('forest_zone', zone || 'outskirts')
     .single();
   
   if (res.error || !res.data) {
@@ -14151,14 +14425,21 @@ if (document.readyState === 'loading') {
     newsTicker.init();
     dayNightCycle.init();
     if (typeof weatherSystem !== 'undefined') weatherSystem.init().catch(function(){});
-    if (typeof worldEvents !== 'undefined') worldEvents.init();
+    if (typeof worldEvents !== 'undefined') worldEvents.init().catch(function(){});
   });
 } else {
   newsTicker.init();
   dayNightCycle.init();
   if (typeof weatherSystem !== 'undefined') weatherSystem.init().catch(function(){});
-  if (typeof worldEvents !== 'undefined') worldEvents.init();
+  if (typeof worldEvents !== 'undefined') worldEvents.init().catch(function(){});
 }
+
+// WORLD STATE: periodically check for a newly-triggered celebration buff
+// so players already using the app find out even if they weren't the one
+// whose boss kill happened to land on the 10th
+safeSetInterval(function() {
+  if (typeof checkForNewCelebrationBuff === 'function') checkForNewCelebrationBuff();
+}, 60000);
 
 document.addEventListener('DOMContentLoaded', function() {
   var guestbookInput = document.getElementById('guestbook-message-input');
@@ -19653,12 +19934,11 @@ async function generateDungeonEnemies(playerStats) {
     return [];
   }
   
-  // CRITICAL: Filter out raccoons completely (guard against null species/name)
+  // Guard against malformed rows with no name (raccoon-specific filtering
+  // removed — that species was fully removed from enemy_pets, this check
+  // was only ever a workaround for it)
   var filteredEnemies = res.data.filter(function(enemy) {
-    if (!enemy.name) return false;
-    var speciesOk = !enemy.species || enemy.species !== 'raccoon';
-    var nameOk = enemy.name.toLowerCase().indexOf('raccoon') === -1;
-    return speciesOk && nameOk;
+    return !!enemy.name;
   });
   
   if (filteredEnemies.length === 0) return [];
@@ -23455,6 +23735,9 @@ var weatherSystem = {
 
   init: async function() {
     this.currentDate = new Date().toISOString().slice(0, 10);
+    // Fire-and-forget warm-up so getWorldStateValueSync() below has a
+    // better chance of a fresh value by the time generateWeather() runs
+    if (typeof getWorldStateFlags === 'function') getWorldStateFlags().catch(function(){});
     // Try DB first, fall back to localStorage, then generate
     var loaded = await this.loadFromDailyFeatures();
     if (!loaded) {
@@ -23502,6 +23785,16 @@ var weatherSystem = {
     var isNight = hour >= 18 || hour < 6;
     // Starry only available at night — exclude it during the day so it doesn't waste its weight
     var pool = isNight ? this.weatherTypes : this.weatherTypes.filter(function(w) { return w.id !== 'starry'; });
+
+    // WORLD STATE: cursed weather grows more likely as corruption_level
+    // rises (nudged down by boss kills, drifts back up otherwise) — clone
+    // the pool so we don't mutate the shared weatherTypes weights directly
+    var corruptionLevel = getWorldStateValueSync('corruption_level', 50);
+    pool = pool.map(function(w) {
+      if (w.id !== 'cursed') return w;
+      // weight 2 at corruption 0, up to weight 20 at corruption 100
+      return Object.assign({}, w, { weight: 2 + (corruptionLevel / 100) * 18 });
+    });
 
     var totalWeight = pool.reduce(function(s, w) { return s + w.weight; }, 0);
     var random = Math.random() * totalWeight;
@@ -23634,7 +23927,17 @@ var weatherSystem = {
       }
     };
     var map = bonusMap[bonusType];
-    return (map && map[id] !== undefined) ? map[id] : 1.0;
+    var bonus = (map && map[id] !== undefined) ? map[id] : 1.0;
+    
+    // WORLD STATE: a defeated boss triggers a short community-wide
+    // celebration buff (see nudgeWorldStateForBossKill()) — layers on
+    // top of the weather bonus for XP/PP specifically
+    if (bonusType === 'xpBonus' || bonusType === 'ppBonus') {
+      var celebrationBonus = (typeof getWorldStateValueSync === 'function') ? getWorldStateValueSync('celebration_buff', null) : null;
+      if (celebrationBonus) bonus *= celebrationBonus;
+    }
+    
+    return bonus;
   },
 
   setWeather: function(weatherId) {
@@ -23857,53 +24160,42 @@ var worldEvents = {
   currentEvent: null,
   eventEndDate: null,
   
-  init: function() {
-    var saved = localStorage.getItem('currentEvent');
-    var savedEnd = localStorage.getItem('eventEndDate');
-    
-    if (saved && savedEnd) {
-      this.currentEvent = JSON.parse(saved);
-      this.eventEndDate = new Date(savedEnd);
-      
-      if (new Date() > this.eventEndDate) {
-        this.generateEvent();
-      }
-    } else {
-      this.generateEvent();
-    }
-    
+  // Made genuinely shared via active_world_event + roll_world_event() —
+  // previously this only ever touched localStorage, meaning every player's
+  // browser independently rolled its own random event rather than everyone
+  // actually experiencing the same "world" event together.
+  init: async function() {
+    await this.rollEvent();
     this.displayEvent();
     
     safeSetInterval(function() {
-      if (worldEvents.eventEndDate && new Date() > worldEvents.eventEndDate) {
-        worldEvents.generateEvent();
-      }
+      worldEvents.rollEvent().then(function() { worldEvents.displayEvent(); });
     }, 3600000);
   },
   
-  generateEvent: function() {
-    if (Math.random() < 0.3) {
-      this.currentEvent = null;
-      this.eventEndDate = null;
-      localStorage.removeItem('currentEvent');
-      localStorage.removeItem('eventEndDate');
-      this.displayEvent();
-      return;
+  // Asks the server whether the current event has expired and, if so,
+  // atomically rolls a new one (or "no event", same 30% chance as before)
+  // — row-locked server-side so simultaneous page loads across different
+  // players can't cause two different events to get picked.
+  rollEvent: async function() {
+    try {
+      var candidates = this.events.map(function(e) { return { id: e.id, duration: e.duration }; });
+      var res = await supabaseClient.rpc('roll_world_event', { p_candidates: candidates });
+      if (res.error || !res.data) return;
+      
+      var data = res.data;
+      if (!data.event_id) {
+        this.currentEvent = null;
+        this.eventEndDate = null;
+        return;
+      }
+      var matched = this.events.find(function(e) { return e.id === data.event_id; });
+      this.currentEvent = matched || null;
+      this.eventEndDate = data.ends_at ? new Date(data.ends_at) : null;
+      if (matched) dbg('🎪 Current event:', matched.name, '| Effects:', matched.effects);
+    } catch (e) {
+      dbg('[WorldEvents] roll error:', e);
     }
-    
-    var event = this.events[Math.floor(Math.random() * this.events.length)];
-    this.currentEvent = event;
-    
-    var endDate = new Date();
-    endDate.setDate(endDate.getDate() + event.duration);
-    this.eventEndDate = endDate;
-    
-    localStorage.setItem('currentEvent', JSON.stringify(event));
-    localStorage.setItem('eventEndDate', endDate.toISOString());
-    
-    this.displayEvent();
-    
-    dbg('🎪 New event:', event.name, '| Effects:', event.effects);
   },
   
   displayEvent: function() {
@@ -24321,16 +24613,34 @@ async function loadEquipmentShop() {
   try {
     var currentWeek = getCurrentRotationWeek();
     
+    // MINI SEASONS: layer in seasonal equipment (separate 1-4 rotation from
+    // the regular A/B/C weekly rotation above, see getSeasonalWeekSlot())
+    var activeSeasons = await getActiveMiniSeasons();
+    var activeSeasonKeys = activeSeasons.map(function(s) { return s.season_key; });
+    var currentSeasonalSlot = getSeasonalWeekSlot();
+    var orClause = 'rotation_week.eq.' + currentWeek + ',is_boss_drop.eq.true';
+    if (activeSeasonKeys.length > 0) {
+      orClause += ',and(season_key.in.(' + activeSeasonKeys.join(',') + '),season_week_slot.eq.' + currentSeasonalSlot + ')';
+    }
+    
     var res = await supabaseClient
       .from('equipment')
       .select('*')
-      .or('rotation_week.eq.' + currentWeek + ',is_boss_drop.eq.true')
+      .or(orClause)
       .order('tier', { ascending: true })
       .order('weight_class', { ascending: true });
     
     if (res.error) throw res.error;
     
     var equipment = res.data || [];
+    
+    // WORLD STATE: same threshold gating as the item shop
+    var corruptionLevelForEquip = await getWorldStateValue('corruption_level', 50);
+    equipment = equipment.filter(function(item) {
+      if (item.unlock_min_corruption != null && corruptionLevelForEquip < item.unlock_min_corruption) return false;
+      if (item.unlock_max_corruption != null && corruptionLevelForEquip > item.unlock_max_corruption) return false;
+      return true;
+    });
 
     // Apply active filter
     if (typeof currentEquipmentFilter !== 'undefined' && currentEquipmentFilter !== 'all' && currentEquipmentFilter !== '') {
@@ -24369,12 +24679,14 @@ async function loadEquipmentShop() {
         (item.defense_bonus > 0 ? ' | +' + item.defense_bonus + ' DEF' : '') +
         (item.speed_bonus   > 0 ? ' | +' + item.speed_bonus   + ' SPD' : '') +
         (item.hp_bonus      > 0 ? ' | +' + item.hp_bonus      + ' HP'  : '') +
+        (item.hp_penalty_pct > 0 ? ' | -' + Math.round(item.hp_penalty_pct * 100) + '% Max HP' : '') +
         ' | Tier ' + item.tier + ' (hover to compare stats)"' +
         ' data-tooltip="' + (item.equipment_type === 'weapon' ? '⚔️ Weapon Stats' : '🛡️ Armor Stats') +
         (item.attack_bonus  > 0 ? '\n+' + item.attack_bonus  + ' Attack'  : '') +
         (item.defense_bonus > 0 ? '\n+' + item.defense_bonus + ' Defense' : '') +
         (item.speed_bonus   > 0 ? '\n+' + item.speed_bonus   + ' Speed'   : '') +
         (item.hp_bonus      > 0 ? '\n+' + item.hp_bonus      + ' HP'      : '') +
+        (item.hp_penalty_pct > 0 ? '\n-' + Math.round(item.hp_penalty_pct * 100) + '% Max HP (drawback)' : '') +
         '\nTier ' + item.tier + ' · ' + item.weight_class +
         '">';
       
@@ -24400,6 +24712,9 @@ async function loadEquipmentShop() {
       }
       if (item.hp_bonus > 0) {
         cardHtml += '<div class="stat">❤️ HP: +' + item.hp_bonus + '</div>';
+      }
+      if (item.hp_penalty_pct > 0) {
+        cardHtml += '<div class="stat" style="color:#ff6666;">⚠️ Max HP: -' + Math.round(item.hp_penalty_pct * 100) + '% (drawback)</div>';
       }
       
       cardHtml += '</div>';
@@ -24862,6 +25177,25 @@ async function addPassXP(amount, source) {
     flashNavButton('mypets', 10000); // Pass rewards are in mypets/pass section
     playSound('levelup');
   }
+  
+  // MINI SEASONS: feed the same XP into any currently active season
+  // pass(es) too — fire-and-forget, shouldn't block or fail the main pass
+  // update above if something goes wrong here.
+  try {
+    var activeSeasonsForXP = await getActiveMiniSeasons();
+    for (var i = 0; i < activeSeasonsForXP.length; i++) {
+      supabaseClient.rpc('add_season_pass_xp', {
+        p_season_key: activeSeasonsForXP[i].season_key,
+        p_amount: amount
+      }).then(function(res) {
+        if (res.data && res.data.leveled_up) {
+          dbg('[SeasonPass] Leveled up:', res.data);
+        }
+      });
+    }
+  } catch (e) {
+    dbg('[SeasonPass] XP feed error:', e);
+  }
 }
 
 // Save daily XP caps to localStorage
@@ -24948,7 +25282,7 @@ async function grantPassReward(level, reward) {
       break;
       
     case 'title':
-      await awardTitle(reward.titleKey);
+      await awardPlayerTitle(reward.titleKey, 'PawketPass reward');
       var titleData = await supabaseClient
         .from('titles')
         .select('display_name')
@@ -25005,6 +25339,163 @@ function updatePassUI() {
     var percent = (passProgress.xp / passProgress.xpToNextLevel) * 100;
     xpFill.style.width = Math.min(percent, 100) + '%';
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// MINI SEASONS — seasonal cosmetic reward track ("mini pass")
+// Separate from the main PawketPass above: content (reward ladder) and
+// progress are both scoped per season_key, so they naturally reset each
+// new season rather than needing manual resetting.
+// ══════════════════════════════════════════════════════════════════════════
+
+async function claimSeasonPassReward(seasonKey, level) {
+  if (!currentUser) return false;
+  try {
+    var res = await supabaseClient.rpc('claim_season_pass_reward', {
+      p_season_key: seasonKey,
+      p_level: level
+    });
+    if (res.error || !res.data || res.data.error) {
+      showToast(res.data && res.data.error ? res.data.error : 'Could not claim reward', 'error');
+      return false;
+    }
+    var reward = res.data;
+    if (reward.reward_type === 'points') {
+      var amount = parseInt(reward.reward_value) || 0;
+      updateAllPoints(currentPoints + amount);
+      await supabaseClient.rpc('award_pp_secure', { p_user_id: currentUser.id, p_amount: amount, p_reason: 'Season Pass Level ' + level });
+      showToast('✨ +' + amount + ' PawketPoints!', 'success');
+    } else if (reward.reward_type === 'item') {
+      await addItemToInventory(reward.reward_value, 1);
+      showToast('📦 +1x ' + reward.reward_value, 'success');
+    } else if (reward.reward_type === 'skin_key') {
+      var qty = parseInt(reward.reward_value) || 1;
+      await addItemToInventory('00000000-0000-0000-0000-000000000001', qty);
+      showToast('🔑 +' + qty + ' Skin Key' + (qty > 1 ? 's' : '') + '!', 'success');
+    } else if (reward.reward_type === 'title') {
+      await awardPlayerTitle(reward.reward_value, 'Season Pass reward');
+      showToast('🏆 Title unlocked!', 'success', true);
+    } else if (reward.reward_type === 'frame') {
+      // NOTE: profile frame ownership doesn't have a confirmed table/RPC
+      // wired up on the client yet (there's a phase1_frames table but no
+      // client-side granting code found for it) — this shows the reward
+      // but doesn't yet persist frame ownership. Flag for follow-up.
+      dbg('[SeasonPass] Frame reward claimed but not yet wired to a frame-ownership table:', reward.reward_value);
+      showToast('🖼️ Frame reward claimed! (frame system integration pending)', 'success');
+    }
+    return true;
+  } catch (e) {
+    console.error('[SeasonPass] Claim error:', e);
+    showToast('Could not claim reward', 'error');
+    return false;
+  }
+}
+
+async function showSeasonPassModal(seasonKey) {
+  var activeSeasons = await getActiveMiniSeasons();
+  var season = seasonKey ? activeSeasons.find(function(s) { return s.season_key === seasonKey; }) : activeSeasons[0];
+  if (!season) {
+    showToast('No active season right now', 'warning');
+    return;
+  }
+  
+  var rewardsRes = await supabaseClient
+    .from('season_pass_rewards')
+    .select('*')
+    .eq('season_key', season.season_key)
+    .order('level', { ascending: true });
+  var rewards = rewardsRes.data || [];
+  
+  var progressRes = await supabaseClient
+    .from('user_season_pass_progress')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .eq('season_key', season.season_key)
+    .maybeSingle();
+  var progress = progressRes.data || { level: 1, xp: 0, claimed_levels: [] };
+  
+  var modal = makeModal();
+  modal.classList.add('pass-modal');
+  modal.style.maxWidth = '96vw';
+  
+  var content = makeEl('div', {class: 'pass-modal-content'});
+  content.style.cssText = 'padding:20px;max-width:1500px;width:95vw;max-height:88vh;overflow-y:auto;';
+  
+  var header = makeEl('div');
+  header.style.cssText = 'text-align:center;margin-bottom:30px;';
+  header.innerHTML = '<h2 style="color:var(--purple);margin-bottom:6px;">' + (season.icon || '🎫') + ' ' + escapeHtml(season.name) + '</h2>' +
+    (season.theme_description ? '<div style="font-size:0.9rem;color:var(--text-light);margin-bottom:10px;">' + escapeHtml(season.theme_description) + '</div>' : '') +
+    '<div style="font-size:1.2rem;color:var(--text);">Level ' + progress.level + ' / 30</div>';
+  content.appendChild(header);
+  
+  var track = makeEl('div', {class: 'pass-rewards-track'});
+  track.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:14px;';
+  
+  var rewardIcons = { points: '💰', item: '📦', skin_key: '🔑', title: '🏆', frame: '🖼️' };
+  
+  rewards.forEach(function(reward) {
+    var level = reward.level;
+    var unlocked = progress.level >= level;
+    var claimed = (progress.claimed_levels || []).indexOf(level) !== -1;
+    
+    var card = makeEl('div', {class: 'pass-reward-card'});
+    card.style.cssText = 'background:' + (unlocked ? '#fff' : '#f5f5f5') + ';border:2px solid ' + (claimed ? '#4CAF50' : unlocked ? 'var(--purple)' : '#ddd') + ';border-radius:12px;padding:15px;text-align:center;position:relative;' + (unlocked ? '' : 'opacity:0.6;');
+    
+    var badge = makeEl('div');
+    badge.textContent = 'Lv.' + level;
+    badge.style.cssText = 'position:absolute;top:5px;right:5px;background:var(--purple);color:white;padding:2px 8px;border-radius:8px;font-size:0.8rem;font-weight:bold;';
+    card.appendChild(badge);
+    
+    var icon = makeEl('div');
+    icon.style.cssText = 'font-size:2rem;margin:10px 0;';
+    icon.textContent = rewardIcons[reward.reward_type] || '🎁';
+    card.appendChild(icon);
+    
+    var desc = makeEl('div');
+    desc.style.cssText = 'font-size:0.9rem;color:var(--text);margin-bottom:10px;';
+    if (reward.reward_type === 'points') desc.textContent = reward.reward_value + ' PP';
+    else if (reward.reward_type === 'skin_key') desc.textContent = reward.reward_value + ' Skin Key' + (reward.reward_value > 1 ? 's' : '');
+    else desc.textContent = reward.reward_value;
+    card.appendChild(desc);
+    
+    if (unlocked && !claimed) {
+      var claimBtn = makeEl('button', {class: 'btn btn-primary btn-sm'});
+      claimBtn.textContent = 'Claim';
+      claimBtn.onclick = function(lvl) {
+        return async function() {
+          this.disabled = true;
+          this.textContent = '...';
+          await claimSeasonPassReward(season.season_key, lvl);
+          closeModal();
+          showSeasonPassModal(season.season_key);
+        };
+      }(level);
+      card.appendChild(claimBtn);
+    } else if (claimed) {
+      var claimedText = makeEl('div');
+      claimedText.textContent = '✓ Claimed';
+      claimedText.style.cssText = 'color:#4CAF50;font-weight:bold;';
+      card.appendChild(claimedText);
+    } else {
+      var lockedText = makeEl('div');
+      lockedText.textContent = '🔒 Locked';
+      lockedText.style.cssText = 'color:#999;';
+      card.appendChild(lockedText);
+    }
+    
+    track.appendChild(card);
+  });
+  
+  content.appendChild(track);
+  
+  var closeBtn = makeEl('button', {class: 'btn btn-outline'});
+  closeBtn.textContent = '✕ Close';
+  closeBtn.style.cssText = 'display:block;margin:20px auto 0;';
+  closeBtn.onclick = closeModal;
+  content.appendChild(closeBtn);
+  
+  modal.appendChild(content);
+  document.body.appendChild(modal);
 }
 
 // Show Pass modal
@@ -27995,6 +28486,38 @@ async function todayCard_render() {
   // Live streamers
   var liveCount = (typeof _currentlyLiveStreamers !== 'undefined') ? _currentlyLiveStreamers.length : 0;
 
+  // MINI SEASONS: banner for whatever's currently active (can be more than
+  // one at once — a custom event layered over a calendar season, etc)
+  var seasonHtml = '';
+  try {
+    var activeSeasons = await getActiveMiniSeasons();
+    seasonHtml = activeSeasons.map(function(s) {
+      return '<div class="today-card-season" onclick="showSeasonPassModal(\'' + s.season_key + '\')">' +
+        (s.icon || '🎫') + ' <strong>' + escapeHtml(s.name) + '</strong> is here! Tap for seasonal rewards →' +
+      '</div>';
+    }).join('');
+  } catch (e) { seasonHtml = ''; }
+
+  // WORLD STATE: show the current corruption level with a short
+  // narrative line, tying boss kills to something visibly persistent,
+  // plus two deliberate buttons so players actually have a say in which
+  // direction it moves (not just an automatic side-effect of boss kills)
+  var worldStateHtml = '';
+  try {
+    var corruptionLevel = await getWorldStateValue('corruption_level', 50);
+    var corruptionDesc = corruptionLevel >= 75 ? 'The corruption is spreading fast. The forest needs heroes.'
+      : corruptionLevel >= 50 ? 'The corruption lingers, held at bay by every trainer\'s effort.'
+      : corruptionLevel >= 25 ? 'The world feels a little safer today, thanks to recent boss kills.'
+      : 'The corruption has been pushed back significantly. Well done, everyone.';
+    worldStateHtml = '<div class="today-card-worldstate">' +
+      '🌍 World Corruption: ' + Math.round(corruptionLevel) + '%. ' + corruptionDesc +
+      '<div class="today-card-ritual-buttons">' +
+        '<button class="today-card-ritual-btn purify" onclick="performCorruptionRitual(\'purify\')">🕯️ Purify (100 PP)</button>' +
+        '<button class="today-card-ritual-btn corrupt" onclick="performCorruptionRitual(\'corrupt\')">🌑 Feed Corruption (100 PP)</button>' +
+      '</div>' +
+    '</div>';
+  } catch (e) { worldStateHtml = ''; }
+
   var weatherHtml = weather
     ? '<div class="today-card-weather"><span class="today-card-icon">' + weather.icon + '</span> ' +
       '<strong>' + weather.name + '</strong>: ' + weather.effect + '</div>'
@@ -28022,6 +28545,8 @@ async function todayCard_render() {
   mount.innerHTML =
     '<div class="today-card">' +
       '<div class="today-card-header">🌟 Today in PawketPets</div>' +
+      seasonHtml +
+      worldStateHtml +
       weatherHtml +
       statsHtml +
       goalHtml +
