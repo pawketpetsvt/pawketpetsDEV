@@ -5849,6 +5849,29 @@ async function checkForNewCelebrationBuff() {
   } catch (e) { /* silent — this is just a periodic nicety, not critical */ }
 }
 
+// Generates a short-lived code the player types into `/link` on Discord
+// to connect their account. Invalidates any previous unused code first
+// (handled server-side in the RPC).
+async function generateDiscordLinkCode() {
+  if (!currentUser) return;
+  try {
+    var res = await supabaseClient.rpc('generate_discord_link_code');
+    if (res.error || !res.data || res.data.error) {
+      showToast(res.data && res.data.error ? res.data.error : 'Could not generate a code', 'error');
+      return;
+    }
+    var codeDisplay = el('discord-link-code-display');
+    var codeValue = el('discord-link-code-value');
+    if (codeDisplay && codeValue) {
+      codeValue.textContent = res.data.code;
+      codeDisplay.style.display = 'block';
+    }
+  } catch (e) {
+    console.error('[Discord] link code error:', e);
+    showToast('Could not generate a code', 'error');
+  }
+}
+
 // Deliberate player-driven lever on corruption — unlike boss kills (an
 // ambient side-effect), this is a real choice: spend 100 PP, once per
 // day, to push the world 5 points toward Light ('purify') or Darkness
@@ -9097,6 +9120,19 @@ async function loadMyProfile() {
     // Update form
     el('edit-username').value = username;
     el('edit-bio').value = player.bio || '';
+    
+    // Discord link status
+    var discordStatusEl = el('discord-link-status');
+    var discordBtnEl = el('discord-link-btn');
+    if (discordStatusEl && discordBtnEl) {
+      if (player.discord_id) {
+        discordStatusEl.textContent = '✅ Linked';
+        discordBtnEl.style.display = 'none';
+      } else {
+        discordStatusEl.textContent = 'Not linked yet — generate a code below and use /link in Discord.';
+        discordBtnEl.style.display = 'inline-block';
+      }
+    }
     
     // Render player title selector
     renderPlayerTitleSelector('player-title-selector-container');
